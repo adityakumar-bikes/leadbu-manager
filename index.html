@@ -143,6 +143,12 @@ canvas{max-height:250px}
 ::-webkit-scrollbar-track{background:var(--bg)}
 ::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
 .hidden{display:none!important}
+.tgt-col{background:rgba(255,255,255,0.025);color:var(--text3);font-size:10px;text-align:right;padding:2px 5px!important}
+.tgt-col.cv-rev,.tgt-col.cv-gm,.tgt-col.cv-gpm{color:#3b82f6}
+.tgt-col.cv-mktg{color:#ef4444}
+.nd{opacity:.25;text-align:center!important}
+.mc{position:sticky;left:0;z-index:2;background:var(--bg3)}
+.hint{font-size:9px;color:var(--text3)}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
 @keyframes spin{to{transform:rotate(360deg)}}
 </style>
@@ -268,6 +274,9 @@ let ACTUALS=TARGETS.map(()=>newActualRec()); // populated by Firebase onValue
 
 function newActualRec(){
   return {
+    // CC via seats (new)
+    cc_seats:Array(12).fill(0),      // seats billed by CC company
+    cc_seat_cost:Array(12).fill(0),  // per-seat cost charged by CC (Rs Absolute)
     // Paid Leads split by source
     google_leads:Array(12).fill(0),  // Google Leads (Lacs)
     google_cpl:Array(12).fill(0),    // Google Trigger CPL (Rs/Lead)
@@ -453,8 +462,14 @@ function deriveActuals(a, adType){
   } else {
     rev=a.paid_leads.map(()=>0); // fallback
   }
-  // CC Cost entered in absolute Rs → convert to Rs Lacs
-  const cc=a.cc.map(v=>(+v||0)/100000);
+  // CC Cost derived from CC Seats × Per-Seat-Cost / 100000
+  const _ccSeats=a.cc_seats||Array(12).fill(0);
+  const _ccSeatCost=a.cc_seat_cost||Array(12).fill(0);
+  const _hasNewCC=_ccSeats.some(v=>v>0)||_ccSeatCost.some(v=>v>0);
+  // Fallback to old manual cc field if new seats not yet entered
+  const cc=_hasNewCC
+    ? _ccSeats.map((s,i)=>(+s||0)*(+((_ccSeatCost[i])||0))/100000)
+    : (a.cc||Array(12).fill(0)).map(v=>(+v||0)/100000);
   const gmArr=rev.map((r,i)=>r-mc2[i]);
   const gpmArr=gmArr.map((g,i)=>g-cc[i]);
 
@@ -752,7 +767,8 @@ function renderModal(recIdx){
   const t=TARGETS[recIdx];
   const a=ACTUALS[recIdx];
   const d=deriveActuals(a, t.ad_type);
-  const vis=getVisibleMonths(); // array of month indices to show
+  const vis=getVisibleMonths();
+  const nc=vis.length*2+3; // metric + 2-per-month + FY-ACT + FY-TGT
 
   // Quarter filter bar
   const qBtns=['Q1 (Apr-Jun)','Q2 (Jul-Sep)','Q3 (Oct-Dec)','Q4 (Jan-Mar)','All Months'].map((lbl,qi)=>{
@@ -762,96 +778,126 @@ function renderModal(recIdx){
   const filterBar=`<div style="display:flex;gap:6px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
     <span style="font-size:10px;color:var(--text2);font-weight:700">Show months:</span>${qBtns}</div>`;
 
-  const colHdrs='<th style="min-width:170px;text-align:left;position:sticky;left:0;z-index:2;background:var(--bg3)">Metric</th>'
-    +vis.map(i=>'<th>'+MONTHS[i]+'</th>').join('')
-    +'<th class="fy-col">FY Total</th>';
+  // Two-row header: month name spans 2 cols (ACT|TGT), sub-row for labels
+  const colHdrs=
+    '<tr>'
+    +'<th rowspan="2" style="min-width:170px;text-align:left;position:sticky;left:0;z-index:3;background:var(--bg3)">Metric</th>'
+    +vis.map(i=>'<th colspan="2" style="text-align:center;border-left:1px solid var(--border2);background:var(--bg2);font-size:11px">'+MONTHS[i]+'</th>').join('')
+    +'<th colspan="2" class="fy-col" style="text-align:center;font-size:11px">FY Total</th>'
+    +'</tr><tr>'
+    +vis.map(()=>'<th style="font-size:9px;color:var(--blue);padding:2px 4px;border-left:1px solid var(--border2)">ACT</th><th style="font-size:9px;color:var(--text3);padding:2px 4px;min-width:52px">TGT</th>').join('')
+    +'<th style="font-size:9px;color:var(--blue);padding:2px 4px">ACT</th><th style="font-size:9px;color:var(--text3);padding:2px 4px">TGT</th>'
+    +'</tr>';
 
-  function inputRow(label,cls,field,arr,step,hint){
+  // Helper: format number, int if dec=0
+  const fmtC=(v,dec)=>dec===0?Math.round(v).toLocaleString('en-IN'):fmt(v,dec);
+
+  function inputRow(label,cls,field,arr,step,hint,tgtArr){
+    const dec=step==='1'?0:step==='0.001'?3:2;
     const cells=vis.map(i=>{
       const v=+(arr[i]||0);
-      const dec=(step==='1'||step==='0.001')?step==='1'?0:3:2;
-      return '<td><input class="pl-input '+cls+'" type="number" step="'+step+'" value="'+v.toFixed(dec)+'" data-field="'+field+'" data-month="'+i+'" data-rec="'+recIdx+'" onchange="onModalInputChange(this)"></td>';
+      const inp='<td style="border-left:1px solid var(--border2)"><input class="pl-input '+cls+'" type="number" step="'+step+'" value="'+v.toFixed(dec)+'" data-field="'+field+'" data-month="'+i+'" data-rec="'+recIdx+'" onchange="onModalInputChange(this)"></td>';
+      const tval=tgtArr!=null?tgtArr[i]:null;
+      const tgt=tval!=null?'<td class="tgt-col">'+fmtC(tval,dec)+'</td>':'<td class="tgt-col nd">—</td>';
+      return inp+tgt;
     }).join('');
-    const fySum=arr.reduce((s,v)=>s+(+v||0),0);
-    return '<tr class="row-input"><td style="left:0">'+label+(hint?'<br><span style="font-size:9px;color:var(--text3)">'+hint+'</span>':'')+'</td>'+cells+'<td class="fy-col" style="color:var(--text2)">'+fySum.toFixed(2)+'</td></tr>';
-  }
-  function compRow(label,arr,cls,dec){
-    const cells=vis.map(i=>'<td class="'+cls+'">'+fmt(arr[i],dec)+'</td>').join('');
-    const fySum=arr.reduce((s,v)=>s+(+v||0),0);
-    return '<tr class="row-computed"><td style="left:0">'+label+'</td>'+cells+'<td class="fy-col '+cls+'">'+fmt(fySum,dec)+'</td></tr>';
-  }
-  function pctRow(label,numArr,denArr,cls){
-    const cells=vis.map(i=>{const v=denArr[i]?pct(numArr[i],denArr[i]):0;return'<td class="'+cls+' cv-pct">'+fmtP(v)+'</td>';}).join('');
-    const fn=numArr.reduce((s,v)=>s+v,0),fd=denArr.reduce((s,v)=>s+v,0);
-    return '<tr class="row-margin"><td style="left:0">'+label+'</td>'+cells+'<td class="fy-col '+cls+' cv-pct">'+fmtP(fd?pct(fn,fd):0)+'</td></tr>';
-  }
-  function tgtRow(label,arr,cls,dec){
-    const cells=vis.map(i=>'<td class="'+cls+'" style="opacity:.6;font-size:10px">'+fmt(arr[i],dec)+'</td>').join('');
-    const fySum=arr.reduce((s,v)=>s+(+v||0),0);
-    return '<tr class="row-tgt"><td style="left:0;color:var(--text3)">↑ TGT: '+label+'</td>'+cells+'<td class="fy-col '+cls+'" style="opacity:.6;font-size:10px">'+fmt(fySum,dec)+'</td></tr>';
-  }
-  function sectionRow(label){
-    return '<tr class="row-section"><td colspan="'+(vis.length+2)+'">'+label+'</td></tr>';
+    const fyAct=arr.reduce((s,v)=>s+(+v||0),0);
+    const fyTgt=tgtArr!=null?tgtArr.reduce((s,v)=>s+(+v||0),0):null;
+    return '<tr class="row-input"><td class="mc">'+label+(hint?'<br><span class="hint">'+hint+'</span>':'')+'</td>'
+      +cells+'<td class="fy-col">'+fmtC(fyAct,dec)+'</td>'
+      +'<td class="fy-col tgt-col">'+(fyTgt!=null?fmtC(fyTgt,dec):'—')+'</td></tr>';
   }
 
+  function compRow(label,arr,cls,dec,tgtArr){
+    const cells=vis.map(i=>{
+      const tval=tgtArr!=null?tgtArr[i]:null;
+      return '<td class="'+cls+'" style="border-left:1px solid var(--border2)">'+fmtC(arr[i],dec)+'</td>'
+        +(tval!=null?'<td class="tgt-col '+cls+'">'+fmtC(tval,dec)+'</td>':'<td class="tgt-col nd">—</td>');
+    }).join('');
+    const fyAct=arr.reduce((s,v)=>s+(+v||0),0);
+    const fyTgt=tgtArr!=null?tgtArr.reduce((s,v)=>s+(+v||0),0):null;
+    return '<tr class="row-computed"><td class="mc">'+label+'</td>'
+      +cells+'<td class="fy-col '+cls+'">'+fmtC(fyAct,dec)+'</td>'
+      +'<td class="fy-col tgt-col '+cls+'">'+(fyTgt!=null?fmtC(fyTgt,dec):'—')+'</td></tr>';
+  }
+
+  function pctRow(label,numArr,denArr,cls,tgtNum,tgtDen){
+    const cells=vis.map(i=>{
+      const v=denArr[i]?pct(numArr[i],denArr[i]):0;
+      const tv=(tgtNum&&tgtDen&&tgtDen[i])?pct(tgtNum[i],tgtDen[i]):null;
+      return '<td class="'+cls+' cv-pct" style="border-left:1px solid var(--border2)">'+fmtP(v)+'</td>'
+        +(tv!=null?'<td class="tgt-col cv-pct">'+fmtP(tv)+'</td>':'<td class="tgt-col nd">—</td>');
+    }).join('');
+    const fn=numArr.reduce((s,v)=>s+v,0),fd=denArr.reduce((s,v)=>s+v,0);
+    const tfn=tgtNum?tgtNum.reduce((s,v)=>s+v,0):0,tfd=tgtDen?tgtDen.reduce((s,v)=>s+v,0):0;
+    return '<tr class="row-margin"><td class="mc">'+label+'</td>'+cells
+      +'<td class="fy-col '+cls+' cv-pct">'+fmtP(fd?pct(fn,fd):0)+'</td>'
+      +'<td class="fy-col tgt-col cv-pct">'+(tfd?fmtP(pct(tfn,tfd)):'—')+'</td></tr>';
+  }
+
+  function sectionRow(label){
+    return '<tr class="row-section"><td colspan="'+nc+'">'+label+'</td></tr>';
+  }
+
+  // Pre-compute target arrays
+  const tRevM=t.rev.monthly, tMktgM=t.mktg.monthly, tCCM=t.cc.monthly;
+  const tGM=tRevM.map((r,i)=>r-tMktgM[i]);
+  const tGPM=tGM.map((g,i)=>g-tCCM[i]);
+  const tLeadsM=t.leads.monthly.map(v=>Math.round(v*100000));
+  const ccSeats=a.cc_seats||Array(12).fill(0);
+  const ccSeatCost=a.cc_seat_cost||Array(12).fill(0);
   const gmArr=d.gm, gpmArr=d.gpm;
   const adType=t.ad_type;
 
-  // Revenue section varies by ad type
   let revSection='';
   if(adType==='CPS'){
     revSection=sectionRow('── REVENUE (CPS: CAC × Retails) ──')
       +inputRow('CAC — Rate Charged (Rs/Retail)','','cac',a.cac,'1','Revenue driver')
       +inputRow('Retails (Units Sold)','','retails',a.retails,'1','')
-      +compRow('= Revenue (Rs Lacs) = CAC×Retails÷1L',d.rev,'cv-rev',1)
-      +tgtRow('Revenue',t.rev.monthly,'tgt',1);
+      +compRow('= Revenue (Rs Lacs)',d.rev,'cv-rev',1,tRevM);
   } else if(adType==='Media Leads'){
     revSection=sectionRow('── REVENUE (Media Leads: CPL × Total Leads) ──')
       +inputRow('CPL — Rate Charged (Rs/Lead)','cpl-input','cpl_rate',a.cpl_rate,'1','Revenue driver')
       +inputRow('Total Leads Delivered (count)','','total_leads',a.total_leads,'1','Absolute count')
-      +compRow('= Revenue (Rs Lacs) = CPL×TotalLeads',d.rev,'cv-rev',1)
-      +tgtRow('Revenue',t.rev.monthly,'tgt',1);
+      +compRow('= Revenue (Rs Lacs)',d.rev,'cv-rev',1,tRevM);
   } else if(adType==='CC contract'){
     revSection=sectionRow('── REVENUE (CC Contract: Seat Cost × Seats) ──')
-      +inputRow('Seat Cost (Rs/seat — Absolute)','cpl-input','seat_cost',a.seat_cost,'1','Enter full Rs e.g. 250000')
+      +inputRow('Seat Cost (Rs/seat — Absolute)','cpl-input','seat_cost',a.seat_cost,'1','e.g. 250000')
       +inputRow('No. of Seats','','seats',a.seats,'1','')
-      +compRow('= Revenue (Rs Lacs) = SeatCost×Seats',d.rev,'cv-rev',1)
-      +tgtRow('Revenue',t.rev.monthly,'tgt',1);
+      +compRow('= Revenue (Rs Lacs)',d.rev,'cv-rev',1,tRevM);
   } else {
     revSection=sectionRow('── REVENUE ──')
-      +compRow('Revenue (Rs Lacs)',d.rev,'cv-rev',1)
-      +tgtRow('Revenue',t.rev.monthly,'tgt',1);
+      +compRow('Revenue (Rs Lacs)',d.rev,'cv-rev',1,tRevM);
   }
 
   const aGLd=a.google_leads||Array(12).fill(0);
   const aMtd=a.meta_leads||Array(12).fill(0);
   const aGcp=a.google_cpl||Array(12).fill(0);
   const aMcp=a.meta_cpl||Array(12).fill(0);
-  const html=filterBar+'<div style="overflow-x:auto"><table class="pl-table"><thead><tr>'+colHdrs+'</tr></thead><tbody>'
+
+  const html=filterBar+'<div style="overflow-x:auto"><table class="pl-table"><thead>'+colHdrs+'</thead><tbody>'
     +sectionRow('── LEADS ──')
     +inputRow('Google Leads (count)','','google_leads',aGLd,'1','Absolute count')
     +inputRow('Meta Leads (count)','','meta_leads',aMtd,'1','Absolute count')
     +compRow('= Paid Leads (count)',d.paid_leads,'cv',0)
     +inputRow('Organic Leads (count)','','organic_leads',a.organic_leads,'1','')
-    +compRow('= Triggered Leads (count)',d.trig_leads,'cv',0)
-    +tgtRow('Triggered Leads',t.leads.monthly.map(v=>Math.round(v*100000)),'tgt',0)
+    +compRow('= Triggered Leads (count)',d.trig_leads,'cv',0,tLeadsM)
     +sectionRow('── MARKETING COST ──')
     +inputRow('Google Trigger CPL (Rs/Lead)','cpl-input','google_cpl',aGcp,'1','')
     +compRow('Google Mktg Cost (Rs Lacs)',d.google_mktg,'cv-mktg',1)
     +inputRow('Meta Trigger CPL (Rs/Lead)','cpl-input','meta_cpl',aMcp,'1','')
     +compRow('Meta Mktg Cost (Rs Lacs)',d.meta_mktg,'cv-mktg',1)
-    +compRow('= Total Mktg Cost (G + M)',d.mktg_cost,'cv-mktg',1)
-    +tgtRow('Mktg Cost',t.mktg.monthly,'tgt',1)
+    +compRow('= Total Mktg Cost (G + M)',d.mktg_cost,'cv-mktg',1,tMktgM)
     +revSection
     +sectionRow('── CC COST ──')
-    +inputRow('CC Cost (Rs — Absolute)','','cc',a.cc,'1','Enter full Rs e.g. 2000000')
-    +compRow('= CC Cost (Rs Lacs)',d.cc,'cv-mktg',2)
-    +tgtRow('CC Cost',t.cc.monthly,'tgt',1)
+    +inputRow('CC Seats (count)','','cc_seats',ccSeats,'1','Seats billed by CC')
+    +inputRow('CC Per Seat Cost (Rs Absolute)','cpl-input','cc_seat_cost',ccSeatCost,'1','e.g. 150000')
+    +compRow('= CC Cost (Rs Lacs)',d.cc,'cv-mktg',2,tCCM)
     +sectionRow('── P&L SUMMARY ──')
-    +compRow('Abs GM = Rev − MktgCost',gmArr,'cv-gm',1)
-    +pctRow('GM %',gmArr,d.rev,'cv-gm')
-    +compRow('Abs GPM = GM − CC Cost',gpmArr,gpmArr.some(v=>v<0)?'cv-neg':'cv-gpm',1)
-    +pctRow('GPM %',gpmArr,d.rev,'cv-gpm')
+    +compRow('Abs GM = Rev − MktgCost',gmArr,'cv-gm',1,tGM)
+    +pctRow('GM %',gmArr,d.rev,'cv-gm',tGM,tRevM)
+    +compRow('Abs GPM = GM − CC Cost',gpmArr,gpmArr.some(v=>v<0)?'cv-neg':'cv-gpm',1,tGPM)
+    +pctRow('GPM %',gpmArr,d.rev,'cv-gpm',tGPM,tRevM)
     +'</tbody></table></div>';
 
   document.getElementById('modal-content').innerHTML=html;
