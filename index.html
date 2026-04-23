@@ -642,6 +642,9 @@ const METRICS=[
 const BAJAJ_CLIENT='Bajaj/KTM/Husq';
 const BAJAJ_BRANDS=['MC','PB','Triumph','Chetak','CV'];
 const BAJAJ_BRAND_LABELS={MC:'MC — Pulsar / Avenger / Dominar',PB:'PB — KTM / Husqvarna',Triumph:'Triumph',Chetak:'Chetak',CV:'CV'};
+const TVS_CLIENT='TVS';
+const TVS_BRANDS=['ICE','EV'];
+const TVS_BRAND_LABELS={ICE:'TVS ICE',EV:'TVS EV (iQube)'};
 
 function newBrandRec(){
   return {
@@ -793,6 +796,7 @@ function getVisibleMonths(){
 function renderModal(recIdx){
   const t=TARGETS[recIdx];
   if(t.client===BAJAJ_CLIENT){renderBajajModal(recIdx);return;}
+  if(t.client===TVS_CLIENT){renderTVSModal(recIdx);return;}
   const a=ACTUALS[recIdx];
   const d=deriveActuals(a, t.ad_type);
   const vis=getVisibleMonths();
