@@ -434,12 +434,13 @@ function deriveActuals(a, adType){
     // CPL_rate (Rs/lead) × Total Leads (absolute) / 100000 = Rs Lacs
     rev=a.total_leads.map((l,i)=>(+(a.cpl_rate[i]||0))*(+l||0)/100000);
   } else if(adType==='CC contract'){
-    // Seat Cost (Rs Lacs/seat) × Seats = Rs Lacs
-    rev=a.seats.map((s,i)=>(+(a.seat_cost[i]||0))*(+s||0));
+    // Seat Cost (Rs Absolute/seat) ÷ 100000 × Seats = Rs Lacs
+    rev=a.seats.map((s,i)=>((+(a.seat_cost[i]||0))/100000)*(+s||0));
   } else {
     rev=a.paid_leads.map(()=>0); // fallback
   }
-  const cc=a.cc.slice();
+  // CC Cost entered in absolute Rs → convert to Rs Lacs
+  const cc=a.cc.map(v=>(+v||0)/100000);
   const gmArr=rev.map((r,i)=>r-mc2[i]);
   const gpmArr=gmArr.map((g,i)=>g-cc[i]);
 
@@ -798,7 +799,7 @@ function renderModal(recIdx){
       +tgtRow('Revenue',t.rev.monthly,'tgt',1);
   } else if(adType==='CC contract'){
     revSection=sectionRow('── REVENUE (CC Contract: Seat Cost × Seats) ──')
-      +inputRow('Seat Cost (Rs Lacs/seat)','cpl-input','seat_cost',a.seat_cost,'0.01','Revenue driver')
+      +inputRow('Seat Cost (Rs/seat — Absolute)','cpl-input','seat_cost',a.seat_cost,'1','Enter full Rs e.g. 250000')
       +inputRow('No. of Seats','','seats',a.seats,'1','')
       +compRow('= Revenue (Rs Lacs) = SeatCost×Seats',d.rev,'cv-rev',1)
       +tgtRow('Revenue',t.rev.monthly,'tgt',1);
@@ -829,7 +830,8 @@ function renderModal(recIdx){
     +tgtRow('Mktg Cost',t.mktg.monthly,'tgt',1)
     +revSection
     +sectionRow('── CC COST ──')
-    +inputRow('CC Cost (Rs Lacs)','','cc',a.cc,'0.01','')
+    +inputRow('CC Cost (Rs — Absolute)','','cc',a.cc,'1','Enter full Rs e.g. 2000000')
+    +compRow('= CC Cost (Rs Lacs)',d.cc,'cv-mktg',2)
     +tgtRow('CC Cost',t.cc.monthly,'tgt',1)
     +sectionRow('── P&L SUMMARY ──')
     +compRow('Abs GM = Rev − MktgCost',gmArr,'cv-gm',1)
