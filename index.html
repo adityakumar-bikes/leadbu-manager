@@ -246,7 +246,10 @@ canvas{max-height:250px}
         <div class="modal-title" id="modal-title">Account P&amp;L Detail</div>
         <div class="modal-sub" id="modal-sub">Monthly actual inputs · Paid Leads + Organic = Triggered · CPL × Paid = Mktg Cost</div>
       </div>
-      <button class="modal-close" onclick="closeModal()">✕ Close</button>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="btn btn-green" onclick="saveModal()" style="font-size:11px;padding:5px 12px">✓ Apply &amp; Close</button>
+        <button class="modal-close" onclick="closeModal()">✕</button>
+      </div>
     </div>
     <div class="modal-body">
       <div id="modal-content" style="overflow-x:auto"></div>
@@ -306,6 +309,14 @@ function migrateActuals(raw){
   raw.forEach((rec,i)=>{
     const def=newActualRec();
     Object.keys(def).forEach(k=>{ if(!rec[k]) rec[k]=def[k].slice?def[k].slice():def[k]; });
+    // Init brands for Bajaj/KTM/Husq
+    if(TARGETS[i]&&TARGETS[i].client===BAJAJ_CLIENT){
+      if(!rec.brands)rec.brands={};
+      BAJAJ_BRANDS.forEach(b=>{
+        if(!rec.brands[b])rec.brands[b]=newBrandRec();
+        else{const def=newBrandRec();Object.keys(def).forEach(k=>{if(!rec.brands[b][k])rec.brands[b][k]=def[k].slice();});}
+      });
+    }
     // Migrate: old paid_leads → google_leads
     const hasOldPaid=rec.paid_leads&&rec.paid_leads.some(v=>v>0);
     const hasNewGoogle=rec.google_leads&&rec.google_leads.some(v=>v>0);
@@ -547,6 +558,7 @@ const fmt=(v,d=1)=>(+v||0).toFixed(d).replace(/\B(?=(\d{3})+(?!\d))/g,',');
 const fmtP=v=>(+v||0).toFixed(1)+'%';
 const pct=(a,b)=>b?a/b*100:0;
 const pc=v=>v>=60?'pct-hi':v>=40?'pct-mid':'pct-lo';
+const fmtC=(v,dec)=>dec===0?Math.round(v).toLocaleString('en-IN'):fmt(v,dec);
 
 // Get period values from target and derived actual
 function getPeriodVals(t,d,field,idx){
@@ -627,6 +639,21 @@ const METRICS=[
   {key:'gpm_pct',label:'GPM%',    cls:'m-gpm',  color:'#eab308', pct:true},
   {key:'leads',label:'Leads(Abs)',cls:'m-leads',color:'#a855f7', intFmt:true},
 ];
+const BAJAJ_CLIENT='Bajaj/KTM/Husq';
+const BAJAJ_BRANDS=['MC','PB','Triumph','Chetak','CV'];
+const BAJAJ_BRAND_LABELS={MC:'MC — Pulsar / Avenger / Dominar',PB:'PB — KTM / Husqvarna',Triumph:'Triumph',Chetak:'Chetak',CV:'CV'};
+
+function newBrandRec(){
+  return {
+    google_leads:Array(12).fill(0),google_cpl:Array(12).fill(0),
+    meta_leads:Array(12).fill(0),meta_cpl:Array(12).fill(0),
+    organic_leads:Array(12).fill(0),
+    cac:Array(12).fill(0),retails:Array(12).fill(0),
+    cpl_rate:Array(12).fill(0),total_leads:Array(12).fill(0),
+    seat_cost:Array(12).fill(0),seats:Array(12).fill(0),
+    cc_seats:Array(12).fill(0),cc_seat_cost:Array(12).fill(0),
+  };
+}
 
 function subCols(mode,showLY){
   if(mode==='tgt')return showLY?['TGT','LY']:['TGT'];
@@ -765,6 +792,7 @@ function getVisibleMonths(){
 
 function renderModal(recIdx){
   const t=TARGETS[recIdx];
+  if(t.client===BAJAJ_CLIENT){renderBajajModal(recIdx);return;}
   const a=ACTUALS[recIdx];
   const d=deriveActuals(a, t.ad_type);
   const vis=getVisibleMonths();
@@ -921,12 +949,155 @@ function onModalEdit(field,monthIdx,val,recIdx){
   ACTUALS[ri][field][monthIdx]=v;
   renderModal(ri);
   updateKPIs(getFiltered());
+  saveActuals(); // auto-save debounced
 }
 
 function saveModal(){
   saveActuals();
   closeModal();
   render();
+}
+
+// ═══════════════════════════
+// BAJAJ BRAND P&L
+// ═══════════════════════════
+function recomputeBajajTotals(recIdx){
+  const a=ACTUALS[recIdx]; if(!a.brands)return;
+  const B=BAJAJ_BRANDS;
+  const get=(b,f,i)=>(+(a.brands[b]&&a.brands[b][f]&&a.brands[b][f][i])||0);
+  ['google_leads','meta_leads','organic_leads','retails','total_leads','seats','cc_seats'].forEach(f=>{
+    a[f]=Array(12).fill(0).map((_,i)=>B.reduce((s,b)=>s+get(b,f,i),0));
+  });
+  const wtd=(f,wf)=>Array(12).fill(0).map((_,i)=>{const den=a[wf][i];return den>0?B.reduce((s,b)=>s+get(b,wf,i)*get(b,f,i),0)/den:0;});
+  a.google_cpl=wtd('google_cpl','google_leads');
+  a.meta_cpl=wtd('meta_cpl','meta_leads');
+  a.cac=wtd('cac','retails');
+  a.cpl_rate=wtd('cpl_rate','total_leads');
+  a.seat_cost=wtd('seat_cost','seats');
+  a.cc_seat_cost=wtd('cc_seat_cost','cc_seats');
+}
+function onBrandInputChange(inp){
+  const brand=inp.getAttribute('data-brand');
+  const field=inp.getAttribute('data-field');
+  const mi=parseInt(inp.getAttribute('data-month'));
+  const ri=parseInt(inp.getAttribute('data-rec'));
+  const v=parseFloat(inp.value)||0;
+  if(!ACTUALS[ri].brands)ACTUALS[ri].brands={};
+  if(!ACTUALS[ri].brands[brand])ACTUALS[ri].brands[brand]=newBrandRec();
+  ACTUALS[ri].brands[brand][field][mi]=v;
+  recomputeBajajTotals(ri);
+  renderModal(ri);
+  updateKPIs(getFiltered());
+  saveActuals();
+}
+function renderBajajModal(recIdx){
+  const t=TARGETS[recIdx],a=ACTUALS[recIdx];
+  if(!a.brands){a.brands={};BAJAJ_BRANDS.forEach(b=>{a.brands[b]=newBrandRec();});}
+  recomputeBajajTotals(recIdx);
+  const d=deriveActuals(a,t.ad_type);
+  const vis=getVisibleMonths();
+  const nc=vis.length*2+3;
+  const adType=t.ad_type;
+
+  const qBtns=['Q1 (Apr-Jun)','Q2 (Jul-Sep)','Q3 (Oct-Dec)','Q4 (Jan-Mar)','All Months'].map((lbl,qi)=>{
+    const active=qi===modalMonthFilter?'style="background:var(--blue2);color:#fff;border-color:var(--blue)"':'';
+    return `<button class="pchip" ${active} onclick="setModalQFilter(${recIdx},${qi})">${lbl}</button>`;
+  }).join('');
+  const filterBar=`<div style="display:flex;gap:6px;align-items:center;margin-bottom:12px;flex-wrap:wrap"><span style="font-size:10px;color:var(--text2);font-weight:700">Show months:</span>${qBtns}</div>`;
+
+  const colHdrs='<tr>'
+    +'<th rowspan="2" style="min-width:160px;text-align:left;position:sticky;left:0;z-index:3;background:var(--bg3)">Metric</th>'
+    +vis.map(i=>'<th colspan="2" style="text-align:center;border-left:1px solid var(--border2);background:var(--bg2);font-size:11px">'+MONTHS[i]+'</th>').join('')
+    +'<th colspan="2" class="fy-col" style="text-align:center;font-size:11px">FY</th>'
+    +'</tr><tr>'
+    +vis.map(()=>'<th style="font-size:9px;color:var(--blue);padding:2px 4px;border-left:1px solid var(--border2)">ACT</th><th style="font-size:9px;color:var(--text3);padding:2px 4px;min-width:48px">TGT</th>').join('')
+    +'<th style="font-size:9px;color:var(--blue);padding:2px 4px">ACT</th><th style="font-size:9px;color:var(--text3);padding:2px 4px">TGT</th></tr>';
+
+  function bInputRow(label,cls,field,arr,step,brand){
+    const dec=step==='1'?0:2;
+    const cells=vis.map(i=>{
+      const v=+(arr[i]||0);
+      return '<td style="border-left:1px solid var(--border2)"><input class="pl-input '+cls+'" type="number" step="'+step+'" value="'+v.toFixed(dec)+'" data-field="'+field+'" data-month="'+i+'" data-rec="'+recIdx+'" data-brand="'+brand+'" onchange="onBrandInputChange(this)"></td><td class="tgt-col nd">—</td>';
+    }).join('');
+    const fyAct=arr.reduce((s,v)=>s+(+v||0),0);
+    return '<tr class="row-input"><td class="mc">'+label+'</td>'+cells+'<td class="fy-col">'+fmtC(fyAct,dec)+'</td><td class="fy-col tgt-col nd">—</td></tr>';
+  }
+  function bCompRow(label,arr,cls,dec,tgtArr){
+    const cells=vis.map(i=>{const tv=tgtArr?tgtArr[i]:null;return'<td class="'+cls+'" style="border-left:1px solid var(--border2)">'+fmtC(arr[i],dec)+'</td>'+(tv!=null?'<td class="tgt-col '+cls+'">'+fmtC(tv,dec)+'</td>':'<td class="tgt-col nd">—</td>');}).join('');
+    const fyAct=arr.reduce((s,v)=>s+(+v||0),0);
+    const fyTgt=tgtArr?tgtArr.reduce((s,v)=>s+(+v||0),0):null;
+    return '<tr class="row-computed"><td class="mc">'+label+'</td>'+cells+'<td class="fy-col '+cls+'">'+fmtC(fyAct,dec)+'</td><td class="fy-col tgt-col '+cls+'">'+(fyTgt!=null?fmtC(fyTgt,dec):'—')+'</td></tr>';
+  }
+  function bPctRow(label,nA,dA,cls,tN,tD){
+    const cells=vis.map(i=>{const v=dA[i]?pct(nA[i],dA[i]):0;const tv=(tN&&tD&&tD[i])?pct(tN[i],tD[i]):null;return'<td class="'+cls+' cv-pct" style="border-left:1px solid var(--border2)">'+fmtP(v)+'</td>'+(tv!=null?'<td class="tgt-col cv-pct">'+fmtP(tv)+'</td>':'<td class="tgt-col nd">—</td>');}).join('');
+    const fn=nA.reduce((s,v)=>s+v,0),fd=dA.reduce((s,v)=>s+v,0);
+    const tfn=tN?tN.reduce((s,v)=>s+v,0):0,tfd=tD?tD.reduce((s,v)=>s+v,0):0;
+    return '<tr class="row-margin"><td class="mc">'+label+'</td>'+cells+'<td class="fy-col '+cls+' cv-pct">'+fmtP(fd?pct(fn,fd):0)+'</td><td class="fy-col tgt-col cv-pct">'+(tfd?fmtP(pct(tfn,tfd)):'—')+'</td></tr>';
+  }
+  function secRow(lbl){return'<tr class="row-section"><td colspan="'+nc+'">'+lbl+'</td></tr>';}
+  function brandHdr(lbl,col){return'<tr style="background:'+col+';"><td colspan="'+nc+'" style="padding:6px 12px;font-size:12px;font-weight:700;color:#fff;letter-spacing:.5px">'+lbl+'</td></tr>';}
+
+  const tRevM=t.rev.monthly,tMktgM=t.mktg.monthly,tCCM=t.cc.monthly;
+  const tGM=tRevM.map((r,i)=>r-tMktgM[i]),tGPM=tGM.map((g,i)=>g-tCCM[i]);
+  const tLeadsM=t.leads.monthly.map(v=>Math.round(v*100000));
+  const BRAND_COLS={MC:'#1e3a5f',PB:'#3b1f5f',Triumph:'#1f3d2e',Chetak:'#3d2a1f',CV:'#3d1f2e'};
+
+  let html=filterBar+'<div style="overflow-x:auto">';
+
+  BAJAJ_BRANDS.forEach(brand=>{
+    const br=a.brands[brand];
+    const bd=deriveActuals(br,adType);
+    const gmA=bd.gm,gpmA=bd.gpm;
+    let revSec='';
+    if(adType==='CPS'){
+      revSec=secRow('REVENUE (CAC × Retails)')+bInputRow('CAC (Rs/Retail)','','cac',br.cac,'1',brand)+bInputRow('Retails','','retails',br.retails,'1',brand)+bCompRow('= Revenue (Lacs)',bd.rev,'cv-rev',1);
+    }else if(adType==='Media Leads'){
+      revSec=secRow('REVENUE (CPL × Leads)')+bInputRow('CPL Charged (Rs/Lead)','cpl-input','cpl_rate',br.cpl_rate,'1',brand)+bInputRow('Total Leads (count)','','total_leads',br.total_leads,'1',brand)+bCompRow('= Revenue (Lacs)',bd.rev,'cv-rev',1);
+    }else if(adType==='CC contract'){
+      revSec=secRow('REVENUE (SeatCost × Seats)')+bInputRow('Seat Cost (Rs Abs)','cpl-input','seat_cost',br.seat_cost,'1',brand)+bInputRow('No. of Seats','','seats',br.seats,'1',brand)+bCompRow('= Revenue (Lacs)',bd.rev,'cv-rev',1);
+    }
+    html+='<table class="pl-table" style="margin-bottom:14px"><thead>'+colHdrs+'</thead><tbody>'
+      +brandHdr('▸ '+BAJAJ_BRAND_LABELS[brand],BRAND_COLS[brand]||'#1e3a5f')
+      +secRow('LEADS')
+      +bInputRow('Google Leads','','google_leads',br.google_leads,'1',brand)
+      +bInputRow('Meta Leads','','meta_leads',br.meta_leads,'1',brand)
+      +bCompRow('= Paid Leads',bd.paid_leads,'cv',0)
+      +bInputRow('Organic Leads','','organic_leads',br.organic_leads,'1',brand)
+      +bCompRow('= Triggered',bd.trig_leads,'cv',0)
+      +secRow('MKTG COST')
+      +bInputRow('Google CPL (Rs)','cpl-input','google_cpl',br.google_cpl,'1',brand)
+      +bCompRow('Google Mktg (Lacs)',bd.google_mktg,'cv-mktg',1)
+      +bInputRow('Meta CPL (Rs)','cpl-input','meta_cpl',br.meta_cpl,'1',brand)
+      +bCompRow('Meta Mktg (Lacs)',bd.meta_mktg,'cv-mktg',1)
+      +bCompRow('= Total Mktg',bd.mktg_cost,'cv-mktg',1)
+      +revSec
+      +secRow('CC COST')
+      +bInputRow('CC Seats','','cc_seats',br.cc_seats,'1',brand)
+      +bInputRow('CC Per Seat (Rs Abs)','cpl-input','cc_seat_cost',br.cc_seat_cost,'1',brand)
+      +bCompRow('= CC Cost (Lacs)',bd.cc,'cv-mktg',2)
+      +secRow('P&L')
+      +bCompRow('GM = Rev − Mktg',gmA,'cv-gm',1)
+      +bPctRow('GM%',gmA,bd.rev,'cv-gm')
+      +bCompRow('GPM = GM − CC',gpmA,gpmA.some(v=>v<0)?'cv-neg':'cv-gpm',1)
+      +bPctRow('GPM%',gpmA,bd.rev,'cv-gpm')
+      +'</tbody></table>';
+  });
+
+  // TOTAL table
+  const gmT=d.gm,gpmT=d.gpm;
+  html+='<table class="pl-table" style="border:2px solid var(--blue);margin-bottom:8px"><thead>'+colHdrs+'</thead><tbody>'
+    +brandHdr('◈ TOTAL — ALL BRANDS','#0c2a4a')
+    +bCompRow('Triggered Leads',d.trig_leads,'cv',0,tLeadsM)
+    +bCompRow('Total Mktg Cost (Lacs)',d.mktg_cost,'cv-mktg',1,tMktgM)
+    +bCompRow('Revenue (Lacs)',d.rev,'cv-rev',1,tRevM)
+    +bCompRow('CC Cost (Lacs)',d.cc,'cv-mktg',2,tCCM)
+    +bCompRow('Abs GM',gmT,'cv-gm',1,tGM)
+    +bPctRow('GM%',gmT,d.rev,'cv-gm',tGM,tRevM)
+    +bCompRow('Abs GPM',gpmT,gpmT.some(v=>v<0)?'cv-neg':'cv-gpm',1,tGPM)
+    +bPctRow('GPM%',gpmT,d.rev,'cv-gpm',tGPM,tRevM)
+    +'</tbody></table></div>';
+
+  document.getElementById('modal-content').innerHTML=html;
 }
 
 // ═══════════════════════════
