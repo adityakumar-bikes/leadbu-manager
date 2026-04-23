@@ -294,7 +294,7 @@ function newActualRec(){
 function migrateActuals(raw){
   if(!raw||!Array.isArray(raw)||raw.length!==TARGETS.length)
     return TARGETS.map(()=>newActualRec());
-  raw.forEach(rec=>{
+  raw.forEach((rec,i)=>{
     const def=newActualRec();
     Object.keys(def).forEach(k=>{ if(!rec[k]) rec[k]=def[k].slice?def[k].slice():def[k]; });
     // Migrate: old paid_leads → google_leads
@@ -303,6 +303,20 @@ function migrateActuals(raw){
     if(hasOldPaid&&!hasNewGoogle){
       rec.google_leads=rec.paid_leads.slice();
       rec.google_cpl=rec.mktg_cpl.slice();
+    }
+    // Migrate: cc was entered as Rs Lacs (old label) — values like 20, 5 etc.
+    // New expectation: absolute Rs (e.g. 2000000). Detect by checking if max cc < 10000
+    // (a cc cost of 10000 Rs absolute = 0.1 lakh, vs 10000 lakh = absurd → safe threshold)
+    const maxCC=rec.cc?Math.max(...rec.cc):0;
+    if(maxCC>0 && maxCC<50000){
+      // Old data was in lakhs — scale up to absolute
+      rec.cc=rec.cc.map(v=>(+v||0)*100000);
+    }
+    // Migrate: seat_cost was entered as Rs Lacs/seat (old label)
+    // New: absolute Rs/seat. If seat_cost values look like lakhs (< 500), scale up.
+    const maxSeat=rec.seat_cost?Math.max(...rec.seat_cost):0;
+    if(maxSeat>0 && maxSeat<500){
+      rec.seat_cost=rec.seat_cost.map(v=>(+v||0)*100000);
     }
   });
   return raw;
