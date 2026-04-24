@@ -780,7 +780,7 @@ function openModal(recIdx){
   const t=TARGETS[recIdx];
   document.getElementById('modal-title').textContent=t.client+' | '+t.ad_type+' | '+t.btl+' — Monthly P&L';
   document.getElementById('modal-sub').textContent='Cat: '+t.cat+' · Fuel: '+t.fuel+' · BA: '+t.ba+' · AdType: '+t.ad_type+'  |  Blue=input · Green=computed · Orange=rate input';
-  try{renderModal(recIdx);}catch(e){document.getElementById('modal-content').innerHTML='<pre style=padding:20px;color:red>ERROR: '+e.message+String.fromCharCode(10)+e.stack+'</pre>';console.error(e);}
+  renderModal(recIdx);
   document.getElementById('modal').classList.add('show');
 }
 
