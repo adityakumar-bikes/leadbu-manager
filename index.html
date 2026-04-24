@@ -662,6 +662,7 @@ function newBrandRec(){
     cpl_rate:Array(12).fill(0),total_leads:Array(12).fill(0),
     seat_cost:Array(12).fill(0),seats:Array(12).fill(0),
     cc_seats:Array(12).fill(0),cc_seat_cost:Array(12).fill(0),
+    leads_processed:Array(12).fill(0),
   };
 }
 
@@ -915,20 +916,27 @@ function renderModal(recIdx){
   const aMtd=a.meta_leads||Array(12).fill(0);
   const aGcp=a.google_cpl||Array(12).fill(0);
   const aMcp=a.meta_cpl||Array(12).fill(0);
+  const aLP=a.leads_processed||Array(12).fill(0);
+
+  const isCC=(adType==='CC contract');
+  const leadsSection=isCC
+    ? sectionRow('── LEADS PROCESSED ──')
+      +inputRow('Leads Processed (count)','','leads_processed',aLP,'1','Absolute count of leads processed')
+    : sectionRow('── LEADS ──')
+      +inputRow('Google Leads (count)','','google_leads',aGLd,'1','Absolute count')
+      +inputRow('Meta Leads (count)','','meta_leads',aMtd,'1','Absolute count')
+      +compRow('= Paid Leads (count)',d.paid_leads,'cv',0)
+      +inputRow('Organic Leads (count)','','organic_leads',a.organic_leads,'1','')
+      +compRow('= Triggered Leads (count)',d.trig_leads,'cv',0,tLeadsM)
+      +sectionRow('── MARKETING COST ──')
+      +inputRow('Google Trigger CPL (Rs/Lead)','cpl-input','google_cpl',aGcp,'1','')
+      +compRow('Google Mktg Cost (Rs Lacs)',d.google_mktg,'cv-mktg',1)
+      +inputRow('Meta Trigger CPL (Rs/Lead)','cpl-input','meta_cpl',aMcp,'1','')
+      +compRow('Meta Mktg Cost (Rs Lacs)',d.meta_mktg,'cv-mktg',1)
+      +compRow('= Total Mktg Cost (G + M)',d.mktg_cost,'cv-mktg',1,tMktgM);
 
   const html=filterBar+'<div style="overflow-x:auto"><table class="pl-table"><thead>'+colHdrs+'</thead><tbody>'
-    +sectionRow('── LEADS ──')
-    +inputRow('Google Leads (count)','','google_leads',aGLd,'1','Absolute count')
-    +inputRow('Meta Leads (count)','','meta_leads',aMtd,'1','Absolute count')
-    +compRow('= Paid Leads (count)',d.paid_leads,'cv',0)
-    +inputRow('Organic Leads (count)','','organic_leads',a.organic_leads,'1','')
-    +compRow('= Triggered Leads (count)',d.trig_leads,'cv',0,tLeadsM)
-    +sectionRow('── MARKETING COST ──')
-    +inputRow('Google Trigger CPL (Rs/Lead)','cpl-input','google_cpl',aGcp,'1','')
-    +compRow('Google Mktg Cost (Rs Lacs)',d.google_mktg,'cv-mktg',1)
-    +inputRow('Meta Trigger CPL (Rs/Lead)','cpl-input','meta_cpl',aMcp,'1','')
-    +compRow('Meta Mktg Cost (Rs Lacs)',d.meta_mktg,'cv-mktg',1)
-    +compRow('= Total Mktg Cost (G + M)',d.mktg_cost,'cv-mktg',1,tMktgM)
+    +leadsSection
     +revSection
     +sectionRow('── CC COST ──')
     +inputRow('CC Seats (count)','','cc_seats',ccSeats,'1','Seats billed by CC')
@@ -1243,10 +1251,16 @@ function renderREModal(recIdx){
   function bhdr(lbl,col){return'<tr style="background:'+col+'"><td colspan="'+nc+'" style="padding:6px 12px;font-size:12px;font-weight:700;color:#fff;letter-spacing:.5px">'+lbl+'</td></tr>';}
   function totalTable(d,label,tRevM,tMktgM,tCCM,tGM,tGPM,tLeadsM){
     const gm=d.gm,gpm=d.gpm;
+    // Sum leads_processed across all sub-brands for CC contract
+    const lpSum=Array(12).fill(0).map((_,i)=>RE_BRANDS.reduce((s,b)=>{
+      const br=a.brands[b];return s+(br&&br.leads_processed?+(br.leads_processed[i]||0):0);},0));
+    const leadsRow=adType==='CC contract'
+      ? bCmp('Total Leads Processed',lpSum,'cv',0)
+      : bCmp('Triggered Leads',d.trig_leads,'cv',0,tLeadsM)
+        +bCmp('Total Mktg Cost (Lacs)',d.mktg_cost,'cv-mktg',1,tMktgM);
     return '<table class="pl-table" style="border:2px solid var(--blue);margin-bottom:18px"><thead>'+colHdrs()+'</thead><tbody>'
       +bhdr('◈ '+label,'#2a1a0a')
-      +bCmp('Triggered Leads',d.trig_leads,'cv',0,tLeadsM)
-      +bCmp('Total Mktg Cost (Lacs)',d.mktg_cost,'cv-mktg',1,tMktgM)
+      +leadsRow
       +bCmp('Revenue (Lacs)',d.rev,'cv-rev',1,tRevM)
       +bCmp('CC Cost (Lacs)',d.cc,'cv-mktg',2,tCCM)
       +bCmp('Abs GM',gm,'cv-gm',1,tGM)
@@ -1261,20 +1275,24 @@ function renderREModal(recIdx){
     if(adType==='CPS')rev=sec('REVENUE (CAC x Retails)')+bInp('CAC (Rs/Retail)','','cac',br.cac,'1',brand)+bInp('Retails','','retails',br.retails,'1',brand)+bCmp('= Revenue (Lacs)',bd.rev,'cv-rev',1);
     else if(adType==='Media Leads')rev=sec('REVENUE (CPL x Leads)')+bInp('CPL Charged (Rs/Lead)','cpl-input','cpl_rate',br.cpl_rate,'1',brand)+bInp('Total Leads','','total_leads',br.total_leads,'1',brand)+bCmp('= Revenue (Lacs)',bd.rev,'cv-rev',1);
     else if(adType==='CC contract')rev=sec('REVENUE (Seat Cost x Seats)')+bInp('Seat Cost (Rs Abs)','cpl-input','seat_cost',br.seat_cost,'1',brand)+bInp('No. of Seats','','seats',br.seats,'1',brand)+bCmp('= Revenue (Lacs)',bd.rev,'cv-rev',1);
+    const leadsRows=adType==='CC contract'
+      ? sec('LEADS PROCESSED')
+        +bInp('Leads Processed (count)','','leads_processed',br.leads_processed||Array(12).fill(0),'1',brand)
+      : sec('LEADS')
+        +bInp('Google Leads','','google_leads',br.google_leads,'1',brand)
+        +bInp('Meta Leads','','meta_leads',br.meta_leads,'1',brand)
+        +bCmp('= Paid Leads',bd.paid_leads,'cv',0)
+        +bInp('Organic Leads','','organic_leads',br.organic_leads,'1',brand)
+        +bCmp('= Triggered',bd.trig_leads,'cv',0)
+        +sec('MKTG COST')
+        +bInp('Google CPL (Rs)','cpl-input','google_cpl',br.google_cpl,'1',brand)
+        +bCmp('Google Mktg (Lacs)',bd.google_mktg,'cv-mktg',1)
+        +bInp('Meta CPL (Rs)','cpl-input','meta_cpl',br.meta_cpl,'1',brand)
+        +bCmp('Meta Mktg (Lacs)',bd.meta_mktg,'cv-mktg',1)
+        +bCmp('= Total Mktg',bd.mktg_cost,'cv-mktg',1);
     return '<table class="pl-table" style="margin-bottom:14px"><thead>'+colHdrs()+'</thead><tbody>'
       +bhdr('▸ '+brandLabel,col)
-      +sec('LEADS')
-      +bInp('Google Leads','','google_leads',br.google_leads,'1',brand)
-      +bInp('Meta Leads','','meta_leads',br.meta_leads,'1',brand)
-      +bCmp('= Paid Leads',bd.paid_leads,'cv',0)
-      +bInp('Organic Leads','','organic_leads',br.organic_leads,'1',brand)
-      +bCmp('= Triggered',bd.trig_leads,'cv',0)
-      +sec('MKTG COST')
-      +bInp('Google CPL (Rs)','cpl-input','google_cpl',br.google_cpl,'1',brand)
-      +bCmp('Google Mktg (Lacs)',bd.google_mktg,'cv-mktg',1)
-      +bInp('Meta CPL (Rs)','cpl-input','meta_cpl',br.meta_cpl,'1',brand)
-      +bCmp('Meta Mktg (Lacs)',bd.meta_mktg,'cv-mktg',1)
-      +bCmp('= Total Mktg',bd.mktg_cost,'cv-mktg',1)
+      +leadsRows
       +rev
       +sec('CC COST')
       +bInp('CC Seats','','cc_seats',br.cc_seats,'1',brand)
