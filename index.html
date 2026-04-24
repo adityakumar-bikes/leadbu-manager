@@ -537,8 +537,10 @@ function setView(v){
   VIEW=v;PERIOD=0;
   document.querySelectorAll('.vtab').forEach(t=>t.classList.toggle('active',t.dataset.v===v));
   const isC=v==='charts';
-  document.getElementById('table-area').classList.toggle('hidden',isC);
+  const isL=v==='leads';
+  document.getElementById('table-area').classList.toggle('hidden',isC||isL);
   document.getElementById('charts-area').classList.toggle('hidden',!isC);
+  document.getElementById('leads-area').classList.toggle('hidden',!isL);
   buildPeriodBar();render();
 }
 function setMode(m){DISP_MODE=m;['tgt','act','tva','all'].forEach(x=>document.getElementById('m-'+x).classList.toggle('active',x===m));render();}
