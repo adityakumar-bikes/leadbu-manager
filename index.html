@@ -219,6 +219,7 @@ canvas{max-height:250px}
   <div class="vtab"        data-v="mon"    onclick="setView('mon')">🗓 Monthly</div>
   <div class="vtab"        data-v="charts" onclick="setView('charts')">📈 Charts</div>
   <div class="vtab"        data-v="leads"  onclick="setView('leads')">🎯 Leads Tracker</div>
+  <div class="vtab"        data-v="mktg"   onclick="setView('mktg')">📣 Mktg Tracker</div>
   <!-- Team Structure tab hidden — call setView('team') or renderTeam() to activate -->
 </div>
 <div class="period-bar" id="period-bar"></div>
@@ -244,6 +245,7 @@ canvas{max-height:250px}
 <!-- LEADS TRACKER -->
 <div id="leads-area" class="hidden" style="padding:0 16px"></div>
 <div id="team-area" class="hidden" style="padding:0 16px"></div>
+<div id="mktg-area" class="hidden" style="padding:0 16px"></div>
 
 <!-- P&L DETAIL MODAL -->
 <div class="modal-overlay" id="modal">
@@ -307,6 +309,9 @@ function newActualRec(){
     seats:Array(12).fill(0),
     // CC Cost (all types)
     cc:Array(12).fill(0),
+    // Google / Meta Revenue from Ad Spends (Rs Lacs — CPS & Media Leads only)
+    google_rev:Array(12).fill(0),
+    meta_rev:Array(12).fill(0),
   };
 }
 // migrateActuals: shape-checks and migrates raw data (from Firebase or backup)
@@ -493,9 +498,13 @@ function deriveActuals(a, adType){
 
   // Quarterly rollups
   const qSum=arr=>[arr[0]+arr[1]+arr[2],arr[3]+arr[4]+arr[5],arr[6]+arr[7]+arr[8],arr[9]+arr[10]+arr[11]];
+  // Google / Meta Revenue from Ad Spends (Rs Lacs — direct input)
+  const google_rev=a.google_rev||Array(12).fill(0);
+  const meta_rev=a.meta_rev||Array(12).fill(0);
   return {
     paid_leads, google_leads, meta_leads, organic_leads:a.organic_leads,
     google_mktg, meta_mktg, mktg_cost:mc2,
+    google_rev, meta_rev,
     trig_leads:tl, rev, cc, gm:gmArr, gpm:gpmArr,
     // quarterly
     trig_q:qSum(tl), mktg_q:qSum(mc2), rev_q:qSum(rev), cc_q:qSum(cc),
@@ -503,12 +512,15 @@ function deriveActuals(a, adType){
     paid_q:qSum(paid_leads), org_q:qSum(a.organic_leads),
     google_q:qSum(google_leads), meta_q:qSum(meta_leads),
     google_mktg_q:qSum(google_mktg), meta_mktg_q:qSum(meta_mktg),
+    google_rev_q:qSum(google_rev), meta_rev_q:qSum(meta_rev),
     // FY
     rev_fy:rev.reduce((s,v)=>s+v,0), mktg_fy:mc2.reduce((s,v)=>s+v,0),
     cc_fy:cc.reduce((s,v)=>s+v,0),   trig_fy:tl.reduce((s,v)=>s+v,0),
     gm_fy:gmArr.reduce((s,v)=>s+v,0),gpm_fy:gpmArr.reduce((s,v)=>s+v,0),
     paid_fy:paid_leads.reduce((s,v)=>s+v,0),
     org_fy:a.organic_leads.reduce((s,v)=>s+v,0),
+    google_rev_fy:google_rev.reduce((s,v)=>s+v,0),
+    meta_rev_fy:meta_rev.reduce((s,v)=>s+v,0),
   };
 }
 
@@ -539,22 +551,52 @@ function getFiltered(){
   });
   // Merge duplicate client+ad_type rows (e.g. 2× Media Leads per client)
   const seenKey={};const merged=[];
+  const mA12=()=>Array(12).fill(0);
+  const sumA=(a,b)=>a.map((v,i)=>(+v||0)+(+(b[i]||0)));           // sum two arrays
+  const wavgA=(v1,w1,v2,w2)=>v1.map((v,i)=>{                       // weighted avg CPL
+    const s=(+(w1[i]||0))+(+(w2[i]||0));
+    return s>0?((+v||0)*(+(w1[i]||0))+(+(v2[i]||0))*(+(w2[i]||0)))/s:0;
+  });
   filtered.forEach(row=>{
     const k=row.t.client+'§'+row.t.ad_type;
     if(seenKey[k]){
       const ex=seenKey[k];
+      // ── merge targets ──
       const sum=(a,b)=>(Array.isArray(a)?a.map((v,i)=>v+(b[i]||0)):((+a||0)+(+b||0)));
       ex.t={...ex.t,
         rev:{fy:ex.t.rev.fy+row.t.rev.fy, monthly:sum(ex.t.rev.monthly,row.t.rev.monthly), qtrs:sum(ex.t.rev.qtrs||[0,0,0,0],row.t.rev.qtrs||[0,0,0,0])},
         mktg:{fy:ex.t.mktg.fy+row.t.mktg.fy, monthly:sum(ex.t.mktg.monthly,row.t.mktg.monthly), qtrs:sum(ex.t.mktg.qtrs||[0,0,0,0],row.t.mktg.qtrs||[0,0,0,0])},
         cc:{fy:(ex.t.cc?ex.t.cc.fy:0)+(row.t.cc?row.t.cc.fy:0)},
-        leads:{fy:(ex.t.leads?ex.t.leads.fy:0)+(row.t.leads?row.t.leads.fy:0), monthly:sum(ex.t.leads?ex.t.leads.monthly:Array(12).fill(0),row.t.leads?row.t.leads.monthly:Array(12).fill(0))},
-        org_leads:{fy:(ex.t.org_leads?ex.t.org_leads.fy:0)+(row.t.org_leads?row.t.org_leads.fy:0), monthly:sum(ex.t.org_leads?ex.t.org_leads.monthly:Array(12).fill(0),row.t.org_leads?row.t.org_leads.monthly:Array(12).fill(0))},
-        mktg_leads:{fy:(ex.t.mktg_leads?ex.t.mktg_leads.fy:0)+(row.t.mktg_leads?row.t.mktg_leads.fy:0), monthly:sum(ex.t.mktg_leads?ex.t.mktg_leads.monthly:Array(12).fill(0),row.t.mktg_leads?row.t.mktg_leads.monthly:Array(12).fill(0))},
+        leads:{fy:(ex.t.leads?ex.t.leads.fy:0)+(row.t.leads?row.t.leads.fy:0), monthly:sum(ex.t.leads?ex.t.leads.monthly:mA12(),row.t.leads?row.t.leads.monthly:mA12())},
+        org_leads:{fy:(ex.t.org_leads?ex.t.org_leads.fy:0)+(row.t.org_leads?row.t.org_leads.fy:0), monthly:sum(ex.t.org_leads?ex.t.org_leads.monthly:mA12(),row.t.org_leads?row.t.org_leads.monthly:mA12())},
+        mktg_leads:{fy:(ex.t.mktg_leads?ex.t.mktg_leads.fy:0)+(row.t.mktg_leads?row.t.mktg_leads.fy:0), monthly:sum(ex.t.mktg_leads?ex.t.mktg_leads.monthly:mA12(),row.t.mktg_leads?row.t.mktg_leads.monthly:mA12())},
       };
       const rv=ex.t.rev.fy,mk=ex.t.mktg.fy,cc=(ex.t.cc?ex.t.cc.fy:0);
       ex.t.gm_pct={fy:rv>0?(rv-mk)/rv*100:0};
       ex.t.gpm_pct={fy:rv>0?(rv-mk-cc)/rv*100:0};
+      // ── merge raw actuals (so both modals' data is combined) ──
+      const eA=ex.a, rA=row.a;
+      const gl1=eA.google_leads||mA12(), gl2=rA.google_leads||mA12();
+      const ml1=eA.meta_leads||mA12(),  ml2=rA.meta_leads||mA12();
+      const tl1=eA.total_leads||mA12(), tl2=rA.total_leads||mA12();
+      const rt1=eA.retails||mA12(),     rt2=rA.retails||mA12();
+      ex.a={...eA,
+        google_leads: sumA(gl1,gl2),
+        meta_leads:   sumA(ml1,ml2),
+        organic_leads:sumA(eA.organic_leads||mA12(), rA.organic_leads||mA12()),
+        total_leads:  sumA(tl1,tl2),
+        retails:      sumA(rt1,rt2),
+        cc_seats:     sumA(eA.cc_seats||mA12(),    rA.cc_seats||mA12()),
+        google_rev:   sumA(eA.google_rev||mA12(),  rA.google_rev||mA12()),
+        meta_rev:     sumA(eA.meta_rev||mA12(),    rA.meta_rev||mA12()),
+        // CPL: weighted avg by respective lead count
+        google_cpl:   wavgA(eA.google_cpl||mA12(), gl1, rA.google_cpl||mA12(), gl2),
+        meta_cpl:     wavgA(eA.meta_cpl||mA12(),   ml1, rA.meta_cpl||mA12(),   ml2),
+        cpl_rate:     wavgA(eA.cpl_rate||mA12(),   tl1, rA.cpl_rate||mA12(),   tl2),
+        cac:          wavgA(eA.cac||mA12(),         rt1, rA.cac||mA12(),        rt2),
+      };
+      // re-derive computed actuals from merged raw inputs
+      ex.d=deriveActuals(ex.a, ex.t.ad_type);
     } else {
       seenKey[k]=row; merged.push(row);
     }
@@ -568,16 +610,18 @@ function setView(v){
   const isC=v==='charts';
   const isL=v==='leads';
   const isT=v==='team';
-  document.getElementById('table-area').classList.toggle('hidden',isC||isL||isT);
+  const isM=v==='mktg';
+  document.getElementById('table-area').classList.toggle('hidden',isC||isL||isT||isM);
   document.getElementById('charts-area').classList.toggle('hidden',!isC);
   document.getElementById('leads-area').classList.toggle('hidden',!isL);
   document.getElementById('team-area').classList.toggle('hidden',!isT);
+  document.getElementById('mktg-area').classList.toggle('hidden',!isM);
   buildPeriodBar();render();
 }
 function setMode(m){DISP_MODE=m;['tgt','act','tva','all'].forEach(x=>document.getElementById('m-'+x).classList.toggle('active',x===m));render();}
 function buildPeriodBar(){
   const pb=document.getElementById('period-bar');
-  if(VIEW==='fy'||VIEW==='charts'||VIEW==='leads'||VIEW==='team'){pb.classList.remove('show');return;}
+  if(VIEW==='fy'||VIEW==='charts'||VIEW==='leads'||VIEW==='team'||VIEW==='mktg'){pb.classList.remove('show');return;}
   pb.classList.add('show');
   const labels=VIEW==='mon'?MONTHS:QTRS.map(q=>q+' FY27');
   pb.innerHTML=`<span style="font-size:10px;color:var(--text2);margin-right:4px">${VIEW==='mon'?'Month:':'Quarter:'}</span>`;
@@ -780,6 +824,7 @@ function render(){
   updateKPIs(rows);
   if(VIEW==='charts'){renderCharts(rows);return;}
   if(VIEW==='leads'){renderLeads(rows);return;}
+  if(VIEW==='mktg'){renderMktg(rows);return;}
   if(VIEW==='team'){renderTeam();return;}
   const thead=document.getElementById('thead');
   const tbody=document.getElementById('tbody');
@@ -967,7 +1012,10 @@ function renderModal(recIdx){
       +compRow('Google Mktg Cost (Rs Lacs)',d.google_mktg,'cv-mktg',1)
       +inputRow('Meta Trigger CPL (Rs/Lead)','cpl-input','meta_cpl',aMcp,'1','')
       +compRow('Meta Mktg Cost (Rs Lacs)',d.meta_mktg,'cv-mktg',1)
-      +compRow('= Total Mktg Cost (G + M)',d.mktg_cost,'cv-mktg',1,tMktgM);
+      +compRow('= Total Mktg Cost (G + M)',d.mktg_cost,'cv-mktg',1,tMktgM)
+      +sectionRow('── ROAS INPUTS ──')
+      +inputRow('Google Revenue from Ad Spends (Rs Lacs)','cv-rev','google_rev',a.google_rev||Array(12).fill(0),'0.01','Revenue attributable to Google ads')
+      +inputRow('Meta Revenue from Ad Spends (Rs Lacs)','cv-rev','meta_rev',a.meta_rev||Array(12).fill(0),'0.01','Revenue attributable to Meta ads');
 
   const html=filterBar+'<div style="overflow-x:auto"><table class="pl-table"><thead>'+colHdrs+'</thead><tbody>'
     +leadsSection
@@ -1364,6 +1412,7 @@ function renderREModal(recIdx){
 // LEADS TRACKER
 // ═══════════════════════════
 let LEADS_PERIOD='fy';
+let MKTG_PERIOD='fy';
 
 function renderLeads(rows){
   const el=document.getElementById('leads-area');
@@ -1448,7 +1497,9 @@ function renderLeads(rows){
     const metaA=getSlice(d.meta_leads,LEADS_PERIOD)/100000;
     const orgA=getSlice(d.organic_leads||Array(12).fill(0),LEADS_PERIOD)/100000;
 
-    if(totT===0&&totA===0) return; // skip zero rows
+    const fZeroL=document.getElementById('f-zeros').value==='1';
+    if(fZeroL&&totT===0) return; // zeros filter: hide accounts with no leads target
+    if(!fZeroL&&totT===0&&totA===0) return; // always hide fully blank
 
     gTT+=totT;gTA+=totA;gMT+=mktgT;gMA+=mktgA;gGL+=goolA;gML_+=metaA;gOT+=orgT;gOA+=orgA;
 
@@ -1481,6 +1532,369 @@ function renderLeads(rows){
   html+='<p style="font-size:10px;color:var(--text3);margin-top:8px">All values in Lakhs. TGT = AOP target · ACT = entered actuals · Google/Meta ACH% = % of Mktg TGT · 🟢≥100% 🟡≥80% 🟠≥60% 🔴&lt;60%</p>';
   el.innerHTML=html;
 }
+
+// ═══════════════════════════
+// MARKETING TRACKER
+// ═══════════════════════════
+function renderMktg(rows){
+  const el=document.getElementById('mktg-area');
+
+  // Deduplicate same client+ad_type (2× Media Leads per client)
+  const _mSeen={};const _mDedup=[];
+  rows.forEach(row=>{
+    const k=row.t.client+'§'+row.t.ad_type;
+    if(_mSeen[k]){
+      const ex=_mSeen[k];
+      const sum=(a,b)=>Array.isArray(a)?a.map((v,i)=>(+v||0)+(+b[i]||0)):(+a||0)+(+b||0);
+      const exT=ex.t, exD=ex.d, rowT=row.t, rowD=row.d;
+      ex.t={...exT,
+        rev:{fy:exT.rev.fy+rowT.rev.fy,monthly:sum(exT.rev.monthly,rowT.rev.monthly),qtrs:sum(exT.rev.qtrs||[0,0,0,0],rowT.rev.qtrs||[0,0,0,0])},
+        mktg:{fy:exT.mktg.fy+rowT.mktg.fy,monthly:sum(exT.mktg.monthly,rowT.mktg.monthly),qtrs:sum(exT.mktg.qtrs||[0,0,0,0],rowT.mktg.qtrs||[0,0,0,0])},
+        mktg_leads:{fy:(exT.mktg_leads?exT.mktg_leads.fy:0)+(rowT.mktg_leads?rowT.mktg_leads.fy:0),monthly:sum(exT.mktg_leads?exT.mktg_leads.monthly:Array(12).fill(0),rowT.mktg_leads?rowT.mktg_leads.monthly:Array(12).fill(0))},
+      };
+      // merge derived actuals arrays
+      ['mktg_cost','google_mktg','meta_mktg','rev','gm','paid_leads','google_leads','meta_leads'].forEach(f=>{
+        exD[f]=(exD[f]||Array(12).fill(0)).map((v,i)=>(+v||0)+(+(rowD[f]||[])[i]||0));
+      });
+      ['mktg_fy','mktg_q','rev_fy','rev_q','gm_fy','gm_q','google_mktg_q','meta_mktg_q','paid_fy'].forEach(f=>{
+        if(Array.isArray(exD[f])) exD[f]=exD[f].map((v,i)=>(+v||0)+(+(rowD[f]||[])[i]||0));
+        else exD[f]=(+exD[f]||0)+(+rowD[f]||0);
+      });
+    } else { _mSeen[k]=row; _mDedup.push(row); }
+  });
+  rows=_mDedup;
+
+  if(!rows.filter(r=>r.t.ad_type!=='CC contract').length){
+    el.innerHTML='<p style="color:var(--text3);padding:24px">No accounts match current filters (CC-only accounts excluded from Mktg Tracker).</p>';return;
+  }
+
+  // Period buttons (same as Leads Tracker)
+  const periods=[
+    {id:'fy',label:'FY Total'},
+    {id:'q0',label:'Q1 Apr-Jun'},{id:'q1',label:'Q2 Jul-Sep'},
+    {id:'q2',label:'Q3 Oct-Dec'},{id:'q3',label:'Q4 Jan-Mar'},
+    ...MONTHS.map((m,i)=>({id:'m'+i,label:m}))
+  ];
+  function mSlice(arr,pid){
+    if(!arr||!arr.length)return 0;
+    if(pid==='fy')return arr.reduce((s,v)=>s+(+v||0),0);
+    if(pid.startsWith('q')){const s=+pid[1]*3;return (+arr[s]||0)+(+arr[s+1]||0)+(+arr[s+2]||0);}
+    return +(arr[+pid.slice(1)])||0;
+  }
+  const pb=periods.map(p=>{
+    const act=p.id===MKTG_PERIOD;
+    return '<button onclick="MKTG_PERIOD=\''+p.id+'\';renderMktg(getFiltered())" style="padding:4px 10px;font-size:11px;border-radius:4px;border:1px solid var(--border2);cursor:pointer;margin:2px;background:'+(act?'var(--blue)':'var(--bg2)')+';color:'+(act?'#fff':'var(--text2)')+'">'+p.label+'</button>';
+  }).join('');
+
+  // Formatters
+  const fRs=v=>v===0?'—':(v>=10000?'₹'+Math.round(v/1000)+'K':v>=1000?'₹'+Math.round(v):v>=100?'₹'+v.toFixed(0):'₹'+v.toFixed(0));
+  const fPct=v=>v===0?'—':v.toFixed(1)+'%';
+  const fRoas=v=>v===0||!isFinite(v)?'—':v.toFixed(2)+'x';
+  const fLac=v=>v===0?'—':v.toFixed(2)+'L';
+
+  // Color helpers
+  const tcplColor=(tgt,act)=>{if(tgt<=0||act<=0)return '#8b949e';const r=act/tgt;return r<=1?'#3fb950':r<=1.2?'#d29922':'#f85149';};
+  const gmColor=(tgt,act)=>{if(tgt<=0)return '#8b949e';const r=act/tgt;return r>=1?'#3fb950':r>=0.8?'#d29922':r>=0.6?'#f0883e':'#f85149';};
+  const roasColor=v=>v>=3?'#3fb950':v>=1.5?'#d29922':v>0?'#f0883e':'#8b949e';
+
+  const metricCell=(val,color,fmt)=>'<td style="text-align:right;color:'+(color||'var(--text2)')+'">'+fmt(val)+'</td>';
+  const twoCell=(t,a,fmt,cFn)=>{
+    const tc=t<=0?'var(--text3)':'var(--text2)';
+    const ac=t>0&&a>0?cFn(t,a):'#8b949e';
+    return '<td style="text-align:right;color:'+tc+'">'+fmt(t)+'</td><td style="text-align:right;color:'+ac+';font-weight:600">'+fmt(a)+'</td>';
+  };
+
+  // Table header
+  const thB='padding:6px 8px;text-align:center;font-size:10px;border-bottom:2px solid var(--border2);border-left:1px solid var(--border2)';
+  const thS='padding:4px 6px;text-align:right;font-size:9px;color:var(--text3);border-bottom:1px solid var(--border2)';
+
+  let html='<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:16px">'+pb+'</div>';
+  html+='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">';
+  html+='<thead>'
+    +'<tr>'
+    +'<th rowspan="2" style="text-align:left;padding:6px 10px;position:sticky;left:0;z-index:2;background:var(--bg3);border-bottom:2px solid var(--border2);min-width:130px">Account</th>'
+    +'<th rowspan="2" style="text-align:left;padding:6px 6px;background:var(--bg3);border-bottom:2px solid var(--border2);font-size:10px;color:var(--text3);min-width:55px">Type</th>'
+    +'<th colspan="3" style="'+thB+';background:#0a2a10;color:#3fb950">Mktg Leads (L)</th>'
+    +'<th colspan="2" style="'+thB+';background:#1a2a0a;color:#8eca5a">TCPL (Rs/Lead)</th>'
+    +'<th colspan="2" style="'+thB+';background:#0a2040;color:#58a6ff">Google</th>'
+    +'<th colspan="2" style="'+thB+';background:#2a001a;color:#ff80a0">Meta</th>'
+    +'<th colspan="2" style="'+thB+';background:#2a1a00;color:#f0883e">ROAS</th>'
+    +'</tr><tr>'
+    +['TGT','ACT','Contrib%','TGT','ACT','Leads(L)','CPL(Rs)','Leads(L)','CPL(Rs)','Google','Meta'].map((h,i)=>{
+      const bgs=['#0a2a10','#0a2a10','#0a2a10','#1a2a0a','#1a2a0a','#0a2040','#0a2040','#2a001a','#2a001a','#2a1a00','#2a1a00'];
+      return '<th style="'+thS+';background:'+bgs[i]+';border-left:1px solid var(--border2);min-width:58px">'+h+'</th>';
+    }).join('')
+    +'</tr></thead><tbody>';
+
+  // Grand total accumulators
+  let [gMktgLT,gPaidL,gTrigL,gMktgSpendT,gMktgSpendA,gGoogL,gMetaL,gGoogSpend,gMetaSpend,gGoogRevA,gMetaRevA]=[0,0,0,0,0,0,0,0,0,0,0];
+
+  let lastClient='';
+  rows.forEach(({t,a,d},ri)=>{
+    // Skip CC contracts — no mktg spend
+    if(t.ad_type==='CC contract') return;
+
+    // Targets
+    const mktgLT=t.mktg_leads?mSlice(t.mktg_leads.monthly,MKTG_PERIOD):0;  // Lacs (target)
+    const mktgSpendT=mSlice(t.mktg.monthly,MKTG_PERIOD);                    // Rs Lacs (target)
+    const tcplT=mktgLT>0?mktgSpendT/mktgLT:0;                              // Rs/lead (Lacs cancel)
+
+    // Actuals
+    const trigL=mSlice(d.trig_leads,MKTG_PERIOD)/100000; // Lacs
+    const paidL=mSlice(d.paid_leads,MKTG_PERIOD)/100000; // Lacs (Google+Meta)
+    const googL=mSlice(d.google_leads,MKTG_PERIOD)/100000; // Lacs
+    const metaL=mSlice(d.meta_leads,MKTG_PERIOD)/100000;   // Lacs
+    const mktgSpendA=mSlice(d.mktg_cost,MKTG_PERIOD);     // Rs Lacs (Google+Meta total spend)
+    const googSpend=mSlice(d.google_mktg,MKTG_PERIOD);    // Rs Lacs
+    const metaSpend=mSlice(d.meta_mktg,MKTG_PERIOD);      // Rs Lacs
+    const googRevA=mSlice(d.google_rev,MKTG_PERIOD);      // Rs Lacs
+    const metaRevA=mSlice(d.meta_rev,MKTG_PERIOD);        // Rs Lacs
+
+    // Overall TCPL actual = total spend / total paid leads
+    const tcplA=paidL>0?(mktgSpendA*100000/(paidL*100000)):0; // = mktgSpendA/paidL Rs/lead
+    // Google CPL = Google spend / Google leads (Lacs cancel)
+    const googCpl=googL>0?googSpend/googL:0;
+    // Meta CPL = Meta spend / Meta leads
+    const metaCpl=metaL>0?metaSpend/metaL:0;
+
+    const googRoas=googSpend>0&&googRevA>0?(googRevA/googSpend):0;
+    const metaRoas=metaSpend>0&&metaRevA>0?(metaRevA/metaSpend):0;
+
+    // Skip fully zero rows
+    const fZeroM=document.getElementById('f-zeros').value==='1';
+    if(fZeroM&&mktgLT===0) return; // zeros filter: hide accounts with no mktg target
+    if(!fZeroM&&mktgLT===0&&paidL===0&&googL===0&&metaL===0) return; // always hide fully blank
+
+    gMktgLT+=mktgLT;gPaidL+=paidL;gTrigL+=trigL;
+    gMktgSpendT+=mktgSpendT;gMktgSpendA+=mktgSpendA;
+    gGoogL+=googL;gMetaL+=metaL;
+    gGoogSpend+=googSpend;gMetaSpend+=metaSpend;
+    gGoogRevA+=googRevA;gMetaRevA+=metaRevA;
+
+    const contribPct=trigL>0?(paidL/trigL*100):0;
+    const cTcpl=tcplT>0&&tcplA>0?(tcplA<=tcplT?'#3fb950':tcplA/tcplT<=1.2?'#d29922':'#f85149'):'#8b949e';
+
+    const isNewClient=t.client!==lastClient;
+    if(isNewClient) lastClient=t.client;
+    const bg=ri%2===0?'var(--bg1)':'var(--bg2)';
+    const borderTop=isNewClient?'border-top:2px solid var(--border2);':'';
+
+    html+='<tr style="background:'+bg+';'+borderTop+'">'
+      +'<td style="padding:5px 10px;font-size:11px;color:var(--text1);font-weight:'+(isNewClient?'700':'400')+';position:sticky;left:0;background:'+bg+'">'+t.client+'</td>'
+      +'<td style="padding:5px 6px;font-size:10px;color:var(--text3)">'+t.ad_type+'</td>'
+      // Mktg Leads TGT | ACT | Contrib%
+      +'<td style="text-align:right;color:var(--text3)">'+fLac(mktgLT)+'</td>'
+      +'<td style="text-align:right;color:#3fb950;font-weight:600">'+fLac(paidL)+'</td>'
+      +'<td style="text-align:right;color:'+(contribPct>=60?'#3fb950':contribPct>=40?'#d29922':'var(--text2)')+'">'+
+        (trigL>0?contribPct.toFixed(0)+'%':'—')+'</td>'
+      // TCPL TGT | ACT
+      +'<td style="text-align:right;color:var(--text3)">'+fRs(tcplT)+'</td>'
+      +'<td style="text-align:right;font-weight:600;color:'+cTcpl+'">'+fRs(tcplA)+'</td>'
+      // Google Leads | CPL
+      +'<td style="text-align:right;color:#58a6ff">'+fLac(googL)+'</td>'
+      +'<td style="text-align:right;color:#a0c4ff">'+fRs(googCpl)+'</td>'
+      // Meta Leads | CPL
+      +'<td style="text-align:right;color:#ff80a0">'+fLac(metaL)+'</td>'
+      +'<td style="text-align:right;color:#ffb3c6">'+fRs(metaCpl)+'</td>'
+      // ROAS Google | Meta
+      +'<td style="text-align:right;color:'+roasColor(googRoas)+'">'+fRoas(googRoas)+'</td>'
+      +'<td style="text-align:right;color:'+roasColor(metaRoas)+'">'+fRoas(metaRoas)+'</td>'
+      +'</tr>';
+  });
+
+  // Grand totals row
+  const gContrib=gTrigL>0?(gPaidL/gTrigL*100):0;
+  const gTcplT=gMktgLT>0?gMktgSpendT/gMktgLT:0;
+  const gTcplA=gPaidL>0?gMktgSpendA/gPaidL:0;
+  const gGoogCpl=gGoogL>0?gGoogSpend/gGoogL:0;
+  const gMetaCpl=gMetaL>0?gMetaSpend/gMetaL:0;
+  const gGoogRoas=gGoogSpend>0&&gGoogRevA>0?(gGoogRevA/gGoogSpend):0;
+  const gMetaRoas=gMetaSpend>0&&gMetaRevA>0?(gMetaRevA/gMetaSpend):0;
+  const gcTcpl=gTcplT>0&&gTcplA>0?(gTcplA<=gTcplT?'#3fb950':gTcplA/gTcplT<=1.2?'#d29922':'#f85149'):'#8b949e';
+
+  html+='<tr style="background:var(--bg3);font-weight:700;border-top:2px solid var(--border2)">'
+    +'<td colspan="2" style="padding:6px 10px;position:sticky;left:0;background:var(--bg3)">📊 TOTAL</td>'
+    +'<td style="text-align:right;color:var(--text3)">'+fLac(gMktgLT)+'</td>'
+    +'<td style="text-align:right;color:#3fb950">'+fLac(gPaidL)+'</td>'
+    +'<td style="text-align:right">'+(gTrigL>0?gContrib.toFixed(0)+'%':'—')+'</td>'
+    +'<td style="text-align:right;color:var(--text3)">'+fRs(gTcplT)+'</td>'
+    +'<td style="text-align:right;color:'+gcTcpl+'">'+fRs(gTcplA)+'</td>'
+    +'<td style="text-align:right;color:#58a6ff">'+fLac(gGoogL)+'</td>'
+    +'<td style="text-align:right;color:#a0c4ff">'+fRs(gGoogCpl)+'</td>'
+    +'<td style="text-align:right;color:#ff80a0">'+fLac(gMetaL)+'</td>'
+    +'<td style="text-align:right;color:#ffb3c6">'+fRs(gMetaCpl)+'</td>'
+    +'<td style="text-align:right;color:'+roasColor(gGoogRoas)+'">'+fRoas(gGoogRoas)+'</td>'
+    +'<td style="text-align:right;color:'+roasColor(gMetaRoas)+'">'+fRoas(gMetaRoas)+'</td>'
+    +'</tr>';
+  html+='</tbody></table></div>';
+
+  // Charts section
+  html+='<div style="margin-top:24px">'
+    +'<h3 style="font-size:13px;font-weight:700;color:var(--text1);margin-bottom:12px">📈 Marketing Analytics Charts</h3>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">'
+
+    // Chart 1: Overall Mktg Spend + Leads + TCPL
+    +'<div style="background:var(--bg2);border-radius:8px;padding:12px;border:1px solid var(--border2)">'
+    +'<div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:8px">Overall — Mktg Spend & Leads & TCPL</div>'
+    +'<canvas id="mc-overall" height="180"></canvas></div>'
+
+    // Chart 2: Google breakdown
+    +'<div style="background:var(--bg2);border-radius:8px;padding:12px;border:1px solid var(--border2)">'
+    +'<div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:8px">Google — Spend, Leads & CPL</div>'
+    +'<canvas id="mc-google" height="180"></canvas></div>'
+
+    // Chart 3: Meta breakdown
+    +'<div style="background:var(--bg2);border-radius:8px;padding:12px;border:1px solid var(--border2)">'
+    +'<div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:8px">Meta — Spend, Leads & CPL</div>'
+    +'<canvas id="mc-meta" height="180"></canvas></div>'
+
+    // Chart 4: Account-wise TCPL comparison
+    +'<div style="background:var(--bg2);border-radius:8px;padding:12px;border:1px solid var(--border2)">'
+    +'<div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:8px">Account-wise TCPL — TGT vs ACT</div>'
+    +'<canvas id="mc-acct-tcpl" height="180"></canvas></div>'
+
+    +'</div>'
+
+    // Chart 5: Account-wise GM%
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">'
+    +'<div style="background:var(--bg2);border-radius:8px;padding:12px;border:1px solid var(--border2)">'
+    +'<div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:8px">Account-wise GM% — TGT vs ACT</div>'
+    +'<canvas id="mc-acct-gm" height="180"></canvas></div>'
+
+    // Chart 6: Account-wise ROAS
+    +'<div style="background:var(--bg2);border-radius:8px;padding:12px;border:1px solid var(--border2)">'
+    +'<div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:8px">Account-wise ROAS (Google & Meta)</div>'
+    +'<canvas id="mc-acct-roas" height="180"></canvas></div>'
+    +'</div>'
+    +'</div>';
+
+  html+='<p style="font-size:10px;color:var(--text3);margin-top:8px">All leads in Lacs · Contrib% = Mktg Leads / Total Triggered Leads · CPL = Google Spend / Google Leads · ROAS = Ad Revenue / Ad Spend (enter in P&amp;L modal → ROAS Inputs) · 🟢ROAS≥3x 🟡≥1.5x 🟠>0 · CC contracts excluded</p>';
+  el.innerHTML=html;
+
+  // Build chart data from rows
+  const mktgRows=rows.filter(r=>r.t.ad_type!=='CC contract');
+  const MO=MONTHS; // labels for monthly
+  const isMonthly=MKTG_PERIOD.startsWith('m');
+  const labels=isMonthly?[MONTHS[+MKTG_PERIOD.slice(1)]]:MONTHS;
+  const getPeriodArray=(arr)=>{
+    if(!arr||!arr.length)return Array(12).fill(0);
+    if(MKTG_PERIOD==='fy')return arr;
+    if(MKTG_PERIOD.startsWith('q')){const s=+MKTG_PERIOD[1]*3;return arr.slice(s,s+3);}
+    const idx=+MKTG_PERIOD.slice(1);return [arr[idx]||0];
+  };
+  const xLabels=MKTG_PERIOD==='fy'?MONTHS:MKTG_PERIOD.startsWith('q')?MONTHS.slice(+MKTG_PERIOD[1]*3,+MKTG_PERIOD[1]*3+3):[MONTHS[+MKTG_PERIOD.slice(1)]];
+
+  // Aggregated monthly arrays across all mktg rows
+  const aggMktgSpend=xLabels.map((_,li)=>{
+    const src=MKTG_PERIOD==='fy'?li:MKTG_PERIOD.startsWith('q')?(+MKTG_PERIOD[1]*3+li):(+MKTG_PERIOD.slice(1));
+    return mktgRows.reduce((s,{d})=>s+(d.mktg_cost[src]||0),0);
+  });
+  const aggMktgTgt=xLabels.map((_,li)=>{
+    const src=MKTG_PERIOD==='fy'?li:MKTG_PERIOD.startsWith('q')?(+MKTG_PERIOD[1]*3+li):(+MKTG_PERIOD.slice(1));
+    return mktgRows.reduce((s,{t})=>s+(t.mktg.monthly[src]||0),0);
+  });
+  const aggMktgLeads=xLabels.map((_,li)=>{
+    const src=MKTG_PERIOD==='fy'?li:MKTG_PERIOD.startsWith('q')?(+MKTG_PERIOD[1]*3+li):(+MKTG_PERIOD.slice(1));
+    return mktgRows.reduce((s,{d})=>s+(d.paid_leads[src]||0),0)/100000;
+  });
+  const aggTcpl=aggMktgSpend.map((m,i)=>aggMktgLeads[i]>0?(m*100000/(aggMktgLeads[i]*100000)):0);
+  // ^ simplifies: m/aggMktgLeads[i] since both Lacs
+  const aggGoogSpend=xLabels.map((_,li)=>{
+    const src=MKTG_PERIOD==='fy'?li:MKTG_PERIOD.startsWith('q')?(+MKTG_PERIOD[1]*3+li):(+MKTG_PERIOD.slice(1));
+    return mktgRows.reduce((s,{d})=>s+(d.google_mktg[src]||0),0);
+  });
+  const aggGoogLeads=xLabels.map((_,li)=>{
+    const src=MKTG_PERIOD==='fy'?li:MKTG_PERIOD.startsWith('q')?(+MKTG_PERIOD[1]*3+li):(+MKTG_PERIOD.slice(1));
+    return mktgRows.reduce((s,{d})=>s+(d.google_leads[src]||0),0)/100000;
+  });
+  const aggGoogCpl=aggGoogSpend.map((s,i)=>aggGoogLeads[i]>0?s/aggGoogLeads[i]:0);
+  const aggMetaSpend=xLabels.map((_,li)=>{
+    const src=MKTG_PERIOD==='fy'?li:MKTG_PERIOD.startsWith('q')?(+MKTG_PERIOD[1]*3+li):(+MKTG_PERIOD.slice(1));
+    return mktgRows.reduce((s,{d})=>s+(d.meta_mktg[src]||0),0);
+  });
+  const aggMetaLeads=xLabels.map((_,li)=>{
+    const src=MKTG_PERIOD==='fy'?li:MKTG_PERIOD.startsWith('q')?(+MKTG_PERIOD[1]*3+li):(+MKTG_PERIOD.slice(1));
+    return mktgRows.reduce((s,{d})=>s+(d.meta_leads[src]||0),0)/100000;
+  });
+  const aggMetaCpl=aggMetaSpend.map((s,i)=>aggMetaLeads[i]>0?s/aggMetaLeads[i]:0);
+
+  const mCO={responsive:true,plugins:{legend:{labels:{color:'#8b949e',font:{size:9}}}},scales:{x:{ticks:{color:'#8b949e',font:{size:9}},grid:{color:'#1e2d45'}},y:{ticks:{color:'#8b949e',font:{size:9}},grid:{color:'#1e2d45'}}}};
+  const mCOdual=(y1lbl,y2lbl)=>({...mCO,scales:{x:{ticks:{color:'#8b949e',font:{size:9}},grid:{color:'#1e2d45'}},y:{type:'linear',display:true,position:'left',title:{display:true,text:y1lbl,color:'#8b949e',font:{size:8}},ticks:{color:'#8b949e',font:{size:9}},grid:{color:'#1e2d45'}},y1:{type:'linear',display:true,position:'right',title:{display:true,text:y2lbl,color:'#8b949e',font:{size:8}},ticks:{color:'#8b949e',font:{size:9}},grid:{drawOnChartArea:false}}}});
+
+  ['mc-overall','mc-google','mc-meta','mc-acct-tcpl','mc-acct-gm','mc-acct-roas'].forEach(id=>{if(CI[id]){CI[id].destroy();delete CI[id];}});
+
+  // Chart 1: Overall
+  CI['mc-overall']=new Chart(document.getElementById('mc-overall'),{type:'bar',data:{labels:xLabels,datasets:[
+    {label:'Mktg Spend TGT (L)',data:aggMktgTgt,backgroundColor:'#1d4ed855',borderColor:'#3b82f6',borderWidth:1,yAxisID:'y'},
+    {label:'Mktg Spend ACT (L)',data:aggMktgSpend,backgroundColor:'#7c3aed88',borderColor:'#a855f7',borderWidth:1,yAxisID:'y'},
+    {label:'Mktg Leads ACT (L)',data:aggMktgLeads,type:'line',borderColor:'#22c55e',fill:false,tension:.3,pointRadius:3,borderWidth:2,yAxisID:'y1'},
+    {label:'TCPL ACT (Rs)',data:aggTcpl,type:'line',borderColor:'#f97316',fill:false,tension:.3,pointRadius:3,borderWidth:2,borderDash:[4,3],yAxisID:'y1'},
+  ]},options:mCOdual('Spend (Lacs)','Leads(L) / TCPL(Rs)')});
+
+  // Chart 2: Google
+  CI['mc-google']=new Chart(document.getElementById('mc-google'),{type:'bar',data:{labels:xLabels,datasets:[
+    {label:'Google Spend (L)',data:aggGoogSpend,backgroundColor:'#4285f488',borderColor:'#4285f4',borderWidth:1,yAxisID:'y'},
+    {label:'Google Leads (L)',data:aggGoogLeads,type:'line',borderColor:'#34a853',fill:false,tension:.3,pointRadius:3,borderWidth:2,yAxisID:'y1'},
+    {label:'Google CPL (Rs)',data:aggGoogCpl,type:'line',borderColor:'#fbbc04',fill:false,tension:.3,pointRadius:3,borderWidth:2,borderDash:[4,3],yAxisID:'y1'},
+  ]},options:mCOdual('Spend (Lacs)','Leads(L) / CPL(Rs)')});
+
+  // Chart 3: Meta
+  CI['mc-meta']=new Chart(document.getElementById('mc-meta'),{type:'bar',data:{labels:xLabels,datasets:[
+    {label:'Meta Spend (L)',data:aggMetaSpend,backgroundColor:'#1877f288',borderColor:'#1877f2',borderWidth:1,yAxisID:'y'},
+    {label:'Meta Leads (L)',data:aggMetaLeads,type:'line',borderColor:'#e91e8c',fill:false,tension:.3,pointRadius:3,borderWidth:2,yAxisID:'y1'},
+    {label:'Meta CPL (Rs)',data:aggMetaCpl,type:'line',borderColor:'#ff9800',fill:false,tension:.3,pointRadius:3,borderWidth:2,borderDash:[4,3],yAxisID:'y1'},
+  ]},options:mCOdual('Spend (Lacs)','Leads(L) / CPL(Rs)')});
+
+  // Chart 4: Account-wise TCPL
+  const acctLabels=[];const acctTcplTgt=[];const acctTcplAct=[];
+  mktgRows.forEach(({t,d})=>{
+    const mT=mSlice(t.mktg.monthly,MKTG_PERIOD);
+    const mLT=t.mktg_leads?mSlice(t.mktg_leads.monthly,MKTG_PERIOD):0;
+    const mA=mSlice(d.mktg_cost,MKTG_PERIOD);
+    const pL=mSlice(d.paid_leads,MKTG_PERIOD);
+    const tcplT=mLT>0?mT/mLT:0;
+    const tcplA=pL>0?(mA*100000/pL):0;
+    if(mT>0||mA>0){acctLabels.push(t.client.length>8?t.client.slice(0,8)+'…':t.client);acctTcplTgt.push(+tcplT.toFixed(0));acctTcplAct.push(+tcplA.toFixed(0));}
+  });
+  CI['mc-acct-tcpl']=new Chart(document.getElementById('mc-acct-tcpl'),{type:'bar',data:{labels:acctLabels,datasets:[
+    {label:'TCPL TGT',data:acctTcplTgt,backgroundColor:'#1d4ed866',borderColor:'#3b82f6',borderWidth:1},
+    {label:'TCPL ACT',data:acctTcplAct,backgroundColor:'#dc262688',borderColor:'#f87171',borderWidth:1},
+  ]},options:{...mCO,scales:{...mCO.scales,y:{...mCO.scales.y,ticks:{...mCO.scales.y.ticks,callback:v=>'₹'+v}}}}});
+
+  // Chart 5: Account-wise GM%
+  const acctGmTgt=[];const acctGmAct=[];const acctGmLabels=[];
+  mktgRows.forEach(({t,d})=>{
+    const rT=mSlice(t.rev.monthly,MKTG_PERIOD);
+    const mT=mSlice(t.mktg.monthly,MKTG_PERIOD);
+    const rA=mSlice(d.rev,MKTG_PERIOD);
+    const gA=mSlice(d.gm,MKTG_PERIOD);
+    const gmT=rT>0?(rT-mT)/rT*100:0;
+    const gmA=rA>0?gA/rA*100:0;
+    if(rT>0||rA>0){acctGmLabels.push(t.client.length>8?t.client.slice(0,8)+'…':t.client);acctGmTgt.push(+gmT.toFixed(1));acctGmAct.push(+gmA.toFixed(1));}
+  });
+  CI['mc-acct-gm']=new Chart(document.getElementById('mc-acct-gm'),{type:'bar',data:{labels:acctGmLabels,datasets:[
+    {label:'GM% TGT',data:acctGmTgt,backgroundColor:'#14532d66',borderColor:'#22c55e',borderWidth:1},
+    {label:'GM% ACT',data:acctGmAct,backgroundColor:'#4ade8088',borderColor:'#86efac',borderWidth:1},
+  ]},options:{...mCO,scales:{...mCO.scales,y:{...mCO.scales.y,ticks:{...mCO.scales.y.ticks,callback:v=>v+'%'}}}}});
+
+  // Chart 6: Account-wise ROAS
+  const acctRoasLabels=[];const acctGoogRoas=[];const acctMetaRoas=[];
+  mktgRows.forEach(({t,d})=>{
+    const rA=mSlice(d.rev,MKTG_PERIOD);
+    const gA=mSlice(d.google_mktg,MKTG_PERIOD);
+    const mA=mSlice(d.meta_mktg,MKTG_PERIOD);
+    if(gA>0||mA>0){
+      acctRoasLabels.push(t.client.length>8?t.client.slice(0,8)+'…':t.client);
+      acctGoogRoas.push(gA>0?+(rA/gA).toFixed(2):0);
+      acctMetaRoas.push(mA>0?+(rA/mA).toFixed(2):0);
+    }
+  });
+  CI['mc-acct-roas']=new Chart(document.getElementById('mc-acct-roas'),{type:'bar',data:{labels:acctRoasLabels,datasets:[
+    {label:'Google ROAS',data:acctGoogRoas,backgroundColor:'#4285f488',borderColor:'#4285f4',borderWidth:1},
+    {label:'Meta ROAS',data:acctMetaRoas,backgroundColor:'#1877f288',borderColor:'#1877f2',borderWidth:1},
+  ]},options:{...mCO,scales:{...mCO.scales,y:{...mCO.scales.y,ticks:{...mCO.scales.y.ticks,callback:v=>v+'x'}}}}});
+}
+
 
 // ═══════════════════════════
 // CHARTS
