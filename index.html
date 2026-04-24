@@ -1,5 +1,4 @@
-
-<div id="leads-area" class="hidden" style="padding:16px 0"></div><!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -239,6 +238,9 @@ canvas{max-height:250px}
   <div class="chart-card"><div class="chart-title">🥧 Client Revenue Mix — FY27 TGT</div><canvas id="c-clients"></canvas></div>
   <div class="chart-card"><div class="chart-title">🏆 Quarterly P&amp;L — Rev · GM · GPM (TGT vs ACT)</div><canvas id="c-quarterly"></canvas></div>
 </div>
+
+<!-- LEADS TRACKER -->
+<div id="leads-area" class="hidden" style="padding:0 16px"></div>
 
 <!-- P&L DETAIL MODAL -->
 <div class="modal-overlay" id="modal">
@@ -1309,125 +1311,108 @@ function renderREModal(recIdx){
 // ═══════════════════════════
 // LEADS TRACKER
 // ═══════════════════════════
-let LEADS_PERIOD='fy';  // 'fy' | 'q0'..'q3' | 'm0'..'m11'
+let LEADS_PERIOD='fy';
 
 function renderLeads(rows){
   const el=document.getElementById('leads-area');
   if(!rows.length){el.innerHTML='<p style="color:var(--text3);padding:24px">No accounts match current filters.</p>';return;}
 
-  // ── period bar ──────────────────────────────────────────────────────────
+  // Period buttons
   const periods=[
-    {id:'fy',   label:'FY Total'},
-    {id:'q0',   label:'Q1 Apr-Jun'},
-    {id:'q1',   label:'Q2 Jul-Sep'},
-    {id:'q2',   label:'Q3 Oct-Dec'},
-    {id:'q3',   label:'Q4 Jan-Mar'},
+    {id:'fy',label:'FY Total'},
+    {id:'q0',label:'Q1 Apr-Jun'},{id:'q1',label:'Q2 Jul-Sep'},
+    {id:'q2',label:'Q3 Oct-Dec'},{id:'q3',label:'Q4 Jan-Mar'},
     ...MONTHS.map((m,i)=>({id:'m'+i,label:m}))
   ];
-
-  function getSlice(arr12, pid){
-    if(pid==='fy')return arr12.reduce((s,v)=>s+(+v||0),0);
-    if(pid.startsWith('q')){const s=+pid[1]*3;return arr12.slice(s,s+3).reduce((a,b)=>a+(+b||0),0);}
-    return +(arr12[+pid.slice(1)])||0;
+  function getSlice(arr,pid){
+    if(!arr||!arr.length)return 0;
+    if(pid==='fy')return arr.reduce((s,v)=>s+(+v||0),0);
+    if(pid.startsWith('q')){const s=+pid[1]*3;return (+arr[s]||0)+(+arr[s+1]||0)+(+arr[s+2]||0);}
+    return +(arr[+pid.slice(1)])||0;
   }
-
   const pb=periods.map(p=>{
     const act=p.id===LEADS_PERIOD;
-    return '<button onclick="LEADS_PERIOD=\''+p.id+'\';renderLeads(getFiltered())" '
-      +'style="padding:4px 10px;font-size:11px;border-radius:4px;border:1px solid var(--border2);cursor:pointer;background:'+(act?'var(--blue)':'var(--bg2)')
-      +';color:'+(act?'#fff':'var(--text2)')+'">'+p.label+'</button>';
+    return '<button onclick="LEADS_PERIOD=\''+p.id+'\';renderLeads(getFiltered())" style="padding:4px 10px;font-size:11px;border-radius:4px;border:1px solid var(--border2);cursor:pointer;margin:2px;background:'+(act?'var(--blue)':'var(--bg2)')+';color:'+(act?'#fff':'var(--text2)')+'">'+p.label+'</button>';
   }).join('');
 
-  const achColor=v=>v>=1?'#3fb950':v>=0.8?'#d29922':v>=0.6?'#f0883e':'#f85149';
-  const fmtL=v=>v===0?'—':v.toFixed(2)+'L';
-  const fmtA=v=>v>=0?'<span style="color:'+achColor(v)+'">'+Math.round(v*100)+'%</span>':'<span style="color:#8b949e">—</span>';
+  const achC=v=>v<0?'#8b949e':v>=1?'#3fb950':v>=0.8?'#d29922':v>=0.6?'#f0883e':'#f85149';
+  const fL=v=>v===0?'—':v.toFixed(2)+'L';
+  const fAch=(t,a)=>{
+    if(t<=0)return '<td style="text-align:right;color:#8b949e">—</td>';
+    const r=a/t;
+    return '<td style="text-align:right;font-weight:600;color:'+achC(r)+'">'+Math.round(r*100)+'%</td>';
+  };
+  const td=(v,col)=>'<td style="text-align:right;color:'+(col||'var(--text2)')+'">'+fL(v)+'</td>';
 
-  // ── table ────────────────────────────────────────────────────────────────
-  let html='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">'+pb+'</div>';
+  let html='<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:16px">'+pb+'</div>';
   html+='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">';
 
-  // Header
-  html+='<thead><tr>'
-    +'<th style="text-align:left;padding:6px 10px;position:sticky;left:0;z-index:2;background:var(--bg3);border-bottom:2px solid var(--border2);min-width:160px">Account</th>'
-    +'<th style="text-align:left;padding:6px 8px;background:var(--bg3);border-bottom:2px solid var(--border2);white-space:nowrap">Ad Type</th>'
-    +'<th colspan="3" style="text-align:center;padding:6px 8px;background:#0c2a4a;border-bottom:2px solid var(--border2);color:#58a6ff;font-size:11px">🎯 Total Triggered Leads</th>'
-    +'<th colspan="3" style="text-align:center;padding:6px 8px;background:#1a2a1a;border-bottom:2px solid var(--border2);color:#3fb950;font-size:11px">📢 Mktg Triggered Leads</th>'
-    +'<th colspan="3" style="text-align:center;padding:6px 8px;background:#2a1a1a;border-bottom:2px solid var(--border2);color:#f0883e;font-size:11px">🌱 Organic Leads</th>'
+  // Column headers - 4 sections: Total | Mktg | Google | Meta | Organic
+  const thBase='padding:6px 8px;text-align:center;font-size:11px;border-bottom:2px solid var(--border2);border-left:1px solid var(--border2)';
+  const th2='padding:4px 8px;text-align:right;font-size:10px;color:var(--text3);border-bottom:1px solid var(--border2)';
+  html+='<thead>'
+    +'<tr>'
+    +'<th rowspan="2" style="text-align:left;padding:6px 10px;position:sticky;left:0;z-index:2;background:var(--bg3);border-bottom:2px solid var(--border2);min-width:140px">Account</th>'
+    +'<th rowspan="2" style="text-align:left;padding:6px 6px;background:var(--bg3);border-bottom:2px solid var(--border2);font-size:10px;color:var(--text3)">Type</th>'
+    +'<th colspan="3" style="'+thBase+';background:#0a2040;color:#58a6ff">Total Triggered Leads</th>'
+    +'<th colspan="3" style="'+thBase+';background:#0a2a10;color:#3fb950">Mktg Triggered Leads</th>'
+    +'<th colspan="2" style="'+thBase+';background:#1a1a30;color:#a0a0ff">Google Leads (ACT)</th>'
+    +'<th colspan="2" style="'+thBase+';background:#2a1020;color:#ff80a0">Meta Leads (ACT)</th>'
+    +'<th colspan="3" style="'+thBase+';background:#2a1a00;color:#f0883e">Organic Leads</th>'
     +'</tr><tr>'
-    +'<th style="background:var(--bg3);border-bottom:1px solid var(--border2);position:sticky;left:0;z-index:2"></th>'
-    +'<th style="background:var(--bg3);border-bottom:1px solid var(--border2)"></th>'
-    +['Total TGT','Total ACT','ACH%','Mktg TGT','Mktg ACT','ACH%','Org TGT','Org ACT','ACH%'].map((h,i)=>{
-      const bgs=['#0c2a4a','#0c2a4a','#0c2a4a','#1a2a1a','#1a2a1a','#1a2a1a','#2a1a1a','#2a1a1a','#2a1a1a'];
-      return '<th style="text-align:right;padding:4px 8px;font-size:10px;color:var(--text2);background:'+bgs[i]+';border-bottom:1px solid var(--border2);min-width:70px">'+h+'</th>';
+    +['TGT','ACT','ACH%','TGT','ACT','ACH%','ACT','ACH%','ACT','ACH%','TGT','ACT','ACH%'].map((h,i)=>{
+      const bgs=['#0a2040','#0a2040','#0a2040','#0a2a10','#0a2a10','#0a2a10','#1a1a30','#1a1a30','#2a1020','#2a1020','#2a1400','#2a1400','#2a1400'];
+      return '<th style="'+th2+';background:'+bgs[i]+';border-left:1px solid var(--border2);min-width:60px">'+h+'</th>';
     }).join('')
     +'</tr></thead><tbody>';
 
-  // Subtotals per section (for grand total row)
-  let gTotalTgt=0,gTotalAct=0,gMktgTgt=0,gMktgAct=0,gOrgTgt=0,gOrgAct=0;
+  // Totals accumulators
+  let [gTT,gTA,gMT,gMA,gGL,gML_,gOT,gOA]=[0,0,0,0,0,0,0,0];
 
-  // Group by client for section headers
   let lastClient='';
   rows.forEach(({t,a,d},ri)=>{
-    // Actuals (absolute counts → Lakhs)
-    const totalAct = getSlice(d.trig_leads, LEADS_PERIOD)/100000;
-    const mktgAct  = getSlice(d.paid_leads,  LEADS_PERIOD)/100000;
-    const orgAct   = getSlice(d.organic_leads||Array(12).fill(0), LEADS_PERIOD)/100000;
+    const totT=getSlice(t.leads.monthly,LEADS_PERIOD);
+    const mktgT=t.mktg_leads?getSlice(t.mktg_leads.monthly,LEADS_PERIOD):0;
+    const orgT=t.org_leads?getSlice(t.org_leads.monthly,LEADS_PERIOD):0;
+    // Actuals → Lakhs
+    const totA=getSlice(d.trig_leads,LEADS_PERIOD)/100000;
+    const mktgA=getSlice(d.paid_leads,LEADS_PERIOD)/100000;
+    const goolA=getSlice(d.google_leads,LEADS_PERIOD)/100000;
+    const metaA=getSlice(d.meta_leads,LEADS_PERIOD)/100000;
+    const orgA=getSlice(d.organic_leads||Array(12).fill(0),LEADS_PERIOD)/100000;
 
-    // Targets (already in Lakhs)
-    const totalTgt = getSlice(t.leads.monthly,     LEADS_PERIOD);
-    const mktgTgt  = t.mktg_leads ? getSlice(t.mktg_leads.monthly, LEADS_PERIOD) : 0;
-    const orgTgt   = t.org_leads  ? getSlice(t.org_leads.monthly,  LEADS_PERIOD) : 0;
+    if(totT===0&&totA===0) return; // skip zero rows
 
-    // Skip rows with zero target AND zero actual
-    if(totalTgt===0&&totalAct===0&&mktgTgt===0&&orgTgt===0) return;
+    gTT+=totT;gTA+=totA;gMT+=mktgT;gMA+=mktgA;gGL+=goolA;gML_+=metaA;gOT+=orgT;gOA+=orgA;
 
-    gTotalTgt+=totalTgt; gTotalAct+=totalAct;
-    gMktgTgt +=mktgTgt;  gMktgAct +=mktgAct;
-    gOrgTgt  +=orgTgt;   gOrgAct  +=orgAct;
-
-    // Client section header
     if(t.client!==lastClient){
-      html+='<tr style="background:var(--bg2)"><td colspan="11" style="padding:4px 10px;font-size:11px;font-weight:700;color:var(--text2);position:sticky;left:0">'+t.client+'</td></tr>';
+      html+='<tr style="background:var(--bg2)"><td colspan="15" style="padding:3px 10px;font-size:11px;font-weight:700;color:var(--text2);border-top:1px solid var(--border2)">'+t.client+'</td></tr>';
       lastClient=t.client;
     }
-
-    const ach=(tgt,act)=>tgt>0?act/tgt:-1;
-    const stripe=ri%2===0?'var(--bg1)':'var(--bg2)';
-    html+='<tr style="background:'+stripe+'">'
-      +'<td style="padding:5px 10px;position:sticky;left:0;background:'+stripe+';font-size:11px;color:var(--text1)">'+t.client+'</td>'
-      +'<td style="padding:5px 8px;font-size:10px;color:var(--text3)">'+t.ad_type+'</td>'
-      // Total
-      +'<td style="padding:5px 8px;text-align:right;color:var(--text2)">'+fmtL(totalTgt)+'</td>'
-      +'<td style="padding:5px 8px;text-align:right;color:var(--blue)">'+fmtL(totalAct)+'</td>'
-      +'<td style="padding:5px 8px;text-align:right">'+fmtA(ach(totalTgt,totalAct))+'</td>'
-      // Mktg
-      +'<td style="padding:5px 8px;text-align:right;color:var(--text2)">'+fmtL(mktgTgt)+'</td>'
-      +'<td style="padding:5px 8px;text-align:right;color:var(--blue)">'+fmtL(mktgAct)+'</td>'
-      +'<td style="padding:5px 8px;text-align:right">'+fmtA(ach(mktgTgt,mktgAct))+'</td>'
-      // Organic
-      +'<td style="padding:5px 8px;text-align:right;color:var(--text2)">'+fmtL(orgTgt)+'</td>'
-      +'<td style="padding:5px 8px;text-align:right;color:var(--blue)">'+fmtL(orgAct)+'</td>'
-      +'<td style="padding:5px 8px;text-align:right">'+fmtA(ach(orgTgt,orgAct))+'</td>'
+    const bg=ri%2===0?'var(--bg1)':'var(--bg2)';
+    html+='<tr style="background:'+bg+'">'
+      +'<td style="padding:5px 10px;font-size:11px;color:var(--text1);position:sticky;left:0;background:'+bg+'">'+t.client+'</td>'
+      +'<td style="padding:5px 6px;font-size:10px;color:var(--text3)">'+t.ad_type+'</td>'
+      +td(totT)+td(totA,'var(--blue)')+fAch(totT,totA)
+      +td(mktgT)+td(mktgA,'var(--blue)')+fAch(mktgT,mktgA)
+      +td(goolA,'#a0a0ff')+fAch(mktgT,goolA)
+      +td(metaA,'#ff80a0')+fAch(mktgT,metaA)
+      +td(orgT)+td(orgA,'var(--blue)')+fAch(orgT,orgA)
       +'</tr>';
   });
 
-  // Grand total row
-  const ach=(t,a)=>t>0?a/t:-1;
+  // Grand total
   html+='<tr style="background:var(--bg3);font-weight:700;border-top:2px solid var(--border2)">'
-    +'<td colspan="2" style="padding:6px 10px;position:sticky;left:0;background:var(--bg3);font-size:12px;color:var(--text1)">📊 TOTAL</td>'
-    +'<td style="padding:6px 8px;text-align:right;color:var(--text2)">'+fmtL(gTotalTgt)+'</td>'
-    +'<td style="padding:6px 8px;text-align:right;color:var(--blue)">'+fmtL(gTotalAct)+'</td>'
-    +'<td style="padding:6px 8px;text-align:right">'+fmtA(ach(gTotalTgt,gTotalAct))+'</td>'
-    +'<td style="padding:6px 8px;text-align:right;color:var(--text2)">'+fmtL(gMktgTgt)+'</td>'
-    +'<td style="padding:6px 8px;text-align:right;color:var(--blue)">'+fmtL(gMktgAct)+'</td>'
-    +'<td style="padding:6px 8px;text-align:right">'+fmtA(ach(gMktgTgt,gMktgAct))+'</td>'
-    +'<td style="padding:6px 8px;text-align:right;color:var(--text2)">'+fmtL(gOrgTgt)+'</td>'
-    +'<td style="padding:6px 8px;text-align:right;color:var(--blue)">'+fmtL(gOrgAct)+'</td>'
-    +'<td style="padding:6px 8px;text-align:right">'+fmtA(ach(gOrgTgt,gOrgAct))+'</td>'
+    +'<td colspan="2" style="padding:6px 10px;position:sticky;left:0;background:var(--bg3)">📊 TOTAL</td>'
+    +td(gTT)+td(gTA,'var(--blue)')+fAch(gTT,gTA)
+    +td(gMT)+td(gMA,'var(--blue)')+fAch(gMT,gMA)
+    +td(gGL,'#a0a0ff')+fAch(gMT,gGL)
+    +td(gML_,'#ff80a0')+fAch(gMT,gML_)
+    +td(gOT)+td(gOA,'var(--blue)')+fAch(gOT,gOA)
     +'</tr>';
 
   html+='</tbody></table></div>';
-  html+='<p style="font-size:10px;color:var(--text3);margin-top:8px">All values in Lakhs. ACT = entered actuals. TGT = AOP targets. Green ≥100% · Yellow ≥80% · Orange ≥60% · Red &lt;60%</p>';
+  html+='<p style="font-size:10px;color:var(--text3);margin-top:8px">All values in Lakhs. TGT = AOP target · ACT = entered actuals · Google/Meta ACH% = % of Mktg TGT · 🟢≥100% 🟡≥80% 🟠≥60% 🔴&lt;60%</p>';
   el.innerHTML=html;
 }
 
