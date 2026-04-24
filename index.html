@@ -965,14 +965,13 @@ function saveModal(){
 // ═══════════════════════════
 // BAJAJ BRAND P&L
 // ═══════════════════════════
-function recomputeBajajTotals(recIdx){
+function recomputeBrandTotals(recIdx,BRANDS){
   const a=ACTUALS[recIdx]; if(!a.brands)return;
-  const B=BAJAJ_BRANDS;
   const get=(b,f,i)=>(+(a.brands[b]&&a.brands[b][f]&&a.brands[b][f][i])||0);
   ['google_leads','meta_leads','organic_leads','retails','total_leads','seats','cc_seats'].forEach(f=>{
-    a[f]=Array(12).fill(0).map((_,i)=>B.reduce((s,b)=>s+get(b,f,i),0));
+    a[f]=Array(12).fill(0).map((_,i)=>BRANDS.reduce((s,b)=>s+get(b,f,i),0));
   });
-  const wtd=(f,wf)=>Array(12).fill(0).map((_,i)=>{const den=a[wf][i];return den>0?B.reduce((s,b)=>s+get(b,wf,i)*get(b,f,i),0)/den:0;});
+  const wtd=(f,wf)=>Array(12).fill(0).map((_,i)=>{const den=a[wf][i];return den>0?BRANDS.reduce((s,b)=>s+get(b,wf,i)*get(b,f,i),0)/den:0;});
   a.google_cpl=wtd('google_cpl','google_leads');
   a.meta_cpl=wtd('meta_cpl','meta_leads');
   a.cac=wtd('cac','retails');
@@ -980,6 +979,7 @@ function recomputeBajajTotals(recIdx){
   a.seat_cost=wtd('seat_cost','seats');
   a.cc_seat_cost=wtd('cc_seat_cost','cc_seats');
 }
+function recomputeBajajTotals(recIdx){recomputeBrandTotals(recIdx,BAJAJ_BRANDS);}
 function onBrandInputChange(inp){
   const brand=inp.getAttribute('data-brand');
   const field=inp.getAttribute('data-field');
