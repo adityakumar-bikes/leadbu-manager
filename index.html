@@ -171,6 +171,8 @@ canvas{max-height:250px}
     <label class="btn btn-dim" title="Restore actuals from JSON backup" style="cursor:pointer">📂 Restore<input type="file" accept=".json" style="display:none" onchange="restoreActuals(this)"></label>
     <button class="btn btn-red" onclick="clearActuals()">🗑 Clear</button>
     <button class="btn btn-dim" onclick="exportCSV()">⬇ CSV</button>
+    <button class="btn btn-dim" id="user-btn" onclick="promptUserName()" title="Click to change your name">👤 <span id="user-label">Set Name</span></button>
+    <button class="btn btn-dim" onclick="openAuditPanel()" title="View change log">🕐 Audit Log</button>
   </div>
 </div>
 
@@ -365,6 +367,273 @@ function loadActuals(){
 let _fbRef=null;
 let _fbSaveTimer=null;
 let _fbLocalUpdate=false; // flag to suppress echo from our own write
+
+// ═══════════════════════════
+// USER IDENTITY + AUDIT LOG
+// ═══════════════════════════
+function getCurrentUser(){
+  return localStorage.getItem('leadbu_user')||'Unknown';
+}
+function promptUserName(){
+  const cur=getCurrentUser();
+  const name=window.prompt('Enter your name (shown in audit log):',cur==='Unknown'?'':cur);
+  if(name&&name.trim()){
+    localStorage.setItem('leadbu_user',name.trim());
+    document.getElementById('user-label').textContent=name.trim();
+  }
+}
+function initUserLabel(){
+  const n=localStorage.getItem('leadbu_user');
+  if(n&&n.trim()) document.getElementById('user-label').textContent=n;
+  // No auto-prompt on load — name is asked only when someone tries to edit
+}
+
+// Returns true if name is set; otherwise prompts and returns false (blocks the edit)
+function requireName(){
+  const n=localStorage.getItem('leadbu_user');
+  if(n&&n.trim()) return true;
+  // Block edit — force name entry
+  let entered='';
+  while(!entered||!entered.trim()){
+    entered=window.prompt('⚠ You must set your name before editing.\n\nThis is required so changes are tracked in the audit log.\n\nEnter your name:','');
+    if(entered===null){
+      // User hit Cancel — show red button and abort the edit
+      const btn=document.getElementById('user-btn');
+      if(btn){btn.style.background='#7f1d1d';btn.style.color='#fca5a5';btn.title='⚠ Name required — click to set';}
+      return false;
+    }
+  }
+  localStorage.setItem('leadbu_user',entered.trim());
+  document.getElementById('user-label').textContent=entered.trim();
+  const btn=document.getElementById('user-btn');
+  if(btn){btn.style.background='';btn.style.color='';btn.title='Click to change your name';}
+  return true;
+}
+
+function writeAuditEntry(entry){
+  // PRIMARY: always write to localStorage (works offline, no Firebase rules needed)
+  try{
+    const stored=JSON.parse(localStorage.getItem('leadbu_audit')||'[]');
+    stored.unshift(entry); // newest first
+    if(stored.length>500) stored.splice(500);
+    localStorage.setItem('leadbu_audit',JSON.stringify(stored));
+    console.log('[Audit] Logged:',entry.user,entry.client,entry.field,entry.month,'old:',entry.old,'→ new:',entry.new);
+  }catch(e){console.error('[Audit] localStorage write failed:',e);}
+  // SECONDARY: also push to Firebase for cross-device visibility
+  if(_auditRef){
+    _auditRef.push(entry).catch(e=>console.warn('[Audit] Firebase write failed:',e));
+  }
+}
+
+function logChange(recIdx,field,monthIdx,oldVal,newVal,brand){
+  const t=TARGETS[recIdx];
+  if(!t) return;
+  if(oldVal===newVal) return; // no actual change
+  writeAuditEntry({
+    ts: Date.now(),
+    user: getCurrentUser(),
+    client: t.client,
+    ad_type: t.ad_type,
+    field,
+    month: MONTHS[monthIdx]||monthIdx,
+    brand: brand||null,
+    old: +oldVal||0,
+    new: +newVal||0,
+  });
+}
+
+// ── Audit Panel ─────────────────────────────────────────────────────────────
+const AUDIT_FIELD_LABELS={
+  google_leads:'Google Leads',meta_leads:'Meta Leads',organic_leads:'Organic Leads',
+  total_leads:'Total Leads',retails:'Retails',seats:'Seats',cc_seats:'CC Seats',
+  google_cpl:'Google CPL',meta_cpl:'Meta CPL',cpl_rate:'Blended CPL',cac:'CAC',
+  google_rev:'Google Revenue',meta_rev:'Meta Revenue',
+  google_mktg:'Google Spend',meta_mktg:'Meta Spend',
+  mktg_cost:'Total Mktg Spend',rev:'Revenue',gm:'Gross Margin'
+};
+const AUDIT_USER_COLORS=['#60a5fa','#34d399','#f472b6','#fbbf24','#a78bfa','#fb923c','#38bdf8','#4ade80'];
+
+function _auditRelTime(ts){
+  const diff=Math.floor((Date.now()-ts)/1000);
+  if(diff<60) return 'just now';
+  if(diff<3600) return Math.floor(diff/60)+'m ago';
+  if(diff<86400) return Math.floor(diff/3600)+'h ago';
+  return Math.floor(diff/86400)+'d ago';
+}
+function _auditFmtTs(ts){
+  const d=new Date(ts);
+  return d.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'2-digit'})+
+    ' '+d.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true});
+}
+function _auditFmtVal(v){
+  if(v===null||v===undefined) return '—';
+  if(Math.abs(v)<0.001) return '0';
+  return v%1===0?v.toLocaleString('en-IN'):(+v).toFixed(2);
+}
+
+function openAuditPanel(){
+  const modal=document.getElementById('modal');
+  const mc=document.getElementById('modal-content');
+  document.getElementById('modal-title').textContent='Change History';
+  document.getElementById('modal-sub').textContent='All field edits tracked by user · This device + Firebase combined';
+  modal.classList.add('show');
+
+  // Read localStorage entries immediately
+  let entries=[];
+  try{ entries=JSON.parse(localStorage.getItem('leadbu_audit')||'[]'); }catch(e){}
+  entries=entries.sort((a,b)=>b.ts-a.ts);
+  window._auditEntries=entries;
+  window._auditUserFilter='';
+  window._auditClientFilter='';
+  _renderAuditPanel(mc,entries);
+
+  // Async: merge Firebase entries in background
+  if(_auditRef){
+    _auditRef.orderByKey().limitToLast(500).once('value',snap=>{
+      const raw=snap.val()||{};
+      const fbEntries=Object.values(raw);
+      const seen=new Set(entries.map(e=>e.ts+'|'+e.client+'|'+e.field+'|'+e.month));
+      let added=0;
+      fbEntries.forEach(e=>{
+        const k=e.ts+'|'+e.client+'|'+e.field+'|'+e.month;
+        if(!seen.has(k)){seen.add(k);entries.push(e);added++;}
+      });
+      if(added>0){
+        entries=entries.sort((a,b)=>b.ts-a.ts);
+        window._auditEntries=entries;
+        _renderAuditPanel(mc,entries);
+      }
+    }).catch(()=>{});
+  }
+}
+
+function _renderAuditPanel(mc,allEntries){
+  if(!allEntries.length){
+    mc.innerHTML='<div style="padding:24px;text-align:center;color:var(--text3)">'
+      +'<div style="font-size:32px;margin-bottom:8px">📋</div>'
+      +'<div style="font-size:13px">No changes recorded yet.</div>'
+      +'<div style="font-size:11px;margin-top:6px">Open a P&L modal, edit any field — it will appear here.</div>'
+      +'</div>';
+    return;
+  }
+
+  // Build per-user summary
+  const userMap={};
+  allEntries.forEach(e=>{
+    if(!userMap[e.user]) userMap[e.user]={count:0,last:0,lastEntry:null,accounts:new Set()};
+    userMap[e.user].count++;
+    userMap[e.user].accounts.add(e.client);
+    if(e.ts>userMap[e.user].last){userMap[e.user].last=e.ts;userMap[e.user].lastEntry=e;}
+  });
+  const users=Object.keys(userMap).sort((a,b)=>userMap[b].last-userMap[a].last);
+  const clients=[...new Set(allEntries.map(e=>e.client))].sort();
+
+  let html='<div style="margin-bottom:0">'
+    // Header row
+    +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">'
+    +'<div style="font-size:14px;font-weight:700;color:var(--text1)">🕐 Audit Log</div>'
+    +'<div style="font-size:11px;color:var(--text3)">'+allEntries.length+' total changes &nbsp;·&nbsp; '+users.length+' editor'+(users.length!==1?'s':'')+'</div>'
+    +'</div>'
+
+    // User cards
+    +'<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">';
+
+  // "All" card
+  const activeU=window._auditUserFilter||'';
+  html+='<div onclick="window._auditUserFilter=\'\';_auditRefreshTable()" style="cursor:pointer;border-radius:8px;border:2px solid '+(activeU===''?'var(--blue)':'var(--border2)')+';background:'+(activeU===''?'rgba(59,130,246,0.12)':'var(--bg3)')+';padding:10px 14px;min-width:100px">'
+    +'<div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.6px;font-weight:600">All Users</div>'
+    +'<div style="font-size:20px;font-weight:800;color:var(--text1);margin:3px 0">'+allEntries.length+'</div>'
+    +'<div style="font-size:10px;color:var(--text3)">edits total</div>'
+    +'</div>';
+
+  users.forEach((u,idx)=>{
+    const ud=userMap[u];
+    const col=AUDIT_USER_COLORS[idx%AUDIT_USER_COLORS.length];
+    const isActive=activeU===u;
+    const le=ud.lastEntry;
+    const fieldLabel=AUDIT_FIELD_LABELS[le.field]||le.field;
+    html+='<div onclick="window._auditUserFilter=\''+u.replace(/'/g,"\\'")+'\';_auditRefreshTable()" style="cursor:pointer;border-radius:8px;border:2px solid '+(isActive?col:'var(--border2)')+';background:'+(isActive?'rgba('+_hexToRgb(col)+',0.10)':'var(--bg3)')+';padding:10px 14px;min-width:130px;max-width:200px">'
+      +'<div style="display:flex;align-items:center;gap:5px;margin-bottom:4px">'
+      +'<span style="width:8px;height:8px;border-radius:50%;background:'+col+';flex-shrink:0"></span>'
+      +'<span style="font-size:12px;font-weight:700;color:'+col+';overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+u+'</span>'
+      +'</div>'
+      +'<div style="font-size:20px;font-weight:800;color:var(--text1)">'+ud.count+'</div>'
+      +'<div style="font-size:10px;color:var(--text3);margin-top:1px">edit'+(ud.count!==1?'s':'')+' &nbsp;·&nbsp; '+ud.accounts.size+' account'+(ud.accounts.size!==1?'s':'')+'</div>'
+      +'<div style="font-size:10px;color:var(--text2);margin-top:5px;border-top:1px solid var(--border);padding-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+le.client+' · '+fieldLabel+' · '+le.month+'">'+le.client+' · '+fieldLabel+'</div>'
+      +'<div style="font-size:10px;color:var(--text3)">'+_auditRelTime(ud.last)+'</div>'
+      +'</div>';
+  });
+  html+='</div>'; // end user cards
+
+  // Client filter + search row
+  html+='<div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap">'
+    +'<span style="font-size:11px;color:var(--text3);font-weight:600">Filter:</span>'
+    +'<select id="al-client" onchange="window._auditClientFilter=this.value;_auditRefreshTable()" style="font-size:11px;background:var(--bg2);color:var(--text1);border:1px solid var(--border2);border-radius:4px;padding:3px 8px">'
+    +'<option value="">All Accounts</option>'+clients.map(c=>'<option'+(c===window._auditClientFilter?' selected':'')+'>'+c+'</option>').join('')
+    +'</select>'
+    +'<span id="al-count" style="font-size:10px;color:var(--text3);margin-left:4px"></span>'
+    +'</div>';
+
+  // Detail table
+  html+='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:11px">'
+    +'<thead><tr style="background:var(--bg3)">'
+    +['When','By','Account','Ad Type','Brand','What Changed','Month','Was','Now'].map(h=>'<th style="padding:5px 10px;text-align:left;border-bottom:2px solid var(--border2);white-space:nowrap;color:var(--text3);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px">'+h+'</th>').join('')
+    +'</tr></thead>'
+    +'<tbody id="audit-tbody"></tbody>'
+    +'</table></div></div>';
+
+  mc.innerHTML=html;
+  _auditRefreshTable();
+}
+
+function _hexToRgb(hex){
+  const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);
+  return r+','+g+','+b;
+}
+
+function _auditRefreshTable(){
+  const fu=window._auditUserFilter||'';
+  const fc=window._auditClientFilter||'';
+  const entries=(window._auditEntries||[]).filter(e=>
+    (!fu||e.user===fu)&&(!fc||e.client===fc)
+  );
+  const tbody=document.getElementById('audit-tbody');
+  if(!tbody) return;
+  const cnt=document.getElementById('al-count');
+  if(cnt) cnt.textContent='Showing '+Math.min(entries.length,300)+' of '+entries.length+' edits';
+
+  // User color map
+  const allUsers=[...new Set((window._auditEntries||[]).map(e=>e.user))].sort((a,b)=>{
+    const la=Math.max(...(window._auditEntries||[]).filter(e=>e.user===a).map(e=>e.ts));
+    const lb=Math.max(...(window._auditEntries||[]).filter(e=>e.user===b).map(e=>e.ts));
+    return lb-la;
+  });
+  const uColorMap={};
+  allUsers.forEach((u,i)=>{uColorMap[u]=AUDIT_USER_COLORS[i%AUDIT_USER_COLORS.length];});
+
+  tbody.innerHTML=entries.slice(0,300).map((e,i)=>{
+    const bg=i%2===0?'transparent':'rgba(255,255,255,0.02)';
+    const delta=e.new-e.old;
+    const deltaCol=delta>0?'#3fb950':delta<0?'#f85149':'#8b949e';
+    const fieldLabel=AUDIT_FIELD_LABELS[e.field]||e.field;
+    const uCol=uColorMap[e.user]||'var(--text2)';
+    return '<tr style="background:'+bg+';border-bottom:1px solid rgba(255,255,255,0.03)">'
+      +'<td style="padding:6px 10px;white-space:nowrap;color:var(--text3);font-size:10px">'+_auditFmtTs(e.ts)+'</td>'
+      +'<td style="padding:6px 10px;font-weight:700;color:'+uCol+';white-space:nowrap">'+e.user+'</td>'
+      +'<td style="padding:6px 10px;color:var(--text1);font-weight:600;white-space:nowrap">'+e.client+'</td>'
+      +'<td style="padding:6px 10px;color:var(--text3);font-size:10px">'+e.ad_type+'</td>'
+      +'<td style="padding:6px 10px;color:var(--text3);font-size:10px">'+(e.brand||'—')+'</td>'
+      +'<td style="padding:6px 10px;color:var(--yellow);font-weight:600">'+fieldLabel+'</td>'
+      +'<td style="padding:6px 10px;color:var(--text2)">'+e.month+'</td>'
+      +'<td style="padding:6px 10px;text-align:right;color:var(--text3)">'+_auditFmtVal(e.old)+'</td>'
+      +'<td style="padding:6px 10px;text-align:right;font-weight:700;color:'+deltaCol+'">'
+        +(delta!==0?(delta>0?'▲ ':'▼ '):'')+_auditFmtVal(e.new)
+      +'</td>'
+      +'</tr>';
+  }).join('');
+}
+
+function filterAudit(){ _auditRefreshTable(); } // backward compat
 
 function saveActuals(){
   // Optimistic local indicator
@@ -616,7 +885,8 @@ function setView(v){
   document.getElementById('leads-area').classList.toggle('hidden',!isL);
   document.getElementById('team-area').classList.toggle('hidden',!isT);
   document.getElementById('mktg-area').classList.toggle('hidden',!isM);
-  buildPeriodBar();render();
+  buildPeriodBar();
+  render();
 }
 function setMode(m){DISP_MODE=m;['tgt','act','tva','all'].forEach(x=>document.getElementById('m-'+x).classList.toggle('active',x===m));render();}
 function buildPeriodBar(){
@@ -856,6 +1126,7 @@ function render(){
 let modalRecIdx=-1;
 
 function openModal(recIdx){
+  if(!requireName()) return; // must set name before viewing/editing any P&L
   modalRecIdx=recIdx;
   modalMonthFilter=currentQIdx();
   const t=TARGETS[recIdx];
@@ -1053,7 +1324,9 @@ function onModalInputChange(input){
 function onModalEdit(field,monthIdx,val,recIdx){
   const ri=(recIdx!==undefined)?recIdx:modalRecIdx;
   if(ri<0)return;
+  const oldV=+(ACTUALS[ri][field]&&ACTUALS[ri][field][monthIdx])||0;
   const v=parseFloat(val)||0;
+  logChange(ri,field,monthIdx,oldV,v,null);
   ACTUALS[ri][field][monthIdx]=v;
   renderModal(ri);
   updateKPIs(getFiltered());
@@ -1092,6 +1365,8 @@ function onBrandInputChange(inp){
   const v=parseFloat(inp.value)||0;
   if(!ACTUALS[ri].brands)ACTUALS[ri].brands={};
   if(!ACTUALS[ri].brands[brand])ACTUALS[ri].brands[brand]=newBrandRec();
+  const _oldBV=+(ACTUALS[ri].brands[brand][field]&&ACTUALS[ri].brands[brand][field][mi])||0;
+  logChange(ri,field,mi,_oldBV,v,brand);
   ACTUALS[ri].brands[brand][field][mi]=v;
   recomputeBajajTotals(ri);
   renderModal(ri);
@@ -2025,6 +2300,7 @@ try {
 }
 _fbDb = firebase.database(_fbApp);
 _fbRef = _fbDb.ref('actuals/fy27_v2');
+let _auditRef = _fbDb.ref('actuals/fy27_audit');
 
 // Wire up filters + modal close (non-data setup, safe to do immediately)
 ['f-cat','f-fuel','f-client','f-adtype','f-btl','f-ba','f-zeros'].forEach(id=>document.getElementById(id).addEventListener('change',render));
@@ -2052,6 +2328,7 @@ _fbRef.on('value', snapshot=>{
     }
   }
   _fbFirstLoad=false;
+  initUserLabel();
   render();
   // Hide loading overlay on first successful load
   const ov=document.getElementById('fb-loading');
@@ -2063,8 +2340,8 @@ _fbRef.on('value', snapshot=>{
   const ov=document.getElementById('fb-loading');
   if(ov){
     ov.innerHTML='<div style="color:#f87171;font-size:14px;font-family:sans-serif;text-align:center;padding:24px">⚠ Could not connect to shared DB<br><small style=\'color:#94a3b8\'>Working offline – data saved locally only</small></div>';
-    setTimeout(()=>{ const o=document.getElementById('fb-loading'); if(o)o.remove(); render(); },3000);
-  } else { render(); }
+    setTimeout(()=>{ const o=document.getElementById('fb-loading'); if(o)o.remove(); initUserLabel(); render(); },3000);
+  } else { initUserLabel(); render(); }
 });
 
 // Add sync indicator to header
