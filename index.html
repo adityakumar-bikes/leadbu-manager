@@ -725,7 +725,7 @@ const BAJAJ_BRANDS=['MC','PB','Triumph','Chetak','CV'];
 const BAJAJ_BRAND_LABELS={MC:'MC — Pulsar / Avenger / Dominar',PB:'PB — KTM / Husqvarna',Triumph:'Triumph',Chetak:'Chetak',CV:'CV'};
 const TVS_CLIENT='TVS';
 const TVS_BRANDS=['Commuter','Premium','Scooter','Moped','EV'];
-const TVS_BRAND_LABELS={Commuter:'TVS Commuter',Premium:'TVS Premium',Scooter:'TVS Scooter',Moped:'TVS Moped',EV:'TVS EV (iQube)'};
+const TVS_BRAND_LABELS={Commuter:'TVS Commuter (Raider, Radeon, Sports, Star City Plus)',Premium:'TVS Premium (Apache 160-200, Apache 310 Series, Ronin)',Scooter:'TVS Scooter (Jupiter 110, 125, NTorq, Scooty Zest)',Moped:'TVS Moped (XL100)',EV:'TVS EV (iQube)'};
 const RE_CLIENT='Royal Enfield';
 const RE_BRANDS=['ICE','EV'];
 const RE_BRAND_LABELS={ICE:'RE ICE',EV:'RE EV — Flying Flea'};
@@ -740,6 +740,8 @@ function newBrandRec(){
     seat_cost:Array(12).fill(0),seats:Array(12).fill(0),
     cc_seats:Array(12).fill(0),cc_seat_cost:Array(12).fill(0),
     leads_processed:Array(12).fill(0),
+    google_rev:Array(12).fill(0),
+    meta_rev:Array(12).fill(0),
   };
 }
 
@@ -975,12 +977,18 @@ function renderModal(recIdx){
     revSection=sectionRow('── REVENUE (CPS: CAC × Retails) ──')
       +inputRow('CAC — Rate Charged (Rs/Retail)','','cac',a.cac,'1','Revenue driver')
       +inputRow('Retails (Units Sold)','','retails',a.retails,'1','')
-      +compRow('= Revenue (Rs Lacs)',d.rev,'cv-rev',1,tRevM);
+      +compRow('= Revenue (Rs Lacs)',d.rev,'cv-rev',1,tRevM)
+      +sectionRow('── ROAS INPUTS (Ad Revenue) ──')
+      +inputRow('Google Revenue from Ad Spends (Rs Lacs)','cv-rev','google_rev',a.google_rev||Array(12).fill(0),'0.01','Rev attributable to Google — used for ROAS')
+      +inputRow('Meta Revenue from Ad Spends (Rs Lacs)','cv-rev','meta_rev',a.meta_rev||Array(12).fill(0),'0.01','Rev attributable to Meta — used for ROAS');
   } else if(adType==='Media Leads'){
     revSection=sectionRow('── REVENUE (Media Leads: CPL × Total Leads) ──')
       +inputRow('CPL — Rate Charged (Rs/Lead)','cpl-input','cpl_rate',a.cpl_rate,'1','Revenue driver')
       +inputRow('Total Leads Delivered (count)','','total_leads',a.total_leads,'1','Absolute count')
-      +compRow('= Revenue (Rs Lacs)',d.rev,'cv-rev',1,tRevM);
+      +compRow('= Revenue (Rs Lacs)',d.rev,'cv-rev',1,tRevM)
+      +sectionRow('── ROAS INPUTS (Ad Revenue) ──')
+      +inputRow('Google Revenue from Ad Spends (Rs Lacs)','cv-rev','google_rev',a.google_rev||Array(12).fill(0),'0.01','Rev attributable to Google — used for ROAS')
+      +inputRow('Meta Revenue from Ad Spends (Rs Lacs)','cv-rev','meta_rev',a.meta_rev||Array(12).fill(0),'0.01','Rev attributable to Meta — used for ROAS');
   } else if(adType==='CC contract'){
     revSection=sectionRow('── REVENUE (CC Contract: Seat Cost × Seats) ──')
       +inputRow('Seat Cost (Rs/seat — Absolute)','cpl-input','seat_cost',a.seat_cost,'1','e.g. 250000')
@@ -1012,10 +1020,7 @@ function renderModal(recIdx){
       +compRow('Google Mktg Cost (Rs Lacs)',d.google_mktg,'cv-mktg',1)
       +inputRow('Meta Trigger CPL (Rs/Lead)','cpl-input','meta_cpl',aMcp,'1','')
       +compRow('Meta Mktg Cost (Rs Lacs)',d.meta_mktg,'cv-mktg',1)
-      +compRow('= Total Mktg Cost (G + M)',d.mktg_cost,'cv-mktg',1,tMktgM)
-      +sectionRow('── ROAS INPUTS ──')
-      +inputRow('Google Revenue from Ad Spends (Rs Lacs)','cv-rev','google_rev',a.google_rev||Array(12).fill(0),'0.01','Revenue attributable to Google ads')
-      +inputRow('Meta Revenue from Ad Spends (Rs Lacs)','cv-rev','meta_rev',a.meta_rev||Array(12).fill(0),'0.01','Revenue attributable to Meta ads');
+      +compRow('= Total Mktg Cost (G + M)',d.mktg_cost,'cv-mktg',1,tMktgM);
 
   const html=filterBar+'<div style="overflow-x:auto"><table class="pl-table"><thead>'+colHdrs+'</thead><tbody>'
     +leadsSection
@@ -1067,7 +1072,7 @@ function saveModal(){
 function recomputeBrandTotals(recIdx,BRANDS){
   const a=ACTUALS[recIdx]; if(!a.brands)return;
   const get=(b,f,i)=>(+(a.brands[b]&&a.brands[b][f]&&a.brands[b][f][i])||0);
-  ['google_leads','meta_leads','organic_leads','retails','total_leads','seats','cc_seats'].forEach(f=>{
+  ['google_leads','meta_leads','organic_leads','retails','total_leads','seats','cc_seats','google_rev','meta_rev'].forEach(f=>{
     a[f]=Array(12).fill(0).map((_,i)=>BRANDS.reduce((s,b)=>s+get(b,f,i),0));
   });
   const wtd=(f,wf)=>Array(12).fill(0).map((_,i)=>{const den=a[wf][i];return den>0?BRANDS.reduce((s,b)=>s+get(b,wf,i)*get(b,f,i),0)/den:0;});
@@ -1144,8 +1149,8 @@ function renderBajajModal(recIdx){
   function brandTable(brand,br,bd,adType,brandLabel,col){
     const gm=bd.gm,gpm=bd.gpm;
     let rev='';
-    if(adType==='CPS')rev=sec('REVENUE (CAC × Retails)')+bInp('CAC (Rs/Retail)','','cac',br.cac,'1',brand)+bInp('Retails','','retails',br.retails,'1',brand)+bCmp('= Revenue (Lacs)',bd.rev,'cv-rev',1);
-    else if(adType==='Media Leads')rev=sec('REVENUE (CPL × Leads)')+bInp('CPL Charged (Rs/Lead)','cpl-input','cpl_rate',br.cpl_rate,'1',brand)+bInp('Total Leads (count)','','total_leads',br.total_leads,'1',brand)+bCmp('= Revenue (Lacs)',bd.rev,'cv-rev',1);
+    if(adType==='CPS')rev=sec('REVENUE (CAC × Retails)')+bInp('CAC (Rs/Retail)','','cac',br.cac,'1',brand)+bInp('Retails','','retails',br.retails,'1',brand)+bCmp('= Revenue (Lacs)',bd.rev,'cv-rev',1)+sec('ROAS INPUTS (Ad Revenue)')+bInp('Google Rev from Ads (Lacs)','cv-rev','google_rev',br.google_rev||Array(12).fill(0),'0.01',brand)+bInp('Meta Rev from Ads (Lacs)','cv-rev','meta_rev',br.meta_rev||Array(12).fill(0),'0.01',brand);
+    else if(adType==='Media Leads')rev=sec('REVENUE (CPL × Leads)')+bInp('CPL Charged (Rs/Lead)','cpl-input','cpl_rate',br.cpl_rate,'1',brand)+bInp('Total Leads (count)','','total_leads',br.total_leads,'1',brand)+bCmp('= Revenue (Lacs)',bd.rev,'cv-rev',1)+sec('ROAS INPUTS (Ad Revenue)')+bInp('Google Rev from Ads (Lacs)','cv-rev','google_rev',br.google_rev||Array(12).fill(0),'0.01',brand)+bInp('Meta Rev from Ads (Lacs)','cv-rev','meta_rev',br.meta_rev||Array(12).fill(0),'0.01',brand);
     else if(adType==='CC contract')rev=sec('REVENUE (SeatCost × Seats)')+bInp('Seat Cost (Rs Abs)','cpl-input','seat_cost',br.seat_cost,'1',brand)+bInp('No. of Seats','','seats',br.seats,'1',brand)+bCmp('= Revenue (Lacs)',bd.rev,'cv-rev',1);
     return '<table class="pl-table" style="margin-bottom:14px"><thead>'+colHdrs()+'</thead><tbody>'
       +bhdr('▸ '+brandLabel,col)
@@ -1245,8 +1250,8 @@ function renderTVSModal(recIdx){
   function brandTable(brand,br,bd,adType,brandLabel,col){
     const gm=bd.gm,gpm=bd.gpm;
     let rev='';
-    if(adType==='CPS')rev=sec('REVENUE (CAC × Retails)')+bInp('CAC (Rs/Retail)','','cac',br.cac,'1',brand)+bInp('Retails','','retails',br.retails,'1',brand)+bCmp('= Revenue (Lacs)',bd.rev,'cv-rev',1);
-    else if(adType==='Media Leads')rev=sec('REVENUE (CPL × Leads)')+bInp('CPL Charged (Rs/Lead)','cpl-input','cpl_rate',br.cpl_rate,'1',brand)+bInp('Total Leads (count)','','total_leads',br.total_leads,'1',brand)+bCmp('= Revenue (Lacs)',bd.rev,'cv-rev',1);
+    if(adType==='CPS')rev=sec('REVENUE (CAC × Retails)')+bInp('CAC (Rs/Retail)','','cac',br.cac,'1',brand)+bInp('Retails','','retails',br.retails,'1',brand)+bCmp('= Revenue (Lacs)',bd.rev,'cv-rev',1)+sec('ROAS INPUTS (Ad Revenue)')+bInp('Google Rev from Ads (Lacs)','cv-rev','google_rev',br.google_rev||Array(12).fill(0),'0.01',brand)+bInp('Meta Rev from Ads (Lacs)','cv-rev','meta_rev',br.meta_rev||Array(12).fill(0),'0.01',brand);
+    else if(adType==='Media Leads')rev=sec('REVENUE (CPL × Leads)')+bInp('CPL Charged (Rs/Lead)','cpl-input','cpl_rate',br.cpl_rate,'1',brand)+bInp('Total Leads (count)','','total_leads',br.total_leads,'1',brand)+bCmp('= Revenue (Lacs)',bd.rev,'cv-rev',1)+sec('ROAS INPUTS (Ad Revenue)')+bInp('Google Rev from Ads (Lacs)','cv-rev','google_rev',br.google_rev||Array(12).fill(0),'0.01',brand)+bInp('Meta Rev from Ads (Lacs)','cv-rev','meta_rev',br.meta_rev||Array(12).fill(0),'0.01',brand);
     else if(adType==='CC contract')rev=sec('REVENUE (SeatCost × Seats)')+bInp('Seat Cost (Rs Abs)','cpl-input','seat_cost',br.seat_cost,'1',brand)+bInp('No. of Seats','','seats',br.seats,'1',brand)+bCmp('= Revenue (Lacs)',bd.rev,'cv-rev',1);
     return '<table class="pl-table" style="margin-bottom:14px"><thead>'+colHdrs()+'</thead><tbody>'
       +bhdr('▸ '+brandLabel,col)
@@ -1354,8 +1359,8 @@ function renderREModal(recIdx){
   function brandTable(brand,br,bd,adType,brandLabel,col){
     const gm=bd.gm,gpm=bd.gpm;
     let rev='';
-    if(adType==='CPS')rev=sec('REVENUE (CAC x Retails)')+bInp('CAC (Rs/Retail)','','cac',br.cac,'1',brand)+bInp('Retails','','retails',br.retails,'1',brand)+bCmp('= Revenue (Lacs)',bd.rev,'cv-rev',1);
-    else if(adType==='Media Leads')rev=sec('REVENUE (CPL x Leads)')+bInp('CPL Charged (Rs/Lead)','cpl-input','cpl_rate',br.cpl_rate,'1',brand)+bInp('Total Leads','','total_leads',br.total_leads,'1',brand)+bCmp('= Revenue (Lacs)',bd.rev,'cv-rev',1);
+    if(adType==='CPS')rev=sec('REVENUE (CAC x Retails)')+bInp('CAC (Rs/Retail)','','cac',br.cac,'1',brand)+bInp('Retails','','retails',br.retails,'1',brand)+bCmp('= Revenue (Lacs)',bd.rev,'cv-rev',1)+sec('ROAS INPUTS (Ad Revenue)')+bInp('Google Rev from Ads (Lacs)','cv-rev','google_rev',br.google_rev||Array(12).fill(0),'0.01',brand)+bInp('Meta Rev from Ads (Lacs)','cv-rev','meta_rev',br.meta_rev||Array(12).fill(0),'0.01',brand);
+    else if(adType==='Media Leads')rev=sec('REVENUE (CPL x Leads)')+bInp('CPL Charged (Rs/Lead)','cpl-input','cpl_rate',br.cpl_rate,'1',brand)+bInp('Total Leads','','total_leads',br.total_leads,'1',brand)+bCmp('= Revenue (Lacs)',bd.rev,'cv-rev',1)+sec('ROAS INPUTS (Ad Revenue)')+bInp('Google Rev from Ads (Lacs)','cv-rev','google_rev',br.google_rev||Array(12).fill(0),'0.01',brand)+bInp('Meta Rev from Ads (Lacs)','cv-rev','meta_rev',br.meta_rev||Array(12).fill(0),'0.01',brand);
     else if(adType==='CC contract')rev=sec('REVENUE (Seat Cost x Seats)')+bInp('Seat Cost (Rs Abs)','cpl-input','seat_cost',br.seat_cost,'1',brand)+bInp('No. of Seats','','seats',br.seats,'1',brand)+bCmp('= Revenue (Lacs)',bd.rev,'cv-rev',1);
     const leadsRows=adType==='CC contract'
       ? sec('LEADS PROCESSED')
