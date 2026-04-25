@@ -434,6 +434,8 @@ function logChange(recIdx,field,monthIdx,oldVal,newVal,brand){
     user: getCurrentUser(),
     client: t.client,
     ad_type: t.ad_type,
+    btl: t.btl||'—',
+    ba: t.ba||'—',
     field,
     month: MONTHS[monthIdx]||monthIdx,
     brand: brand||null,
@@ -485,6 +487,9 @@ function openAuditPanel(){
   window._auditEntries=entries;
   window._auditUserFilter='';
   window._auditClientFilter='';
+  window._auditAdTypeFilter='';
+  window._auditBtlFilter='';
+  window._auditBaFilter='';
   _renderAuditPanel(mc,entries);
 
   // Async: merge Firebase entries in background
@@ -565,13 +570,20 @@ function _renderAuditPanel(mc,allEntries){
   });
   html+='</div>'; // end user cards
 
-  // Client filter + search row
-  html+='<div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap">'
-    +'<span style="font-size:11px;color:var(--text3);font-weight:600">Filter:</span>'
-    +'<select id="al-client" onchange="window._auditClientFilter=this.value;_auditRefreshTable()" style="font-size:11px;background:var(--bg2);color:var(--text1);border:1px solid var(--border2);border-radius:4px;padding:3px 8px">'
-    +'<option value="">All Accounts</option>'+clients.map(c=>'<option'+(c===window._auditClientFilter?' selected':'')+'>'+c+'</option>').join('')
-    +'</select>'
-    +'<span id="al-count" style="font-size:10px;color:var(--text3);margin-left:4px"></span>'
+  // Filter row — Account, AdType, BTL, BA
+  const adTypes=[...new Set(allEntries.map(e=>e.ad_type).filter(Boolean))].sort();
+  const btls=[...new Set(allEntries.map(e=>e.btl).filter(v=>v&&v!=='—'))].sort();
+  const bas=[...new Set(allEntries.map(e=>e.ba).filter(v=>v&&v!=='—'))].sort();
+  const mkSel=(id,label,opts,cur,prop)=>'<select id="'+id+'" onchange="window.'+prop+'=this.value;_auditRefreshTable()" style="font-size:11px;background:var(--bg2);color:var(--text1);border:1px solid var(--border2);border-radius:4px;padding:3px 8px">'
+    +'<option value="">'+label+'</option>'+opts.map(o=>'<option'+(o===cur?' selected':'')+'>'+o+'</option>').join('')+'</select>';
+  html+='<div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap;padding:8px 10px;background:var(--bg3);border-radius:6px;border:1px solid var(--border)">'
+    +'<span style="font-size:10px;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:.6px">Filter</span>'
+    +mkSel('al-client','All Accounts',clients,window._auditClientFilter||'','_auditClientFilter')
+    +mkSel('al-adtype','All Ad Types',adTypes,window._auditAdTypeFilter||'','_auditAdTypeFilter')
+    +mkSel('al-btl','All BTL',btls,window._auditBtlFilter||'','_auditBtlFilter')
+    +mkSel('al-ba','All BA',bas,window._auditBaFilter||'','_auditBaFilter')
+    +'<button onclick="window._auditClientFilter=\'\';window._auditAdTypeFilter=\'\';window._auditBtlFilter=\'\';window._auditBaFilter=\'\';window._auditUserFilter=\'\';_renderAuditPanel(document.getElementById(\'modal-content\'),window._auditEntries)" style="font-size:10px;padding:3px 8px;border-radius:4px;border:1px solid var(--border2);background:var(--bg4);color:var(--text2);cursor:pointer">✕ Clear</button>'
+    +'<span id="al-count" style="font-size:10px;color:var(--text3);margin-left:auto"></span>'
     +'</div>';
 
   // Detail table
@@ -594,9 +606,19 @@ function _hexToRgb(hex){
 function _auditRefreshTable(){
   const fu=window._auditUserFilter||'';
   const fc=window._auditClientFilter||'';
-  const entries=(window._auditEntries||[]).filter(e=>
-    (!fu||e.user===fu)&&(!fc||e.client===fc)
-  );
+  const fat=window._auditAdTypeFilter||'';
+  const fbtl=window._auditBtlFilter||'';
+  const fba=window._auditBaFilter||'';
+  // For old entries without btl/ba, look up from TARGETS
+  const tMap={};
+  TARGETS.forEach(t=>{tMap[t.client+'|'+t.ad_type]=t;});
+  const entries=(window._auditEntries||[]).filter(e=>{
+    const t=tMap[e.client+'|'+e.ad_type];
+    const ebtl=e.btl||(t?t.btl:'')||'';
+    const eba=e.ba||(t?t.ba:'')||'';
+    return (!fu||e.user===fu)&&(!fc||e.client===fc)
+      &&(!fat||e.ad_type===fat)&&(!fbtl||ebtl===fbtl)&&(!fba||eba===fba);
+  });
   const tbody=document.getElementById('audit-tbody');
   if(!tbody) return;
   const cnt=document.getElementById('al-count');
