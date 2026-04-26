@@ -488,6 +488,8 @@ canvas{max-height:260px}
     <div class="ctx-sep"></div>
     <span class="badge"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg><span class="num" id="rec-count">—</span> accounts</span>
     <span class="save-ok" id="save-ok"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Saved</span>
+    <!-- ── Active users presence strip ── -->
+    <div id="active-users-strip" style="display:none;align-items:center;gap:8px;padding:2px 10px;background:var(--pos-bg);border:1px solid rgba(52,211,153,0.2);border-radius:20px;margin-left:4px"></div>
     <div style="margin-left:auto;display:flex;gap:6px;align-items:center">
       <button class="btn btn-dim" id="user-btn" onclick="promptUserName()" title="Click to change your name">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
@@ -779,6 +781,7 @@ function promptUserName(){
   if(name&&name.trim()){
     localStorage.setItem('leadbu_user',name.trim());
     document.getElementById('user-label').textContent=name.trim();
+    registerPresence(); // re-register with new name
   }
 }
 function initUserLabel(){
@@ -806,6 +809,7 @@ function requireName(){
   document.getElementById('user-label').textContent=entered.trim();
   const btn=document.getElementById('user-btn');
   if(btn){btn.style.background='';btn.style.color='';btn.title='Click to change your name';}
+  registerPresence(); // now named — announce presence
   return true;
 }
 
@@ -2865,6 +2869,66 @@ _fbDb = firebase.database(_fbApp);
 _fbRef = _fbDb.ref('actuals/fy27_v2');
 let _auditRef = _fbDb.ref('actuals/fy27_audit');
 
+// ── Presence: who's currently viewing the page ────────────────────────────────
+const _sessionId = Math.random().toString(36).slice(2); // unique per tab
+let _myPresenceRef = null;
+
+function registerPresence(){
+  if(!_fbDb) return;
+  const name = getCurrentUser();
+  if(!name || name==='Unknown') return; // only register named users
+  const presenceRef = _fbDb.ref('presence/fy27/' + _sessionId);
+  _myPresenceRef = presenceRef;
+  // Use Firebase .info/connected so onDisconnect fires even on tab close
+  _fbDb.ref('.info/connected').on('value', snap=>{
+    if(!snap.val()) return;
+    presenceRef.onDisconnect().remove();
+    presenceRef.set({ name, since: firebase.database.ServerValue.TIMESTAMP });
+  });
+}
+
+function renderActiveUsers(snapshot){
+  const el = document.getElementById('active-users-strip');
+  if(!el) return;
+  const myName = getCurrentUser();
+  const users = [];
+  snapshot.forEach(child=>{
+    const d = child.val();
+    if(d && d.name) users.push(d.name);
+  });
+  if(users.length === 0){ el.style.display='none'; return; }
+  // Deduplicate names
+  const unique = [...new Set(users)];
+  const PALETTE = ['#818cf8','#34d399','#fb923c','#f472b6','#60a5fa','#a78bfa','#fbbf24','#22d3ee'];
+  const avatars = unique.map((n,i)=>{
+    const initials = n.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
+    const color = PALETTE[i % PALETTE.length];
+    const isMe = n === myName;
+    return `<div title="${n}${isMe?' (you)':''}" style="
+      width:26px;height:26px;border-radius:50%;
+      background:${color}22;border:1.5px solid ${color};
+      display:flex;align-items:center;justify-content:center;
+      font-size:9.5px;font-weight:700;color:${color};
+      position:relative;flex-shrink:0;cursor:default;
+      ${isMe?'box-shadow:0 0 0 2px '+color+'55;':''}
+    ">${initials}${isMe?'<span style="position:absolute;bottom:-1px;right:-1px;width:7px;height:7px;border-radius:50%;background:var(--pos);border:1.5px solid var(--bg)"></span>':''}</div>`;
+  }).join('');
+  const label = unique.length===1
+    ? `<span style="font-size:11px;color:var(--text2)">${unique[0]}${unique[0]===myName?' <span style=\'color:var(--text3)\'>(you)</span>':''}</span>`
+    : `<span style="font-size:11px;color:var(--text2)">${unique.length} editing</span>`;
+  el.style.display='flex';
+  el.innerHTML=`
+    <div style="display:flex;align-items:center;gap:6px">
+      <span class="ctx-dot" style="background:var(--pos);box-shadow:0 0 8px var(--pos);animation:pulse 2s ease-in-out infinite;flex-shrink:0"></span>
+      <span style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;white-space:nowrap">Active Now</span>
+      <div style="display:flex;gap:-4px;align-items:center">${avatars}</div>
+      ${label}
+    </div>`;
+}
+
+// Start listening to presence node
+_fbDb.ref('presence/fy27').on('value', snap=>renderActiveUsers(snap));
+
 // Wire up filters + modal close (non-data setup, safe to do immediately)
 ['f-cat','f-fuel','f-client','f-adtype','f-btl','f-ba','f-zeros'].forEach(id=>document.getElementById(id).addEventListener('change',render));
 document.getElementById('modal').addEventListener('click',e=>{if(e.target===document.getElementById('modal'))closeModal();});
@@ -2923,6 +2987,7 @@ _fbRef.on('value', snapshot=>{
   _fbFirstLoad=false;
   initUserLabel();
   setPage(PAGE);
+  registerPresence(); // announce this user as active
   // Hide loading overlay on first successful load
   const ov=document.getElementById('fb-loading');
   if(ov) ov.remove();
