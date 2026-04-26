@@ -715,6 +715,17 @@ function newActualRec(){
     // Google / Meta Revenue from Ad Spends (Rs Lacs — CPS & Media Leads only)
     google_rev:Array(12).fill(0),
     meta_rev:Array(12).fill(0),
+    // ROAS Cr% inputs (auto-compute google_rev / meta_rev)
+    google_cr_pct:Array(12).fill(0),   // expected Cr% from Google leads (%)
+    meta_cr_pct:Array(12).fill(0),     // expected Cr% from Meta leads (%)
+    // Bidirectional Overall Cr%
+    overall_cr_pct:Array(12).fill(0),  // Overall Cr% = Retails / Triggered Leads (%)
+    // DMS / VoC retails split (TVS & Ampere)
+    dms_retails:Array(12).fill(0),
+    voc_retails:Array(12).fill(0),
+    // AI Bot Cost
+    ai_per_lead_cost:Array(12).fill(0),   // Rs per lead (Absolute)
+    ai_leads_processed:Array(12).fill(0), // count of leads processed by AI
   };
 }
 // migrateActuals: shape-checks and migrates raw data (from Firebase or backup)
@@ -863,6 +874,9 @@ const AUDIT_FIELD_LABELS={
   cm_revQ1:'Rev TGT Q1',cm_revQ2:'Rev TGT Q2',cm_revQ3:'Rev TGT Q3',cm_revQ4:'Rev TGT Q4',
   cm_mktgQ1:'Mktg TGT Q1',cm_mktgQ2:'Mktg TGT Q2',cm_mktgQ3:'Mktg TGT Q3',cm_mktgQ4:'Mktg TGT Q4',
   cm_ccFY:'CC Cost FY',cm_leadsFY:'Leads FY',cm_NEW_CLIENT:'New Client Added',
+  google_cr_pct:'Google Cr%',meta_cr_pct:'Meta Cr%',overall_cr_pct:'Overall Cr%',
+  dms_retails:'DMS Retails',voc_retails:'VoC Retails',
+  ai_per_lead_cost:'AI Per Lead Cost',ai_leads_processed:'AI Leads Processed',
   CLEAR_ALL:'Clear All Actuals',
 };
 const AUDIT_USER_COLORS=['#60a5fa','#34d399','#f472b6','#fbbf24','#a78bfa','#fb923c','#38bdf8','#4ade80'];
@@ -1608,17 +1622,33 @@ function deriveActuals(a, adType){
     ? _ccSeats.map((s,i)=>(+s||0)*(+((_ccSeatCost[i])||0))/100000)
     : (a.cc||Array(12).fill(0)).map(v=>(+v||0)/100000);
   const gmArr=rev.map((r,i)=>r-mc2[i]);
-  const gpmArr=gmArr.map((g,i)=>g-cc[i]);
 
   // Quarterly rollups
   const qSum=arr=>[arr[0]+arr[1]+arr[2],arr[3]+arr[4]+arr[5],arr[6]+arr[7]+arr[8],arr[9]+arr[10]+arr[11]];
-  // Google / Meta Revenue from Ad Spends (Rs Lacs — direct input)
-  const google_rev=a.google_rev||Array(12).fill(0);
-  const meta_rev=a.meta_rev||Array(12).fill(0);
+  // ROAS Revenue — auto-computed from Cr% × Leads × Rate
+  // Rate: CAC for CPS, CPL for Media Leads (per-unit revenue in Rs Absolute)
+  const gCrPct=a.google_cr_pct||Array(12).fill(0);
+  const mCrPct=a.meta_cr_pct||Array(12).fill(0);
+  const _rate=adType==='CPS'?a.cac:(adType==='Media Leads'?a.cpl_rate:Array(12).fill(0));
+  const google_rev=google_leads.map((g,i)=>{
+    const cr=+(gCrPct[i]||0); const rt=+((_rate&&_rate[i])||0);
+    return cr>0?Math.round(g*cr/100)*rt/100000:(+(a.google_rev&&a.google_rev[i])||0);
+  });
+  const meta_rev=meta_leads.map((m,i)=>{
+    const cr=+(mCrPct[i]||0); const rt=+((_rate&&_rate[i])||0);
+    return cr>0?Math.round(m*cr/100)*rt/100000:(+(a.meta_rev&&a.meta_rev[i])||0);
+  });
+  // AI Bot Cost
+  const aiPLC=a.ai_per_lead_cost||Array(12).fill(0);
+  const aiLP=a.ai_leads_processed||Array(12).fill(0);
+  const ai_cost=aiPLC.map((c,i)=>(+(c||0))*(+(aiLP[i]||0))/100000);
+  // GPM = GM - CC - AI Cost
+  const gpmArr=gmArr.map((g,i)=>g-cc[i]-ai_cost[i]);
   return {
     paid_leads, google_leads, meta_leads, organic_leads:a.organic_leads,
     google_mktg, meta_mktg, mktg_cost:mc2,
-    google_rev, meta_rev,
+    google_rev, meta_rev, google_cr_pct:gCrPct, meta_cr_pct:mCrPct,
+    ai_cost, ai_cost_q:qSum(ai_cost), ai_cost_fy:ai_cost.reduce((s,v)=>s+v,0),
     trig_leads:tl, rev, cc, gm:gmArr, gpm:gpmArr,
     // quarterly
     trig_q:qSum(tl), mktg_q:qSum(mc2), rev_q:qSum(rev), cc_q:qSum(cc),
@@ -1874,6 +1904,7 @@ const METRICS=[
 const BAJAJ_CLIENT='Bajaj/KTM/Husq';
 const BAJAJ_BRANDS=['MC','PB','Triumph','Chetak','CV'];
 const BAJAJ_BRAND_LABELS={MC:'MC — Pulsar / Avenger / Dominar',PB:'PB — KTM / Husqvarna',Triumph:'Triumph',Chetak:'Chetak',CV:'CV'};
+const AMPERE_CLIENT='Ampere';
 const TVS_CLIENT='TVS';
 const TVS_BRANDS=['Commuter','Premium','Scooter','Moped','EV'];
 const TVS_BRAND_LABELS={Commuter:'TVS Commuter (Raider, Radeon, Sports, Star City Plus)',Premium:'TVS Premium (Apache 160-200, Apache 310 Series, Ronin)',Scooter:'TVS Scooter (Jupiter 110, 125, NTorq, Scooty Zest)',Moped:'TVS Moped (XL100)',EV:'TVS EV (iQube)'};
@@ -1893,6 +1924,17 @@ function newBrandRec(){
     leads_processed:Array(12).fill(0),
     google_rev:Array(12).fill(0),
     meta_rev:Array(12).fill(0),
+    // ROAS Cr% inputs (auto-compute google_rev / meta_rev)
+    google_cr_pct:Array(12).fill(0),   // expected Cr% from Google leads (%)
+    meta_cr_pct:Array(12).fill(0),     // expected Cr% from Meta leads (%)
+    // Bidirectional Overall Cr%
+    overall_cr_pct:Array(12).fill(0),  // Overall Cr% = Retails / Triggered Leads (%)
+    // DMS / VoC retails split (TVS & Ampere)
+    dms_retails:Array(12).fill(0),
+    voc_retails:Array(12).fill(0),
+    // AI Bot Cost
+    ai_per_lead_cost:Array(12).fill(0),   // Rs per lead (Absolute)
+    ai_leads_processed:Array(12).fill(0), // count of leads processed by AI
   };
 }
 
@@ -2142,23 +2184,41 @@ function renderModal(recIdx){
   const gmArr=d.gm, gpmArr=d.gpm;
   const adType=t.ad_type;
 
+  const showDMSVoC=(t.client===TVS_CLIENT||t.client===AMPERE_CLIENT);
+  const aDMS=a.dms_retails||Array(12).fill(0);
+  const aVoC=a.voc_retails||Array(12).fill(0);
+  const aOvCr=a.overall_cr_pct||Array(12).fill(0);
+  const aGCr=a.google_cr_pct||Array(12).fill(0);
+  const aMCr=a.meta_cr_pct||Array(12).fill(0);
   let revSection='';
   if(adType==='CPS'){
+    const dmsVoCRows=showDMSVoC
+      ? inputRow('DMS Retails','','dms_retails',aDMS,'1','DMS channel retails')
+        +inputRow('VoC Retails','','voc_retails',aVoC,'1','Voice-of-Customer retails')
+        +compRow('= Total Retails (DMS + VoC)',a.retails,'cv',0)
+        +pctRow('DMS Cr% = DMS / Triggered Leads',aDMS,d.trig_leads,'cv-pct')
+        +pctRow('VoC Cr% = VoC / Triggered Leads',aVoC,d.trig_leads,'cv-pct')
+      : inputRow('Retails (Units Sold)','','retails',a.retails,'1','or enter Overall Cr% below');
     revSection=sectionRow('── REVENUE (CPS: CAC × Retails) ──')
       +inputRow('CAC — Rate Charged (Rs/Retail)','','cac',a.cac,'1','Revenue driver')
-      +inputRow('Retails (Units Sold)','','retails',a.retails,'1','')
+      +dmsVoCRows
+      +inputRow('Overall Cr% = Retails / Triggered Leads (%)','cpl-input','overall_cr_pct',aOvCr,'0.01','Enter Cr% to auto-calc Retails, or enter Retails above to auto-calc Cr%')
       +compRow('= Revenue (Rs Lacs)',d.rev,'cv-rev',1,tRevM)
       +sectionRow('── ROAS INPUTS (Ad Revenue) ──')
-      +inputRow('Google Revenue from Ad Spends (Rs Lacs)','cv-rev','google_rev',a.google_rev||Array(12).fill(0),'0.01','Rev attributable to Google — used for ROAS')
-      +inputRow('Meta Revenue from Ad Spends (Rs Lacs)','cv-rev','meta_rev',a.meta_rev||Array(12).fill(0),'0.01','Rev attributable to Meta — used for ROAS');
+      +inputRow('Google Expected Cr% (%)','cpl-input','google_cr_pct',aGCr,'0.01','Auto-computes Google Rev = Cr% × Google Leads × CAC')
+      +compRow('Google Revenue from Ads (Rs Lacs)',d.google_rev,'cv-rev',2)
+      +inputRow('Meta Expected Cr% (%)','cpl-input','meta_cr_pct',aMCr,'0.01','Auto-computes Meta Rev = Cr% × Meta Leads × CAC')
+      +compRow('Meta Revenue from Ads (Rs Lacs)',d.meta_rev,'cv-rev',2);
   } else if(adType==='Media Leads'){
     revSection=sectionRow('── REVENUE (Media Leads: CPL × Total Leads) ──')
       +inputRow('CPL — Rate Charged (Rs/Lead)','cpl-input','cpl_rate',a.cpl_rate,'1','Revenue driver')
       +inputRow('Total Leads Delivered (count)','','total_leads',a.total_leads,'1','Absolute count')
       +compRow('= Revenue (Rs Lacs)',d.rev,'cv-rev',1,tRevM)
       +sectionRow('── ROAS INPUTS (Ad Revenue) ──')
-      +inputRow('Google Revenue from Ad Spends (Rs Lacs)','cv-rev','google_rev',a.google_rev||Array(12).fill(0),'0.01','Rev attributable to Google — used for ROAS')
-      +inputRow('Meta Revenue from Ad Spends (Rs Lacs)','cv-rev','meta_rev',a.meta_rev||Array(12).fill(0),'0.01','Rev attributable to Meta — used for ROAS');
+      +inputRow('Google Expected Cr% (%)','cpl-input','google_cr_pct',aGCr,'0.01','Auto-computes Google Rev = Cr% × Google Leads × CPL')
+      +compRow('Google Revenue from Ads (Rs Lacs)',d.google_rev,'cv-rev',2)
+      +inputRow('Meta Expected Cr% (%)','cpl-input','meta_cr_pct',aMCr,'0.01','Auto-computes Meta Rev = Cr% × Meta Leads × CPL')
+      +compRow('Meta Revenue from Ads (Rs Lacs)',d.meta_rev,'cv-rev',2);
   } else if(adType==='CC contract'){
     revSection=sectionRow('── REVENUE (CC Contract: Seat Cost × Seats) ──')
       +inputRow('Seat Cost (Rs/seat — Absolute)','cpl-input','seat_cost',a.seat_cost,'1','e.g. 250000')
@@ -2192,6 +2252,8 @@ function renderModal(recIdx){
       +compRow('Meta Mktg Cost (Rs Lacs)',d.meta_mktg,'cv-mktg',1)
       +compRow('= Total Mktg Cost (G + M)',d.mktg_cost,'cv-mktg',1,tMktgM);
 
+  const aAiPLC=a.ai_per_lead_cost||Array(12).fill(0);
+  const aAiLP=a.ai_leads_processed||Array(12).fill(0);
   const html=filterBar+'<div style="overflow-x:auto"><table class="pl-table"><thead>'+colHdrs+'</thead><tbody>'
     +leadsSection
     +revSection
@@ -2199,10 +2261,14 @@ function renderModal(recIdx){
     +inputRow('CC Seats (count)','','cc_seats',ccSeats,'1','Seats billed by CC')
     +inputRow('CC Per Seat Cost (Rs Absolute)','cpl-input','cc_seat_cost',ccSeatCost,'1','e.g. 150000')
     +compRow('= CC Cost (Rs Lacs)',d.cc,'cv-mktg',2,tCCM)
+    +sectionRow('── AI BOT COST ──')
+    +inputRow('AI Per Lead Cost (Rs Absolute)','cpl-input','ai_per_lead_cost',aAiPLC,'1','Cost charged per lead processed by AI bot')
+    +inputRow('Total Leads Processed by AI (count)','','ai_leads_processed',aAiLP,'1','Absolute count of leads handled by AI')
+    +compRow('= AI Bot Cost (Rs Lacs)',d.ai_cost,'cv-mktg',2)
     +sectionRow('── P&L SUMMARY ──')
-    +compRow('Abs GM = Rev − MktgCost',gmArr,'cv-gm',1,tGM)
+    +compRow('Abs GM = Rev − Mktg Cost',gmArr,'cv-gm',1,tGM)
     +pctRow('GM %',gmArr,d.rev,'cv-gm',tGM,tRevM)
-    +compRow('Abs GPM = GM − CC Cost',gpmArr,gpmArr.some(v=>v<0)?'cv-neg':'cv-gpm',1,tGPM)
+    +compRow('Abs GPM = GM − CC − AI Cost',gpmArr,gpmArr.some(v=>v<0)?'cv-neg':'cv-gpm',1,tGPM)
     +pctRow('GPM %',gpmArr,d.rev,'cv-gpm',tGPM,tRevM)
     +'</tbody></table></div>';
 
@@ -2216,9 +2282,50 @@ function setModalQFilter(recIdx, qIdx){
 
 function onModalInputChange(input){
   const field=input.getAttribute('data-field');
-  const monthIdx=parseInt(input.getAttribute('data-month'));
-  const recIdx=parseInt(input.getAttribute('data-rec'));
-  onModalEdit(field,monthIdx,input.value,recIdx);
+  const mi=parseInt(input.getAttribute('data-month'));
+  const ri=parseInt(input.getAttribute('data-rec'));
+  const v=parseFloat(input.value)||0;
+
+  // ── Bidirectional: Overall Cr% ↔ Retails ──
+  if(field==='overall_cr_pct'){
+    const d=deriveActuals(ACTUALS[ri],TARGETS[ri].ad_type);
+    const trig=d.trig_leads[mi];
+    const oldCr=+(ACTUALS[ri].overall_cr_pct&&ACTUALS[ri].overall_cr_pct[mi])||0;
+    logChange(ri,'overall_cr_pct',mi,oldCr,v,null);
+    ACTUALS[ri].overall_cr_pct[mi]=v;
+    // auto-update retails from Cr%
+    const newRetails=trig>0?Math.round(v/100*trig):0;
+    const oldR=+(ACTUALS[ri].retails&&ACTUALS[ri].retails[mi])||0;
+    if(oldR!==newRetails){logChange(ri,'retails',mi,oldR,newRetails,null);ACTUALS[ri].retails[mi]=newRetails;}
+    renderModal(ri);updateKPIs(getFiltered());saveActuals();return;
+  }
+  if(field==='retails'){
+    const oldV=+(ACTUALS[ri].retails&&ACTUALS[ri].retails[mi])||0;
+    logChange(ri,'retails',mi,oldV,v,null);
+    ACTUALS[ri].retails[mi]=v;
+    // auto-update Cr% from retails
+    const d=deriveActuals(ACTUALS[ri],TARGETS[ri].ad_type);
+    const trig=d.trig_leads[mi];
+    const newCr=trig>0?(v/trig*100):0;
+    ACTUALS[ri].overall_cr_pct[mi]=newCr;
+    renderModal(ri);updateKPIs(getFiltered());saveActuals();return;
+  }
+  // ── DMS + VoC → auto-sum to retails ──
+  if(field==='dms_retails'||field==='voc_retails'){
+    const oldV=+(ACTUALS[ri][field]&&ACTUALS[ri][field][mi])||0;
+    logChange(ri,field,mi,oldV,v,null);
+    ACTUALS[ri][field][mi]=v;
+    const dms=+(ACTUALS[ri].dms_retails&&ACTUALS[ri].dms_retails[mi])||0;
+    const voc=+(ACTUALS[ri].voc_retails&&ACTUALS[ri].voc_retails[mi])||0;
+    const total=dms+voc;
+    const oldR=+(ACTUALS[ri].retails&&ACTUALS[ri].retails[mi])||0;
+    if(oldR!==total){logChange(ri,'retails',mi,oldR,total,null);ACTUALS[ri].retails[mi]=total;}
+    const d=deriveActuals(ACTUALS[ri],TARGETS[ri].ad_type);
+    const trig=d.trig_leads[mi];
+    ACTUALS[ri].overall_cr_pct[mi]=trig>0?(total/trig*100):0;
+    renderModal(ri);updateKPIs(getFiltered());saveActuals();return;
+  }
+  onModalEdit(field,mi,input.value,ri);
 }
 function onModalEdit(field,monthIdx,val,recIdx){
   const ri=(recIdx!==undefined)?recIdx:modalRecIdx;
@@ -2244,7 +2351,7 @@ function saveModal(){
 function recomputeBrandTotals(recIdx,BRANDS){
   const a=ACTUALS[recIdx]; if(!a.brands)return;
   const get=(b,f,i)=>(+(a.brands[b]&&a.brands[b][f]&&a.brands[b][f][i])||0);
-  ['google_leads','meta_leads','organic_leads','retails','total_leads','seats','cc_seats','google_rev','meta_rev'].forEach(f=>{
+  ['google_leads','meta_leads','organic_leads','retails','total_leads','seats','cc_seats','google_rev','meta_rev','dms_retails','voc_retails','ai_leads_processed'].forEach(f=>{
     a[f]=Array(12).fill(0).map((_,i)=>BRANDS.reduce((s,b)=>s+get(b,f,i),0));
   });
   const wtd=(f,wf)=>Array(12).fill(0).map((_,i)=>{const den=a[wf][i];return den>0?BRANDS.reduce((s,b)=>s+get(b,wf,i)*get(b,f,i),0)/den:0;});
@@ -2254,6 +2361,10 @@ function recomputeBrandTotals(recIdx,BRANDS){
   a.cpl_rate=wtd('cpl_rate','total_leads');
   a.seat_cost=wtd('seat_cost','seats');
   a.cc_seat_cost=wtd('cc_seat_cost','cc_seats');
+  a.google_cr_pct=wtd('google_cr_pct','google_leads');
+  a.meta_cr_pct=wtd('meta_cr_pct','meta_leads');
+  a.overall_cr_pct=wtd('overall_cr_pct','retails');
+  a.ai_per_lead_cost=wtd('ai_per_lead_cost','ai_leads_processed');
 }
 function recomputeBajajTotals(recIdx){recomputeBrandTotals(recIdx,BAJAJ_BRANDS);}
 function onBrandInputChange(inp){
@@ -2263,11 +2374,39 @@ function onBrandInputChange(inp){
   const ri=parseInt(inp.getAttribute('data-rec'));
   const v=parseFloat(inp.value)||0;
   if(!ACTUALS[ri].brands)ACTUALS[ri].brands={};
+  const BRANDS_FOR=ri===TARGETS.findIndex(t=>t.client===TVS_CLIENT)?TVS_BRANDS:
+                   ri===TARGETS.findIndex(t=>t.client===RE_CLIENT)?RE_BRANDS:BAJAJ_BRANDS;
   if(!ACTUALS[ri].brands[brand])ACTUALS[ri].brands[brand]=newBrandRec();
   const _oldBV=+(ACTUALS[ri].brands[brand][field]&&ACTUALS[ri].brands[brand][field][mi])||0;
   logChange(ri,field,mi,_oldBV,v,brand);
   ACTUALS[ri].brands[brand][field][mi]=v;
-  recomputeBajajTotals(ri);
+
+  // DMS/VoC → auto-sum retails
+  if(field==='dms_retails'||field==='voc_retails'){
+    const br=ACTUALS[ri].brands[brand];
+    const dms=+(br.dms_retails&&br.dms_retails[mi])||0;
+    const voc=+(br.voc_retails&&br.voc_retails[mi])||0;
+    br.retails[mi]=dms+voc;
+    const bd=deriveActuals(br,TARGETS[ri].ad_type);
+    const trig=bd.trig_leads[mi];
+    br.overall_cr_pct[mi]=trig>0?((dms+voc)/trig*100):0;
+  }
+  // overall_cr_pct → auto-update retails
+  if(field==='overall_cr_pct'){
+    const br=ACTUALS[ri].brands[brand];
+    const bd=deriveActuals(br,TARGETS[ri].ad_type);
+    const trig=bd.trig_leads[mi];
+    br.retails[mi]=trig>0?Math.round(v/100*trig):0;
+  }
+  // retails direct edit → auto-update overall_cr_pct
+  if(field==='retails'){
+    const br=ACTUALS[ri].brands[brand];
+    const bd=deriveActuals(br,TARGETS[ri].ad_type);
+    const trig=bd.trig_leads[mi];
+    br.overall_cr_pct[mi]=trig>0?(v/trig*100):0;
+  }
+
+  recomputeBrandTotals(ri,BRANDS_FOR);
   renderModal(ri);
   updateKPIs(getFiltered());
   saveActuals();
@@ -2424,8 +2563,32 @@ function renderTVSModal(recIdx){
   function brandTable(brand,br,bd,adType,brandLabel,col){
     const gm=bd.gm,gpm=bd.gpm;
     let rev='';
-    if(adType==='CPS')rev=sec('REVENUE (CAC × Retails)')+bInp('CAC (Rs/Retail)','','cac',br.cac,'1',brand)+bInp('Retails','','retails',br.retails,'1',brand)+bCmp('= Revenue (Lacs)',bd.rev,'cv-rev',1)+sec('ROAS INPUTS (Ad Revenue)')+bInp('Google Rev from Ads (Lacs)','cv-rev','google_rev',br.google_rev||Array(12).fill(0),'0.01',brand)+bInp('Meta Rev from Ads (Lacs)','cv-rev','meta_rev',br.meta_rev||Array(12).fill(0),'0.01',brand);
-    else if(adType==='Media Leads')rev=sec('REVENUE (CPL × Leads)')+bInp('CPL Charged (Rs/Lead)','cpl-input','cpl_rate',br.cpl_rate,'1',brand)+bInp('Total Leads (count)','','total_leads',br.total_leads,'1',brand)+bCmp('= Revenue (Lacs)',bd.rev,'cv-rev',1)+sec('ROAS INPUTS (Ad Revenue)')+bInp('Google Rev from Ads (Lacs)','cv-rev','google_rev',br.google_rev||Array(12).fill(0),'0.01',brand)+bInp('Meta Rev from Ads (Lacs)','cv-rev','meta_rev',br.meta_rev||Array(12).fill(0),'0.01',brand);
+    const brDMS=br.dms_retails||Array(12).fill(0),brVoC=br.voc_retails||Array(12).fill(0);
+    const brGCr=br.google_cr_pct||Array(12).fill(0),brMCr=br.meta_cr_pct||Array(12).fill(0);
+    const brOvCr=br.overall_cr_pct||Array(12).fill(0);
+    if(adType==='CPS')rev=sec('REVENUE (CAC × Retails)')
+      +bInp('CAC (Rs/Retail)','','cac',br.cac,'1',brand)
+      +bInp('DMS Retails','','dms_retails',brDMS,'1',brand)
+      +bInp('VoC Retails','','voc_retails',brVoC,'1',brand)
+      +bCmp('= Total Retails (DMS + VoC)',br.retails,'cv',0)
+      +bPct('DMS Cr%',brDMS,bd.trig_leads,'cv-pct')
+      +bPct('VoC Cr%',brVoC,bd.trig_leads,'cv-pct')
+      +bInp('Overall Cr% (%)','cpl-input','overall_cr_pct',brOvCr,'0.01',brand)
+      +bCmp('= Revenue (Lacs)',bd.rev,'cv-rev',1)
+      +sec('ROAS INPUTS (Ad Revenue)')
+      +bInp('Google Expected Cr% (%)','cpl-input','google_cr_pct',brGCr,'0.01',brand)
+      +bCmp('Google Rev from Ads (Lacs)',bd.google_rev,'cv-rev',2)
+      +bInp('Meta Expected Cr% (%)','cpl-input','meta_cr_pct',brMCr,'0.01',brand)
+      +bCmp('Meta Rev from Ads (Lacs)',bd.meta_rev,'cv-rev',2);
+    else if(adType==='Media Leads')rev=sec('REVENUE (CPL × Leads)')
+      +bInp('CPL Charged (Rs/Lead)','cpl-input','cpl_rate',br.cpl_rate,'1',brand)
+      +bInp('Total Leads (count)','','total_leads',br.total_leads,'1',brand)
+      +bCmp('= Revenue (Lacs)',bd.rev,'cv-rev',1)
+      +sec('ROAS INPUTS (Ad Revenue)')
+      +bInp('Google Expected Cr% (%)','cpl-input','google_cr_pct',brGCr,'0.01',brand)
+      +bCmp('Google Rev from Ads (Lacs)',bd.google_rev,'cv-rev',2)
+      +bInp('Meta Expected Cr% (%)','cpl-input','meta_cr_pct',brMCr,'0.01',brand)
+      +bCmp('Meta Rev from Ads (Lacs)',bd.meta_rev,'cv-rev',2);
     else if(adType==='CC contract')rev=sec('REVENUE (SeatCost × Seats)')+bInp('Seat Cost (Rs Abs)','cpl-input','seat_cost',br.seat_cost,'1',brand)+bInp('No. of Seats','','seats',br.seats,'1',brand)+bCmp('= Revenue (Lacs)',bd.rev,'cv-rev',1);
     return '<table class="pl-table" style="margin-bottom:14px"><thead>'+colHdrs()+'</thead><tbody>'
       +bhdr('▸ '+brandLabel,col)
@@ -2446,10 +2609,14 @@ function renderTVSModal(recIdx){
       +bInp('CC Seats','','cc_seats',br.cc_seats,'1',brand)
       +bInp('CC Per Seat (Rs Abs)','cpl-input','cc_seat_cost',br.cc_seat_cost,'1',brand)
       +bCmp('= CC Cost (Lacs)',bd.cc,'cv-mktg',2)
+      +sec('AI BOT COST')
+      +bInp('AI Per Lead Cost (Rs Abs)','cpl-input','ai_per_lead_cost',br.ai_per_lead_cost||Array(12).fill(0),'1',brand)
+      +bInp('Leads Processed by AI (count)','','ai_leads_processed',br.ai_leads_processed||Array(12).fill(0),'1',brand)
+      +bCmp('= AI Bot Cost (Lacs)',bd.ai_cost,'cv-mktg',2)
       +sec('P&L')
       +bCmp('GM = Rev − Mktg',gm,'cv-gm',1)
       +bPct('GM%',gm,bd.rev,'cv-gm')
-      +bCmp('GPM = GM − CC',gpm,gpm.some(v=>v<0)?'cv-neg':'cv-gpm',1)
+      +bCmp('GPM = GM − CC − AI Cost',gpm,gpm.some(v=>v<0)?'cv-neg':'cv-gpm',1)
       +bPct('GPM%',gpm,bd.rev,'cv-gpm')
       +'</tbody></table>';
   }
@@ -2533,8 +2700,32 @@ function renderREModal(recIdx){
   function brandTable(brand,br,bd,adType,brandLabel,col){
     const gm=bd.gm,gpm=bd.gpm;
     let rev='';
-    if(adType==='CPS')rev=sec('REVENUE (CAC x Retails)')+bInp('CAC (Rs/Retail)','','cac',br.cac,'1',brand)+bInp('Retails','','retails',br.retails,'1',brand)+bCmp('= Revenue (Lacs)',bd.rev,'cv-rev',1)+sec('ROAS INPUTS (Ad Revenue)')+bInp('Google Rev from Ads (Lacs)','cv-rev','google_rev',br.google_rev||Array(12).fill(0),'0.01',brand)+bInp('Meta Rev from Ads (Lacs)','cv-rev','meta_rev',br.meta_rev||Array(12).fill(0),'0.01',brand);
-    else if(adType==='Media Leads')rev=sec('REVENUE (CPL x Leads)')+bInp('CPL Charged (Rs/Lead)','cpl-input','cpl_rate',br.cpl_rate,'1',brand)+bInp('Total Leads','','total_leads',br.total_leads,'1',brand)+bCmp('= Revenue (Lacs)',bd.rev,'cv-rev',1)+sec('ROAS INPUTS (Ad Revenue)')+bInp('Google Rev from Ads (Lacs)','cv-rev','google_rev',br.google_rev||Array(12).fill(0),'0.01',brand)+bInp('Meta Rev from Ads (Lacs)','cv-rev','meta_rev',br.meta_rev||Array(12).fill(0),'0.01',brand);
+    const brDMS=br.dms_retails||Array(12).fill(0),brVoC=br.voc_retails||Array(12).fill(0);
+    const brGCr=br.google_cr_pct||Array(12).fill(0),brMCr=br.meta_cr_pct||Array(12).fill(0);
+    const brOvCr=br.overall_cr_pct||Array(12).fill(0);
+    if(adType==='CPS')rev=sec('REVENUE (CAC x Retails)')
+      +bInp('CAC (Rs/Retail)','','cac',br.cac,'1',brand)
+      +bInp('DMS Retails','','dms_retails',brDMS,'1',brand)
+      +bInp('VoC Retails','','voc_retails',brVoC,'1',brand)
+      +bCmp('= Total Retails (DMS + VoC)',br.retails,'cv',0)
+      +bPct('DMS Cr%',brDMS,bd.trig_leads,'cv-pct')
+      +bPct('VoC Cr%',brVoC,bd.trig_leads,'cv-pct')
+      +bInp('Overall Cr% (%)','cpl-input','overall_cr_pct',brOvCr,'0.01',brand)
+      +bCmp('= Revenue (Lacs)',bd.rev,'cv-rev',1)
+      +sec('ROAS INPUTS (Ad Revenue)')
+      +bInp('Google Expected Cr% (%)','cpl-input','google_cr_pct',brGCr,'0.01',brand)
+      +bCmp('Google Rev from Ads (Lacs)',bd.google_rev,'cv-rev',2)
+      +bInp('Meta Expected Cr% (%)','cpl-input','meta_cr_pct',brMCr,'0.01',brand)
+      +bCmp('Meta Rev from Ads (Lacs)',bd.meta_rev,'cv-rev',2);
+    else if(adType==='Media Leads')rev=sec('REVENUE (CPL x Leads)')
+      +bInp('CPL Charged (Rs/Lead)','cpl-input','cpl_rate',br.cpl_rate,'1',brand)
+      +bInp('Total Leads','','total_leads',br.total_leads,'1',brand)
+      +bCmp('= Revenue (Lacs)',bd.rev,'cv-rev',1)
+      +sec('ROAS INPUTS (Ad Revenue)')
+      +bInp('Google Expected Cr% (%)','cpl-input','google_cr_pct',brGCr,'0.01',brand)
+      +bCmp('Google Rev from Ads (Lacs)',bd.google_rev,'cv-rev',2)
+      +bInp('Meta Expected Cr% (%)','cpl-input','meta_cr_pct',brMCr,'0.01',brand)
+      +bCmp('Meta Rev from Ads (Lacs)',bd.meta_rev,'cv-rev',2);
     else if(adType==='CC contract')rev=sec('REVENUE (Seat Cost x Seats)')+bInp('Seat Cost (Rs Abs)','cpl-input','seat_cost',br.seat_cost,'1',brand)+bInp('No. of Seats','','seats',br.seats,'1',brand)+bCmp('= Revenue (Lacs)',bd.rev,'cv-rev',1);
     const leadsRows=adType==='CC contract'
       ? sec('LEADS PROCESSED')
@@ -2559,10 +2750,14 @@ function renderREModal(recIdx){
       +bInp('CC Seats','','cc_seats',br.cc_seats,'1',brand)
       +bInp('CC Per Seat (Rs Abs)','cpl-input','cc_seat_cost',br.cc_seat_cost,'1',brand)
       +bCmp('= CC Cost (Lacs)',bd.cc,'cv-mktg',2)
+      +sec('AI BOT COST')
+      +bInp('AI Per Lead Cost (Rs Abs)','cpl-input','ai_per_lead_cost',br.ai_per_lead_cost||Array(12).fill(0),'1',brand)
+      +bInp('Leads Processed by AI (count)','','ai_leads_processed',br.ai_leads_processed||Array(12).fill(0),'1',brand)
+      +bCmp('= AI Bot Cost (Lacs)',bd.ai_cost,'cv-mktg',2)
       +sec('P&L')
       +bCmp('GM = Rev - Mktg',gm,'cv-gm',1)
       +bPct('GM%',gm,bd.rev,'cv-gm')
-      +bCmp('GPM = GM - CC',gpm,gpm.some(v=>v<0)?'cv-neg':'cv-gpm',1)
+      +bCmp('GPM = GM − CC − AI Cost',gpm,gpm.some(v=>v<0)?'cv-neg':'cv-gpm',1)
       +bPct('GPM%',gpm,bd.rev,'cv-gpm')
       +'</tbody></table>';
   }
