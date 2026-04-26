@@ -443,13 +443,13 @@ canvas{max-height:260px}
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
         Save
       </button>
-      <button class="btn btn-dim" onclick="backupActuals()" title="Download actuals as JSON backup">
+      <button class="btn btn-dim" onclick="backupFull()" title="Download full backup (Actuals + Client Master) as JSON">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
         Backup
       </button>
-      <label class="btn btn-dim" title="Restore actuals from JSON backup" style="cursor:pointer">
+      <label class="btn btn-dim" title="Restore full backup (Actuals + Client Master) from JSON" style="cursor:pointer">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-        Restore<input type="file" accept=".json" style="display:none" onchange="restoreActuals(this)">
+        Restore<input type="file" accept=".json" style="display:none" onchange="restoreFull(this)">
       </label>
       <button class="btn btn-dim" onclick="exportCSV()" title="Export as CSV">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
@@ -3488,17 +3488,43 @@ let _cmFClient='',_cmFAdType='',_cmFContract='',_cmFBTL='';
 function applyCMFilter(f,v){if(f==='client')_cmFClient=v;else if(f==='adtype')_cmFAdType=v;else if(f==='contract')_cmFContract=v;else if(f==='btl')_cmFBTL=v;renderClients();}
 function clearCMFilters(){_cmFClient='';_cmFAdType='';_cmFContract='';_cmFBTL='';renderClients();}
 
-// ── Client master backup / restore ────────────────────────────────────────────
-function backupClientMaster(){
-  const payload={version:1,savedAt:new Date().toISOString(),
-    clientData:loadClientData(),newClients:loadNewClients()};
+// ── UNIFIED Full Backup / Restore (Actuals + Client Master in one file) ──────
+function backupFull(){
+  const savedAt=new Date().toISOString();
+  const payload={
+    type:'full_backup',
+    version:1,
+    savedAt,
+    app:'LeadBU Manager — FY27',
+    // ── Actuals section (same structure as old backupActuals) ──
+    actuals:{
+      version:2,
+      key:ACT_KEY,
+      account_count:TARGETS.length,
+      accounts:TARGETS.map((t,i)=>({
+        client:t.client,ad_type:t.ad_type,btl:t.btl,cat:t.cat,fuel:t.fuel,
+        actuals:ACTUALS[i]
+      }))
+    },
+    // ── Client Master section (same structure as old backupClientMaster) ──
+    clientMaster:{
+      version:1,
+      clientData:loadClientData(),
+      newClients:loadNewClients()
+    }
+  };
   const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
   const a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
-  a.download='ClientMaster_Backup_'+new Date().toISOString().slice(0,10)+'.json';
+  a.download='LeadBU_FullBackup_'+savedAt.slice(0,10)+'.json';
   a.click();
+  // show toast if the save-ok element exists (header context)
+  const toast=document.getElementById('save-ok');
+  if(toast){toast.textContent='✓ Full backup downloaded';toast.classList.add('show');
+    setTimeout(()=>{toast.textContent='✓ Saved';toast.classList.remove('show');},2500);}
 }
-function restoreClientMaster(input){
+
+function restoreFull(input){
   const file=input.files[0];if(!file)return;
   if(!requireName())return;
   const user=getCurrentUser();
@@ -3506,20 +3532,90 @@ function restoreClientMaster(input){
   reader.onload=e=>{
     try{
       const p=JSON.parse(e.target.result);
-      if(!p.clientData){alert('Invalid client master backup file.');return;}
-      if(!confirm('Restore client master from backup saved '+p.savedAt+'?\nThis will replace all current client contract & contact data.'))return;
-      saveClientDataStore(p.clientData);
-      if(Array.isArray(p.newClients))saveNewClients(p.newClients);
-      writeAuditEntry({ts:Date.now(),user,client:'— ALL CLIENTS —',ad_type:'*',btl:'*',ba:'*',
-        field:'CM_RESTORE',month:'CLIENT MASTER',old:'',
-        new:'Client master restored from backup saved '+p.savedAt});
-      renderClients();
-      alert('✓ Client master restored — '+ Object.keys(p.clientData).length+' business records loaded.');
+      // ── Detect file type ──
+      const isFullBackup = p.type==='full_backup' && p.actuals && p.clientMaster;
+      const isActualsOnly = !p.clientMaster && p.accounts && p.account_count!==undefined;
+      const isClientOnly  = !p.accounts && p.clientData;
+
+      if(!isFullBackup && !isActualsOnly && !isClientOnly){
+        alert('Unrecognised backup file. Please use a LeadBU backup JSON.'); return;
+      }
+
+      // Build confirmation message
+      let what=[];
+      if(isFullBackup||isActualsOnly) what.push('Actuals ('+( (isFullBackup?p.actuals:p).account_count)+' accounts)');
+      if(isFullBackup||isClientOnly)  what.push('Client Master (contract & contact data)');
+      const savedLabel=p.savedAt||'unknown date';
+      if(!confirm('Restore from backup saved on '+savedLabel+'?\n\nThis will replace:\n· '+what.join('\n· ')+'\n\nThis cannot be undone.')){input.value='';return;}
+
+      let actualsMsg='', clientMsg='';
+
+      // ── Restore Actuals ──
+      if(isFullBackup||isActualsOnly){
+        const ap=isFullBackup?p.actuals:p;
+        if(ap.account_count!==TARGETS.length){
+          alert('Actuals mismatch: backup has '+ap.account_count+' accounts, current AOP has '+TARGETS.length+'. Actuals restore skipped — client master was still restored if present.');
+        } else {
+          let matched=0,skipped=0;
+          const usedIdx=new Set();
+          ap.accounts.forEach(saved=>{
+            let idx=-1;
+            for(let i=0;i<TARGETS.length;i++){
+              if(usedIdx.has(i))continue;
+              const t=TARGETS[i];
+              if(t.client===saved.client&&t.ad_type===saved.ad_type&&
+                 t.btl===saved.btl&&t.cat===saved.cat&&t.fuel===saved.fuel){idx=i;break;}
+            }
+            if(idx>=0){
+              usedIdx.add(idx);
+              const def=newActualRec();
+              const merged={...def,...saved.actuals};
+              Object.keys(merged).forEach(k=>{
+                if(Array.isArray(merged[k])&&merged[k].length!==12)merged[k]=def[k];
+              });
+              ACTUALS[idx]=merged;matched++;
+            } else skipped++;
+          });
+          localStorage.setItem(ACT_KEY,JSON.stringify(ACTUALS));
+          writeAuditEntry({ts:Date.now(),user,client:'— ALL —',ad_type:'*',btl:'*',ba:'*',
+            field:'ACTUALS_RESTORE',month:'FULL RESTORE',old:'',
+            new:'Actuals restored from full backup saved '+savedLabel+' ('+matched+' matched, '+skipped+' skipped)'});
+          actualsMsg=matched+' actuals accounts restored'+(skipped?' ('+skipped+' skipped)':'');
+          render();
+        }
+      }
+
+      // ── Restore Client Master ──
+      if(isFullBackup||isClientOnly){
+        const cp=isFullBackup?p.clientMaster:p;
+        if(!cp.clientData){clientMsg='Client master section missing — skipped.';}
+        else {
+          saveClientDataStore(cp.clientData);
+          if(Array.isArray(cp.newClients))saveNewClients(cp.newClients);
+          writeAuditEntry({ts:Date.now(),user,client:'— ALL CLIENTS —',ad_type:'*',btl:'*',ba:'*',
+            field:'CM_RESTORE',month:'FULL RESTORE',old:'',
+            new:'Client master restored from full backup saved '+savedLabel});
+          clientMsg=Object.keys(cp.clientData).length+' client records restored';
+          renderClients();
+        }
+      }
+
+      // Toast / alert summary
+      const summary=[actualsMsg,clientMsg].filter(Boolean).join('\n');
+      const toast=document.getElementById('save-ok');
+      if(toast){toast.textContent='✓ Restored';toast.classList.add('show');
+        setTimeout(()=>{toast.textContent='✓ Saved';toast.classList.remove('show');},3000);}
+      alert('✅ Restore complete\n\n'+summary);
     }catch(err){alert('Could not read backup file: '+err.message);}
   };
   reader.readAsText(file);
   input.value='';
 }
+
+// ── Legacy thin wrappers kept for compatibility with old backup files ──────────
+// Old ClientMaster-only files (.clientData present, no .accounts) still work via restoreFull.
+function backupClientMaster(){ backupFull(); }
+function restoreClientMaster(input){ restoreFull(input); }
 
 const CLIENT_DATA_KEY='aop_client_data_fy27';
 // Migrate old format (keyed by client name) → new format (keyed by "client||adType")
@@ -4004,16 +4100,16 @@ function renderClients(){
         <div style="font-size:12px;color:var(--text2)">${totalCount} clients · Contract, contact & location data</div>
       </div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-        <!-- Backup -->
-        <button class="btn btn-dim" onclick="backupClientMaster()" title="Download client master as JSON backup">
+        <!-- Backup (full) -->
+        <button class="btn btn-dim" onclick="backupFull()" title="Download full backup — Actuals + Client Master in one JSON file">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           Backup
         </button>
-        <!-- Restore -->
-        <label class="btn btn-dim" style="cursor:pointer" title="Restore client master from a backup JSON file">
+        <!-- Restore (full) -->
+        <label class="btn btn-dim" style="cursor:pointer" title="Restore full backup — Actuals + Client Master from one JSON file">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
           Restore
-          <input type="file" accept=".json" style="display:none" onchange="restoreClientMaster(this)">
+          <input type="file" accept=".json" style="display:none" onchange="restoreFull(this)">
         </label>
         <div style="width:1px;height:24px;background:var(--border2)"></div>
         <button class="btn btn-primary" onclick="openClientUpsertModal('add')">
