@@ -495,14 +495,10 @@ canvas{max-height:260px}
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
         <span id="user-label">Set Name</span>
       </button>
-      <div style="position:relative;display:inline-flex" id="audit-btn-wrap">
-        <button class="btn btn-dim" onclick="openAuditPanel()" title="View change log">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-          Audit
-        </button>
-        <span onclick="openAuditV2Preview()" title="Preview new Audit v2 design"
-          style="position:absolute;top:-7px;right:-7px;font-size:8px;font-weight:800;letter-spacing:.03em;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;padding:1px 5px;border-radius:4px;cursor:pointer;line-height:14px;white-space:nowrap;box-shadow:0 2px 6px rgba(99,102,241,.4)">V2</span>
-      </div>
+      <button class="btn btn-dim" onclick="openAuditV2Preview()" title="View change history">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        Audit
+      </button>
     </div>
   </div>
 </div>
@@ -1303,9 +1299,9 @@ function _buildAuditV2(allEntries){
       <div style="display:flex;flex-direction:column">
         <div style="display:flex;align-items:center;gap:10px">
           <span style="font-size:15px;font-weight:700;color:var(--text1)">Change History</span>
-          <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;letter-spacing:.04em">V2 PREVIEW</span>
+          <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;letter-spacing:.04em">NEW</span>
         </div>
-        <span style="font-size:11px;color:var(--text3);margin-top:2px">Timeline · Activity · Inline indicators · Undo</span>
+        <span style="font-size:11px;color:var(--text3);margin-top:2px">Timeline · Activity heatmap · Inline last-edited · Undo</span>
       </div>
       <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
         <button onclick="document.getElementById('audit-v2-overlay').remove()" style="padding:6px 14px;border-radius:7px;background:var(--bg3);border:1px solid var(--border2);color:var(--text2);cursor:pointer;font-size:12px;font-family:inherit">✕ Close Preview</button>
