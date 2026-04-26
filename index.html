@@ -587,8 +587,10 @@ canvas{max-height:260px}
   <!-- CHARTS -->
 <div class="charts-grid hidden" id="charts-area">
   <div class="chart-card wide"><div class="chart-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 17 9 11 13 15 21 7"/><polyline points="14 7 21 7 21 14"/></svg>Monthly Revenue — Target vs Actual vs LY (Rs Lacs)</div><canvas id="c-revenue"></canvas></div>
-  <div class="chart-card"><div class="chart-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>GM% &amp; GPM% — Monthly Target vs Actual</div><canvas id="c-margins"></canvas></div>
-  <div class="chart-card"><div class="chart-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>Monthly Cost Stack vs Revenue</div><canvas id="c-costs"></canvas></div>
+  <div class="chart-card"><div class="chart-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>GM Abs &amp; GM% — Target vs Actual vs LY</div><canvas id="c-gm"></canvas></div>
+  <div class="chart-card"><div class="chart-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>GPM Abs &amp; GPM% — Target vs Actual vs LY</div><canvas id="c-gpm"></canvas></div>
+  <div class="chart-card"><div class="chart-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>Marketing Cost vs Revenue — Monthly</div><canvas id="c-mktg"></canvas></div>
+  <div class="chart-card"><div class="chart-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>CC Cost vs Revenue — Monthly</div><canvas id="c-cc"></canvas></div>
   <div class="chart-card"><div class="chart-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>Google · Meta · Organic Leads — Monthly</div><canvas id="c-leads"></canvas></div>
   <div class="chart-card"><div class="chart-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg>Client Revenue Mix — FY27 TGT</div><canvas id="c-clients"></canvas></div>
   <div class="chart-card"><div class="chart-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22M18 2H6v7a6 6 0 0 0 12 0V2z"/></svg>Quarterly P&amp;L — Rev · GM · GPM</div><canvas id="c-quarterly"></canvas></div>
@@ -3296,37 +3298,78 @@ function renderCharts(rows){
   const lyRM=MONTHS.map((_,i)=>rows.reduce((s,{t})=>s+sArr(t,'rev')[i],0));
   const tMM=MONTHS.map((_,i)=>rows.reduce((s,{t})=>s+mArr(t,'mktg')[i],0));
   const aMM=MONTHS.map((_,i)=>rows.reduce((s,{d})=>s+(d.mktg_cost[i]||0),0));
+  const lyMM=MONTHS.map((_,i)=>rows.reduce((s,{t})=>s+sArr(t,'mktg')[i],0));
   const tCM=MONTHS.map((_,i)=>rows.reduce((s,{t})=>s+mArr(t,'cc')[i],0));
   const aCM=MONTHS.map((_,i)=>rows.reduce((s,{d})=>s+d.cc[i],0));
-  const tGMpct=tRM.map((r,i)=>r?pct(r-tMM[i],r):0);
-  const aGMpct=aRM.map((r,i)=>r?pct(r-aMM[i],r):0);
-  const tGPMpct=tRM.map((r,i)=>r?pct((r-tMM[i])-tCM[i],r):0);
-  const aGPMpct=aRM.map((r,i)=>r?pct((r-aMM[i])-aCM[i],r):0);
+  // GM abs
+  const tGMabs=tRM.map((r,i)=>r-tMM[i]);
+  const aGMabs=aRM.map((r,i)=>r-aMM[i]);
+  const lyGMabs=MONTHS.map((_,i)=>rows.reduce((s,{t})=>s+sArr(t,'gm')[i],0));
+  // GM%
+  const tGMpct=tRM.map((r,i)=>r?+((tGMabs[i]/r)*100).toFixed(1):0);
+  const aGMpct=aRM.map((r,i)=>r?+((aGMabs[i]/r)*100).toFixed(1):0);
+  const lyGMpct=lyRM.map((r,i)=>r?+((lyGMabs[i]/r)*100).toFixed(1):0);
+  // GPM abs
+  const tGPMabs=tGMabs.map((g,i)=>g-tCM[i]);
+  const aGPMabs=aGMabs.map((g,i)=>g-aCM[i]);
+  const lyGPMabs=MONTHS.map((_,i)=>rows.reduce((s,{t})=>s+sArr(t,'gpm')[i],0));
+  // GPM%
+  const tGPMpct=tRM.map((r,i)=>r?+((tGPMabs[i]/r)*100).toFixed(1):0);
+  const aGPMpct=aRM.map((r,i)=>r?+((aGPMabs[i]/r)*100).toFixed(1):0);
+  const lyGPMpct=lyRM.map((r,i)=>r?+((lyGPMabs[i]/r)*100).toFixed(1):0);
   const googleM=MONTHS.map((_,i)=>rows.reduce((s,{d})=>s+(d.google_leads[i]||0),0));
   const metaM=MONTHS.map((_,i)=>rows.reduce((s,{d})=>s+(d.meta_leads[i]||0),0));
   const orgM=MONTHS.map((_,i)=>rows.reduce((s,{a})=>s+(a.organic_leads[i]||0),0));
   const tLeadsM=MONTHS.map((_,i)=>rows.reduce((s,{t})=>s+mArr(t,'leads')[i],0)*100000);
 
+  // Dual-axis options factory (left=Lacs, right=%)
+  const dualOpts=()=>({...CO,scales:{
+    x:{ticks:{color:'#8b949e',font:{size:9}},grid:{color:'#1e2d45'}},
+    y:{position:'left',ticks:{color:'#8b949e',font:{size:9}},grid:{color:'#1e2d45'}},
+    y1:{position:'right',grid:{drawOnChartArea:false},ticks:{color:'#8b949e',font:{size:9},callback:v=>v.toFixed(0)+'%'}},
+  }});
+
+  // 1. Revenue
   dc('c-revenue');CI['c-revenue']=new Chart(document.getElementById('c-revenue'),{type:'bar',data:{labels:MONTHS,datasets:[
     {label:'TGT Rev',data:tRM,backgroundColor:'#1d4ed888',borderColor:'#3b82f6',borderWidth:1},
     {label:'ACT Rev',data:aRM,backgroundColor:'#14532d88',borderColor:'#22c55e',borderWidth:1},
     {label:'LY Rev',data:lyRM,type:'line',borderColor:'#6b7280',borderWidth:2,pointRadius:2,fill:false},
   ]},options:{...CO}});
 
-  dc('c-margins');CI['c-margins']=new Chart(document.getElementById('c-margins'),{type:'line',data:{labels:MONTHS,datasets:[
-    {label:'GM% TGT',data:tGMpct,borderColor:'#22c55e',fill:false,tension:.3,pointRadius:3},
-    {label:'GM% ACT',data:aGMpct,borderColor:'#4ade80',borderDash:[4,3],fill:false,tension:.3,pointRadius:3},
-    {label:'GPM% TGT',data:tGPMpct,borderColor:'#eab308',fill:false,tension:.3,pointRadius:3},
-    {label:'GPM% ACT',data:aGPMpct,borderColor:'#fde047',borderDash:[4,3],fill:false,tension:.3,pointRadius:3},
-  ]},options:{...CO,scales:{...CO.scales,y:{...CO.scales.y,ticks:{...CO.scales.y.ticks,callback:v=>v.toFixed(0)+'%'}}}}});
+  // 2. GM abs + GM%
+  dc('c-gm');CI['c-gm']=new Chart(document.getElementById('c-gm'),{type:'bar',data:{labels:MONTHS,datasets:[
+    {label:'GM TGT (Lacs)',data:tGMabs,backgroundColor:'#14532d88',borderColor:'#22c55e',borderWidth:1,yAxisID:'y'},
+    {label:'GM ACT (Lacs)',data:aGMabs,backgroundColor:'#14532dcc',borderColor:'#4ade80',borderWidth:1,yAxisID:'y'},
+    {label:'LY GM (Lacs)',data:lyGMabs,type:'line',borderColor:'#6b7280',borderWidth:2,pointRadius:2,fill:false,yAxisID:'y'},
+    {label:'GM% TGT',data:tGMpct,type:'line',borderColor:'#22c55e',borderWidth:2,borderDash:[5,3],pointRadius:3,fill:false,yAxisID:'y1'},
+    {label:'GM% ACT',data:aGMpct,type:'line',borderColor:'#86efac',borderWidth:2,pointRadius:3,fill:false,yAxisID:'y1'},
+    {label:'LY GM%',data:lyGMpct,type:'line',borderColor:'#6b728088',borderWidth:1,borderDash:[3,3],pointRadius:2,fill:false,yAxisID:'y1'},
+  ]},options:dualOpts()});
 
-  dc('c-costs');CI['c-costs']=new Chart(document.getElementById('c-costs'),{type:'bar',data:{labels:MONTHS,datasets:[
+  // 3. GPM abs + GPM%
+  dc('c-gpm');CI['c-gpm']=new Chart(document.getElementById('c-gpm'),{type:'bar',data:{labels:MONTHS,datasets:[
+    {label:'GPM TGT (Lacs)',data:tGPMabs,backgroundColor:'#78350f88',borderColor:'#f97316',borderWidth:1,yAxisID:'y'},
+    {label:'GPM ACT (Lacs)',data:aGPMabs,backgroundColor:'#78350fcc',borderColor:'#fb923c',borderWidth:1,yAxisID:'y'},
+    {label:'LY GPM (Lacs)',data:lyGPMabs,type:'line',borderColor:'#6b7280',borderWidth:2,pointRadius:2,fill:false,yAxisID:'y'},
+    {label:'GPM% TGT',data:tGPMpct,type:'line',borderColor:'#eab308',borderWidth:2,borderDash:[5,3],pointRadius:3,fill:false,yAxisID:'y1'},
+    {label:'GPM% ACT',data:aGPMpct,type:'line',borderColor:'#fde047',borderWidth:2,pointRadius:3,fill:false,yAxisID:'y1'},
+    {label:'LY GPM%',data:lyGPMpct,type:'line',borderColor:'#6b728088',borderWidth:1,borderDash:[3,3],pointRadius:2,fill:false,yAxisID:'y1'},
+  ]},options:dualOpts()});
+
+  // 4. Marketing Cost vs Revenue
+  dc('c-mktg');CI['c-mktg']=new Chart(document.getElementById('c-mktg'),{type:'bar',data:{labels:MONTHS,datasets:[
     {label:'Rev TGT',data:tRM,type:'line',borderColor:'#3b82f6',fill:false,tension:.3,pointRadius:2,borderWidth:2},
-    {label:'Rev ACT',data:aRM,type:'line',borderColor:'#22c55e',borderDash:[4,3],fill:false,tension:.3,pointRadius:2},
-    {label:'MktgCost TGT',data:tMM,backgroundColor:'#ef444866',stack:'t'},
-    {label:'CC TGT',data:tCM,backgroundColor:'#f9731666',stack:'t'},
-    {label:'MktgCost ACT',data:aMM,backgroundColor:'#ef4444aa',stack:'a'},
-    {label:'CC ACT',data:aCM,backgroundColor:'#f97316aa',stack:'a'},
+    {label:'Rev ACT',data:aRM,type:'line',borderColor:'#22c55e',borderDash:[4,3],fill:false,tension:.3,pointRadius:2,borderWidth:2},
+    {label:'Mktg TGT',data:tMM,backgroundColor:'#ef444855',borderColor:'#ef4444',borderWidth:1},
+    {label:'Mktg ACT',data:aMM,backgroundColor:'#ef4444aa',borderColor:'#f87171',borderWidth:1},
+  ]},options:{...CO}});
+
+  // 5. CC Cost vs Revenue
+  dc('c-cc');CI['c-cc']=new Chart(document.getElementById('c-cc'),{type:'bar',data:{labels:MONTHS,datasets:[
+    {label:'Rev TGT',data:tRM,type:'line',borderColor:'#3b82f6',fill:false,tension:.3,pointRadius:2,borderWidth:2},
+    {label:'Rev ACT',data:aRM,type:'line',borderColor:'#22c55e',borderDash:[4,3],fill:false,tension:.3,pointRadius:2,borderWidth:2},
+    {label:'CC TGT',data:tCM,backgroundColor:'#f9731655',borderColor:'#f97316',borderWidth:1},
+    {label:'CC ACT',data:aCM,backgroundColor:'#f97316aa',borderColor:'#fb923c',borderWidth:1},
   ]},options:{...CO}});
 
   dc('c-leads');CI['c-leads']=new Chart(document.getElementById('c-leads'),{type:'bar',data:{labels:MONTHS,datasets:[
