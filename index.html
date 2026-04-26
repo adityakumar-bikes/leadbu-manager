@@ -726,6 +726,8 @@ function newActualRec(){
     // AI Bot Cost
     ai_per_lead_cost:Array(12).fill(0),   // Rs per lead (Absolute)
     ai_leads_processed:Array(12).fill(0), // count of leads processed by AI
+    // Piaggio-specific retainer (Rs Lacs/month, added to CPS revenue)
+    piaggio_retainer:Array(12).fill(0),
   };
 }
 // migrateActuals: shape-checks and migrates raw data (from Firebase or backup)
@@ -877,6 +879,7 @@ const AUDIT_FIELD_LABELS={
   google_cr_pct:'Google Cr%',meta_cr_pct:'Meta Cr%',overall_cr_pct:'Overall Cr%',
   dms_retails:'DMS Retails',voc_retails:'VoC Retails',
   ai_per_lead_cost:'AI Per Lead Cost',ai_leads_processed:'AI Leads Processed',
+  piaggio_retainer:'Piaggio Retainer Cost',
   CLEAR_ALL:'Clear All Actuals',
 };
 const AUDIT_USER_COLORS=['#60a5fa','#34d399','#f472b6','#fbbf24','#a78bfa','#fb923c','#38bdf8','#4ade80'];
@@ -1602,8 +1605,9 @@ function deriveActuals(a, adType){
   // Revenue computed from ad-type-specific inputs
   let rev;
   if(adType==='CPS'){
-    // CAC (Rs/retail) × Retails (units) / 100000 = Rs Lacs
-    rev=a.retails.map((r,i)=>(+(a.cac[i]||0))*(+r||0)/100000);
+    // CAC (Rs/retail) × Retails (units) / 100000 + Piaggio retainer (Rs Lacs) = Rs Lacs
+    const _retainer=a.piaggio_retainer||Array(12).fill(0);
+    rev=a.retails.map((r,i)=>(+(a.cac[i]||0))*(+r||0)/100000+(+(_retainer[i]||0)));
   } else if(adType==='Media Leads'){
     // CPL_rate (Rs/lead) × Total Leads (absolute) / 100000 = Rs Lacs
     rev=a.total_leads.map((l,i)=>(+(a.cpl_rate[i]||0))*(+l||0)/100000);
@@ -1910,6 +1914,7 @@ const TVS_BRANDS=['Commuter','Premium','Scooter','Moped','EV'];
 const TVS_BRAND_LABELS={Commuter:'TVS Commuter (Raider, Radeon, Sports, Star City Plus)',Premium:'TVS Premium (Apache 160-200, Apache 310 Series, Ronin)',Scooter:'TVS Scooter (Jupiter 110, 125, NTorq, Scooty Zest)',Moped:'TVS Moped (XL100)',EV:'TVS EV (iQube)'};
 const RE_CLIENT='Royal Enfield';
 const RE_BRANDS=['ICE','EV'];
+const PIAGGIO_CLIENT='Piaggio';
 const RE_BRAND_LABELS={ICE:'RE ICE',EV:'RE EV — Flying Flea'};
 
 function newBrandRec(){
@@ -2185,11 +2190,13 @@ function renderModal(recIdx){
   const adType=t.ad_type;
 
   const showDMSVoC=(t.client===TVS_CLIENT||t.client===AMPERE_CLIENT);
+  const isPiaggioRetainer=(t.client===PIAGGIO_CLIENT&&adType==='CPS');
   const aDMS=a.dms_retails||Array(12).fill(0);
   const aVoC=a.voc_retails||Array(12).fill(0);
   const aOvCr=a.overall_cr_pct||Array(12).fill(0);
   const aGCr=a.google_cr_pct||Array(12).fill(0);
   const aMCr=a.meta_cr_pct||Array(12).fill(0);
+  const aPR=a.piaggio_retainer||Array(12).fill(0);
   let revSection='';
   if(adType==='CPS'){
     const dmsVoCRows=showDMSVoC
@@ -2199,11 +2206,13 @@ function renderModal(recIdx){
         +pctRow('DMS Cr% = DMS / Triggered Leads',aDMS,d.trig_leads,'cv-pct')
         +pctRow('VoC Cr% = VoC / Triggered Leads',aVoC,d.trig_leads,'cv-pct')
       : inputRow('Retails (Units Sold)','','retails',a.retails,'1','or enter Overall Cr% below');
-    revSection=sectionRow('── REVENUE (CPS: CAC × Retails) ──')
+    const revLabel=isPiaggioRetainer?'── REVENUE (CPS: CAC × Retails + Retainer) ──':'── REVENUE (CPS: CAC × Retails) ──';
+    revSection=sectionRow(revLabel)
       +inputRow('CAC — Rate Charged (Rs/Retail)','','cac',a.cac,'1','Revenue driver')
       +dmsVoCRows
       +inputRow('Overall Cr% = Retails / Triggered Leads (%)','cpl-input','overall_cr_pct',aOvCr,'0.01','Enter Cr% to auto-calc Retails, or enter Retails above to auto-calc Cr%')
-      +compRow('= Revenue (Rs Lacs)',d.rev,'cv-rev',1,tRevM)
+      +(isPiaggioRetainer?inputRow('Retainer Cost (Rs Lacs/month)','cv-rev','piaggio_retainer',aPR,'0.01','Fixed monthly retainer paid by Piaggio to BikeDekho — added to CAC×Retails revenue'):'')
+      +compRow(isPiaggioRetainer?'= Total Revenue (CAC×Retails + Retainer)':'= Revenue (Rs Lacs)',d.rev,'cv-rev',1,tRevM)
       +sectionRow('── ROAS INPUTS (Ad Revenue) ──')
       +inputRow('Google Expected Cr% (%)','cpl-input','google_cr_pct',aGCr,'0.01','Auto-computes Google Rev = Cr% × Google Leads × CAC')
       +compRow('Google Revenue from Ads (Rs Lacs)',d.google_rev,'cv-rev',2)
