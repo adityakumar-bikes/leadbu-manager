@@ -3986,7 +3986,6 @@ function renderClients(){
   }
 
   const selS='background:var(--bg3);border:1px solid var(--border2);border-radius:7px;padding:6px 10px;color:var(--text1);font-size:12px;font-family:inherit;outline:none;cursor:pointer;height:34px';
-  const inpS='background:var(--bg3);border:1px solid var(--border2);border-radius:7px;padding:6px 10px;color:var(--text1);font-size:12px;font-family:inherit;outline:none;height:34px;min-width:140px';
 
   let html=`
   <!-- ── Unified Client Upsert Modal ── -->
@@ -4120,10 +4119,13 @@ function renderClients(){
         </select>
       </div>
 
-      <!-- OEM / Client search -->
+      <!-- OEM dropdown -->
       <div style="display:flex;align-items:center;gap:5px">
         <span style="font-size:10.5px;color:var(--text3);white-space:nowrap">OEM</span>
-        <input id="cm-f-oem" type="text" placeholder="Search OEM…" value="${fOEM}" style="${inpS}" oninput="renderClients()">
+        <select id="cm-f-oem" style="${selS}" onchange="renderClients()">
+          <option value="">All</option>
+          ${filterOEMs.map(o=>`<option value="${o.toLowerCase()}"${fOEM===o.toLowerCase()?' selected':''}>${o}</option>`).join('')}
+        </select>
       </div>
 
       <!-- Contract Available -->
