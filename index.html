@@ -495,10 +495,14 @@ canvas{max-height:260px}
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
         <span id="user-label">Set Name</span>
       </button>
-      <button class="btn btn-dim" onclick="openAuditPanel()" title="View change log">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-        Audit
-      </button>
+      <div style="position:relative;display:inline-flex" id="audit-btn-wrap">
+        <button class="btn btn-dim" onclick="openAuditPanel()" title="View change log">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          Audit
+        </button>
+        <span onclick="openAuditV2Preview()" title="Preview new Audit v2 design"
+          style="position:absolute;top:-7px;right:-7px;font-size:8px;font-weight:800;letter-spacing:.03em;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;padding:1px 5px;border-radius:4px;cursor:pointer;line-height:14px;white-space:nowrap;box-shadow:0 2px 6px rgba(99,102,241,.4)">V2</span>
+      </div>
     </div>
   </div>
 </div>
@@ -1073,6 +1077,342 @@ function _auditRefreshTable(){
 }
 
 function filterAudit(){ _auditRefreshTable(); } // backward compat
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// OPTION 5 AUDIT — SNEAK PEEK  (hidden preview, trigger: openAuditV2Preview)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function openAuditV2Preview(){
+  // collect real data from both sources
+  let entries=[];
+  try{ entries=JSON.parse(localStorage.getItem('leadbu_audit')||'[]'); }catch(e){}
+  entries=entries.sort((a,b)=>b.ts-a.ts);
+
+  // async-merge Firebase then re-render
+  if(_auditRef){
+    _auditRef.orderByKey().limitToLast(500).once('value',snap=>{
+      const raw=snap.val()||{};
+      const fb=Object.values(raw);
+      const seen=new Set(entries.map(e=>e.ts+'|'+e.client+'|'+e.field+'|'+e.month));
+      fb.forEach(e=>{ const k=e.ts+'|'+e.client+'|'+e.field+'|'+e.month; if(!seen.has(k)){seen.add(k);entries.push(e);} });
+      entries=entries.sort((a,b)=>b.ts-a.ts);
+      _buildAuditV2(entries);
+    }).catch(()=>{ _buildAuditV2(entries); });
+  } else { _buildAuditV2(entries); }
+}
+
+function _buildAuditV2(allEntries){
+  // remove stale overlay if exists
+  const old=document.getElementById('audit-v2-overlay');
+  if(old) old.remove();
+
+  const PALETTE=['#60a5fa','#34d399','#f472b6','#fbbf24','#a78bfa','#fb923c','#38bdf8','#4ade80'];
+  const allUsers=[...new Set(allEntries.map(e=>e.user))].sort((a,b)=>{
+    return Math.max(...allEntries.filter(e=>e.user===b).map(e=>e.ts)) - Math.max(...allEntries.filter(e=>e.user===a).map(e=>e.ts));
+  });
+  const uColor={};
+  allUsers.forEach((u,i)=>uColor[u]=PALETTE[i%PALETTE.length]);
+
+  // ── helper: sentence from entry ──
+  function sentence(e){
+    const fl=AUDIT_FIELD_LABELS[e.field]||e.field;
+    const isNum=typeof e.new==='number';
+    const delta=isNum?(e.new-e.old):null;
+    const sign=delta>0?'▲':delta<0?'▼':'';
+    const pct=isNum&&e.old&&e.old!==0?Math.abs((delta/e.old)*100).toFixed(1)+'%':'';
+    const newFmt=_auditFmtVal(e.new);
+    const oldFmt=_auditFmtVal(e.old);
+    const col=delta>0?'var(--pos)':delta<0?'var(--neg)':'var(--warn)';
+    const badge=isNum&&delta!==0
+      ?`<span style="font-size:10px;font-weight:700;color:${col};background:${col}18;padding:1px 6px;border-radius:4px;margin-left:4px">${sign}${pct||newFmt}</span>`:'';
+    const type=typeof e.old==='string'?'updated':'changed';
+    return `<span style="color:var(--text2)">${fl}</span> for <span style="color:var(--text1);font-weight:600">${e.month}</span>`
+      +`: <span style="color:var(--text3)">${oldFmt}</span> → <span style="color:var(--text1);font-weight:600">${newFmt}</span>${badge}`;
+  }
+
+  // ── Group entries into sessions (same user, gap < 5 min) ──
+  function makeSessions(entries){
+    const SESSION_GAP=5*60*1000;
+    const sessions=[];
+    let cur=null;
+    entries.forEach(e=>{
+      if(!cur||cur.user!==e.user||(cur.entries[0].ts - e.ts)>SESSION_GAP){
+        cur={user:e.user,start:e.ts,entries:[e]};
+        sessions.push(cur);
+      } else {
+        cur.entries.push(e);
+        cur.start=Math.min(cur.start,e.ts);
+      }
+    });
+    return sessions;
+  }
+
+  // ── Group sessions by date ──
+  function dayLabel(ts){
+    const d=new Date(ts);
+    const today=new Date(); today.setHours(0,0,0,0);
+    const yest=new Date(today); yest.setDate(yest.getDate()-1);
+    d.setHours(0,0,0,0);
+    if(d.getTime()===today.getTime()) return 'Today';
+    if(d.getTime()===yest.getTime()) return 'Yesterday';
+    return d.toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'short',year:'2-digit',timeZone:'Asia/Kolkata'});
+  }
+
+  const sessions=makeSessions(allEntries);
+
+  // group sessions by day
+  const dayMap=new Map();
+  sessions.forEach(s=>{
+    const dl=dayLabel(s.entries[0].ts);
+    if(!dayMap.has(dl)) dayMap.set(dl,[]);
+    dayMap.get(dl).push(s);
+  });
+
+  // ── Activity heatmap data (last 12 weeks) ──
+  const heatMap={};
+  allEntries.forEach(e=>{
+    const d=new Date(e.ts);
+    const key=d.toISOString().slice(0,10);
+    heatMap[key]=(heatMap[key]||0)+1;
+  });
+
+  // ── Per-user stats for mini scoreboard ──
+  const userStats={};
+  allEntries.forEach(e=>{
+    if(!userStats[e.user]) userStats[e.user]={count:0,accounts:new Set(),last:0};
+    userStats[e.user].count++;
+    userStats[e.user].accounts.add(e.client);
+    if(e.ts>userStats[e.user].last) userStats[e.user].last=e.ts;
+  });
+
+  // ── Build the heatmap HTML (12 weeks × 7 days) ──
+  function buildHeatmap(){
+    const today=new Date(); today.setHours(0,0,0,0);
+    const weeks=12;
+    const cells=[];
+    for(let w=weeks-1;w>=0;w--){
+      for(let d=0;d<7;d++){
+        const dt=new Date(today);
+        dt.setDate(today.getDate()-(w*7+d));
+        const key=dt.toISOString().slice(0,10);
+        const cnt=heatMap[key]||0;
+        const intensity=cnt===0?0:cnt<3?1:cnt<8?2:cnt<15?3:4;
+        const colors=['var(--bg3)','#1e3a2f','#166534','#16a34a','#4ade80'];
+        const label=dt.toLocaleDateString('en-IN',{day:'numeric',month:'short'})+': '+cnt+' edit'+(cnt!==1?'s':'');
+        cells.push(`<div title="${label}" style="width:12px;height:12px;border-radius:2px;background:${colors[intensity]};cursor:default"></div>`);
+      }
+    }
+    const days=['S','M','T','W','T','F','S'];
+    const dayLabels=days.map(d=>`<div style="height:12px;font-size:8px;color:var(--text3);line-height:12px">${d}</div>`).join('');
+    return `
+      <div style="display:flex;gap:4px">
+        <div style="display:flex;flex-direction:column;gap:2px;margin-right:2px">${dayLabels}</div>
+        <div style="display:grid;grid-template-rows:repeat(7,12px);grid-auto-flow:column;grid-auto-columns:12px;gap:2px">${cells.join('')}</div>
+      </div>`;
+  }
+
+  // ── Build timeline HTML ──
+  let timelineHTML='';
+  dayMap.forEach((daySessions,dl)=>{
+    const dayTotal=daySessions.reduce((s,sess)=>s+sess.entries.length,0);
+    timelineHTML+=`
+      <div style="margin-bottom:24px">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+          <span style="font-size:12px;font-weight:700;color:var(--text1)">${dl}</span>
+          <span style="font-size:10px;color:var(--text3);background:var(--bg3);padding:2px 8px;border-radius:10px">${dayTotal} edit${dayTotal!==1?'s':''}</span>
+          <div style="flex:1;height:1px;background:var(--border)"></div>
+        </div>`;
+
+    daySessions.forEach(sess=>{
+      const col=uColor[sess.user]||'var(--text2)';
+      const initials=sess.user.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
+      const time=new Date(sess.entries[0].ts).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true,timeZone:'Asia/Kolkata'});
+
+      // Group entries in session by client
+      const clientMap={};
+      sess.entries.forEach(e=>{
+        const k=e.client+(e.ad_type?'||'+e.ad_type:'');
+        if(!clientMap[k]) clientMap[k]={client:e.client,ad_type:e.ad_type,entries:[]};
+        clientMap[k].entries.push(e);
+      });
+
+      timelineHTML+=`
+        <div style="display:flex;gap:12px;margin-bottom:12px">
+          <!-- avatar + spine -->
+          <div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0">
+            <div style="width:30px;height:30px;border-radius:50%;background:${col}22;border:2px solid ${col};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:${col};flex-shrink:0">${initials}</div>
+            <div style="width:1px;flex:1;background:var(--border);margin-top:4px;min-height:8px"></div>
+          </div>
+          <!-- session card -->
+          <div style="flex:1;min-width:0;margin-bottom:4px">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+              <span style="font-size:12px;font-weight:700;color:${col}">${sess.user}</span>
+              <span style="font-size:10px;color:var(--text3)">${time}</span>
+              <span style="font-size:10px;color:var(--text3);background:var(--bg3);padding:1px 7px;border-radius:10px">${sess.entries.length} change${sess.entries!==1?'s':''}</span>
+            </div>
+            ${Object.values(clientMap).map(({client,ad_type,entries})=>{
+              const BIZ={'CPS':'#8b5cf6','Media Leads':'#fbbf24','CC contract':'#34d399'};
+              const bc=BIZ[ad_type]||'var(--text3)';
+              return `<div style="background:var(--bg2);border:1px solid var(--border);border-left:3px solid ${bc};border-radius:8px;padding:10px 14px;margin-bottom:6px">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+                  <span style="font-size:11px;font-weight:700;color:var(--text1)">${client}</span>
+                  ${ad_type?`<span style="font-size:9px;font-weight:700;padding:1px 7px;border-radius:4px;background:${bc}22;color:${bc};border:1px solid ${bc}44">${ad_type}</span>`:''}
+                  <span style="font-size:10px;color:var(--text3);margin-left:auto">${entries.length} field${entries.length!==1?'s':''}</span>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:4px">
+                  ${entries.slice(0,5).map(e=>`<div style="font-size:11px;color:var(--text2);line-height:1.5">${sentence(e)}</div>`).join('')}
+                  ${entries.length>5?`<div style="font-size:10px;color:var(--text3)">+ ${entries.length-5} more changes</div>`:''}
+                </div>
+              </div>`;
+            }).join('')}
+          </div>
+        </div>`;
+    });
+    timelineHTML+='</div>';
+  });
+
+  if(!timelineHTML) timelineHTML=`<div style="padding:40px;text-align:center;color:var(--text3)"><div style="font-size:28px;margin-bottom:10px">📋</div><div>No changes recorded yet — make some edits first.</div></div>`;
+
+  // ── Inline "Last Edited" concept mockup ──
+  const recentByAccount={};
+  allEntries.forEach(e=>{
+    const k=e.client+'||'+(e.ad_type||'');
+    if(!recentByAccount[k]||e.ts>recentByAccount[k].ts) recentByAccount[k]=e;
+  });
+  const inlineRows=Object.entries(recentByAccount).slice(0,6).map(([k,e])=>{
+    const col=uColor[e.user]||'var(--text2)';
+    const initials=e.user.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
+    return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
+      <div style="font-size:12px;font-weight:600;color:var(--text1);width:120px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${e.client}</div>
+      <div style="font-size:10px;color:var(--text3);width:90px;flex-shrink:0">${e.ad_type||'—'}</div>
+      <div style="flex:1;font-size:11px;color:var(--text2)">${AUDIT_FIELD_LABELS[e.field]||e.field} · ${e.month}</div>
+      <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+        <div style="width:20px;height:20px;border-radius:50%;background:${col}22;border:1.5px solid ${col};display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:${col}">${initials}</div>
+        <span style="font-size:10px;color:var(--text3)">${_auditRelTime(e.ts)}</span>
+      </div>
+      <button style="font-size:9px;padding:2px 8px;border-radius:4px;background:var(--bg3);border:1px solid var(--border2);color:var(--neg);cursor:pointer;flex-shrink:0">↩ Undo</button>
+    </div>`;
+  }).join('');
+
+  // ── Assemble full overlay ──
+  const overlay=document.createElement('div');
+  overlay.id='audit-v2-overlay';
+  overlay.style.cssText='position:fixed;inset:0;z-index:9999;background:var(--bg);display:flex;flex-direction:column;overflow:hidden;font-family:inherit';
+  overlay.innerHTML=`
+    <!-- Header -->
+    <div style="background:var(--bg2);border-bottom:1px solid var(--border);padding:14px 22px;display:flex;align-items:center;gap:14px;flex-shrink:0">
+      <div style="display:flex;flex-direction:column">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="font-size:15px;font-weight:700;color:var(--text1)">Change History</span>
+          <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;letter-spacing:.04em">V2 PREVIEW</span>
+        </div>
+        <span style="font-size:11px;color:var(--text3);margin-top:2px">Timeline · Activity · Inline indicators · Undo</span>
+      </div>
+      <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
+        <button onclick="document.getElementById('audit-v2-overlay').remove()" style="padding:6px 14px;border-radius:7px;background:var(--bg3);border:1px solid var(--border2);color:var(--text2);cursor:pointer;font-size:12px;font-family:inherit">✕ Close Preview</button>
+      </div>
+    </div>
+
+    <!-- Body -->
+    <div style="display:flex;flex:1;overflow:hidden">
+
+      <!-- LEFT: Sidebar -->
+      <div style="width:260px;flex-shrink:0;border-right:1px solid var(--border);background:var(--bg2);display:flex;flex-direction:column;overflow-y:auto">
+
+        <!-- Activity heatmap -->
+        <div style="padding:16px;border-bottom:1px solid var(--border)">
+          <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px">Activity · Last 12 Weeks</div>
+          ${buildHeatmap()}
+          <div style="display:flex;align-items:center;gap:4px;margin-top:8px">
+            <span style="font-size:9px;color:var(--text3)">Less</span>
+            ${['var(--bg3)','#1e3a2f','#166534','#16a34a','#4ade80'].map(c=>`<div style="width:10px;height:10px;border-radius:2px;background:${c}"></div>`).join('')}
+            <span style="font-size:9px;color:var(--text3)">More</span>
+          </div>
+        </div>
+
+        <!-- Scoreboard -->
+        <div style="padding:16px;border-bottom:1px solid var(--border)">
+          <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px">Contributors</div>
+          ${allUsers.map((u,i)=>{
+            const s=userStats[u]||{count:0,accounts:new Set(),last:0};
+            const col=uColor[u];
+            const init=u.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
+            return `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)">
+              <div style="width:28px;height:28px;border-radius:50%;background:${col}22;border:2px solid ${col};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:${col};flex-shrink:0">${init}</div>
+              <div style="flex:1;min-width:0">
+                <div style="font-size:12px;font-weight:700;color:${col};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${u}</div>
+                <div style="font-size:10px;color:var(--text3)">${s.count} edits · ${s.accounts.size} accounts</div>
+              </div>
+              <div style="font-size:9px;color:var(--text3);flex-shrink:0">${_auditRelTime(s.last)}</div>
+            </div>`;
+          }).join('')}
+        </div>
+
+        <!-- Export + filters -->
+        <div style="padding:16px">
+          <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px">Quick Filters</div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <select style="background:var(--bg3);border:1px solid var(--border2);border-radius:6px;padding:6px 8px;color:var(--text1);font-size:11px;font-family:inherit;outline:none">
+              <option>All Types</option><option>Actuals Edits</option><option>Client Master</option><option>System Events</option>
+            </select>
+            <select style="background:var(--bg3);border:1px solid var(--border2);border-radius:6px;padding:6px 8px;color:var(--text1);font-size:11px;font-family:inherit;outline:none">
+              <option>All Users</option>${allUsers.map(u=>`<option>${u}</option>`).join('')}
+            </select>
+            <select style="background:var(--bg3);border:1px solid var(--border2);border-radius:6px;padding:6px 8px;color:var(--text1);font-size:11px;font-family:inherit;outline:none">
+              <option>All Accounts</option>${[...new Set(allEntries.map(e=>e.client))].sort().map(c=>`<option>${c}</option>`).join('')}
+            </select>
+          </div>
+          <button style="margin-top:12px;width:100%;padding:7px;border-radius:7px;background:var(--bg3);border:1px solid var(--border2);color:var(--text2);cursor:pointer;font-size:11px;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            Export as CSV
+          </button>
+        </div>
+      </div>
+
+      <!-- RIGHT: Main content — two tabs -->
+      <div style="flex:1;display:flex;flex-direction:column;overflow:hidden">
+
+        <!-- Tab bar -->
+        <div style="display:flex;gap:0;border-bottom:1px solid var(--border);flex-shrink:0;background:var(--bg2)">
+          ${[['timeline-tab','🕐  Timeline','Timeline view — sessions grouped by day'],['inline-tab','⚡  Inline Last-Edited','See last-edited per account at a glance']].map(([id,label,hint],i)=>`
+            <div id="${id}" onclick="document.querySelectorAll('.av2-tab').forEach(t=>t.style.borderBottom='2px solid transparent');document.getElementById('${id}').style.borderBottom='2px solid var(--accent)';document.querySelectorAll('.av2-panel').forEach(p=>p.style.display='none');document.getElementById('${id}-panel').style.display='flex';"
+              class="av2-tab" style="padding:11px 20px;font-size:12px;font-weight:600;color:${i===0?'var(--text1)':'var(--text2)'};cursor:pointer;border-bottom:${i===0?'2px solid var(--accent)':'2px solid transparent'};white-space:nowrap" title="${hint}">${label}</div>
+          `).join('')}
+        </div>
+
+        <!-- Timeline panel -->
+        <div id="timeline-tab-panel" class="av2-panel" style="flex:1;overflow-y:auto;padding:20px 24px;display:flex;flex-direction:column">
+          <div style="font-size:12px;color:var(--text3);background:var(--accent-soft);border:1px solid var(--accent)33;border-radius:8px;padding:10px 14px;margin-bottom:20px;display:flex;align-items:center;gap:8px">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;flex-shrink:0;color:var(--accent)"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            Changes within 5 minutes by the same user are grouped as one session · Showing ${allEntries.length} total edits
+          </div>
+          ${timelineHTML}
+        </div>
+
+        <!-- Inline Last-Edited panel -->
+        <div id="inline-tab-panel" class="av2-panel" style="flex:1;overflow-y:auto;padding:20px 24px;display:none;flex-direction:column">
+          <div style="font-size:12px;color:var(--text3);background:var(--accent-soft);border:1px solid var(--accent)33;border-radius:8px;padding:10px 14px;margin-bottom:20px;display:flex;align-items:center;gap:8px">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;flex-shrink:0;color:var(--accent)"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            In V2, each row in the AOP Tracker will show a "last edited by" chip inline. Preview below uses real data.
+          </div>
+          <div style="background:var(--bg2);border:1px solid var(--border);border-radius:10px;overflow:hidden">
+            <div style="padding:10px 14px;background:var(--bg3);border-bottom:1px solid var(--border);display:grid;grid-template-columns:120px 90px 1fr 130px 70px;gap:10px">
+              ${['Account','Ad Type','Last Change','By · When','Action'].map(h=>`<div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em">${h}</div>`).join('')}
+            </div>
+            <div style="padding:0 14px">
+              ${inlineRows||'<div style="padding:20px;text-align:center;color:var(--text3)">Make some edits to see inline history</div>'}
+            </div>
+          </div>
+          <div style="margin-top:16px;padding:12px 16px;background:var(--warn-bg);border:1px solid var(--warn)33;border-radius:8px;font-size:11px;color:var(--warn)">
+            ↩ <strong>Undo</strong> — will revert the specific field change and log the reversal in the audit trail. Undo is available for the last 50 changes per session.
+          </div>
+        </div>
+
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+}
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 function saveActuals(){
   // Optimistic local indicator
