@@ -2623,132 +2623,159 @@ function renderBajajModal(recIdx){
 
 function renderTVSModal(recIdx){
   const t=TARGETS[recIdx],a=ACTUALS[recIdx];
-  if(!a.brands)a.brands={};TVS_BRANDS.forEach(b=>{if(!a.brands[b])a.brands[b]=newBrandRec();});
-  // Sync each brand's retails from DMS+VoC (fixes stale direct-entry values)
-  TVS_BRANDS.forEach(b=>{const br=a.brands[b];if(!br)return;const dms=Array(12).fill(0).map((_,i)=>+(br.dms_retails&&br.dms_retails[i])||0);const voc=Array(12).fill(0).map((_,i)=>+(br.voc_retails&&br.voc_retails[i])||0);br.retails=dms.map((d,i)=>d+voc[i]);});
+  if(!a.brands)a.brands={};
+  TVS_BRANDS.forEach(b=>{if(!a.brands[b])a.brands[b]=newBrandRec();});
+  // Sync brand retails & recompute totals
+  TVS_BRANDS.forEach(b=>{
+    const br=a.brands[b];if(!br)return;
+    const dms=Array(12).fill(0).map((_,i)=>+(br.dms_retails&&br.dms_retails[i])||0);
+    const voc=Array(12).fill(0).map((_,i)=>+(br.voc_retails&&br.voc_retails[i])||0);
+    br.retails=dms.map((d,i)=>d+voc[i]);
+  });
   recomputeBrandTotals(recIdx,TVS_BRANDS);
   const d=deriveActuals(a,t.ad_type);
   const vis=getVisibleMonths(),nc=vis.length*2+3,adType=t.ad_type;
+  const fmtC=(v,dec)=>dec===0?Math.round(v).toLocaleString('en-IN'):fmt(v,dec);
 
-  function colHdrs(){
-    return '<tr>'
-      +'<th rowspan="2" style="min-width:160px;text-align:left;position:sticky;left:0;z-index:3;background:var(--bg3)">Metric</th>'
-      +vis.map(i=>'<th colspan="2" style="text-align:center;border-left:1px solid var(--border2);background:var(--bg2);font-size:11px">'+MONTHS[i]+'</th>').join('')
-      +'<th colspan="2" class="fy-col" style="text-align:center;font-size:11px">FY</th>'
-      +'</tr><tr>'
-      +vis.map(()=>'<th style="font-size:9px;color:var(--blue);padding:2px 4px;border-left:1px solid var(--border2)">ACT</th><th style="font-size:9px;color:var(--text3);padding:2px 4px;min-width:48px">TGT</th>').join('')
-      +'<th style="font-size:9px;color:var(--blue);padding:2px 4px">ACT</th><th style="font-size:9px;color:var(--text3);padding:2px 4px">TGT</th></tr>';
+  // safe array from any Firebase object or JS array
+  const sa=(obj)=>Array(12).fill(0).map((_,i)=>+(obj&&obj[i])||0);
+
+  const colHdrs='<tr>'
+    +'<th rowspan="2" style="min-width:170px;text-align:left;position:sticky;left:0;z-index:3;background:var(--bg3)">Metric</th>'
+    +vis.map(i=>'<th colspan="2" style="text-align:center;border-left:1px solid var(--border2);background:var(--bg2);font-size:11px">'+MONTHS[i]+'</th>').join('')
+    +'<th colspan="2" class="fy-col" style="text-align:center;font-size:11px">FY Total</th>'
+    +'</tr><tr>'
+    +vis.map(()=>'<th style="font-size:9px;color:var(--blue);padding:2px 4px;border-left:1px solid var(--border2)">ACT</th><th style="font-size:9px;color:var(--text3);padding:2px 4px;min-width:52px">TGT</th>').join('')
+    +'<th style="font-size:9px;color:var(--blue);padding:2px 4px">ACT</th><th style="font-size:9px;color:var(--text3);padding:2px 4px">TGT</th></tr>';
+
+  // Input row wired to onBrandInputChange
+  function bInpR(label,cls,field,rawArr,step,brand,hint){
+    const arr=sa(rawArr);
+    const dec=step==='0.01'?2:0;
+    const cells=vis.map(i=>'<td style="border-left:1px solid var(--border2)"><input class="pl-input '+cls+'" type="number" step="'+step+'" value="'+arr[i].toFixed(dec)+'" data-field="'+field+'" data-month="'+i+'" data-rec="'+recIdx+'" data-brand="'+brand+'" onchange="onBrandInputChange(this)"></td><td class="tgt-col nd">—</td>').join('');
+    const fy=arr.reduce((s,v)=>s+v,0);
+    return '<tr class="row-input"><td class="mc">'+label+(hint?'<br><span class="hint">'+hint+'</span>':'')+'</td>'+cells+'<td class="fy-col">'+fmtC(fy,dec)+'</td><td class="fy-col tgt-col nd">—</td></tr>';
   }
-  function bInp(label,cls,field,arr,step,brand){
-    const dec=step==='1'?0:2;
-    const cells=vis.map(i=>{const v=+(arr[i]||0);return'<td style="border-left:1px solid var(--border2)"><input class="pl-input '+cls+'" type="number" step="'+step+'" value="'+v.toFixed(dec)+'" data-field="'+field+'" data-month="'+i+'" data-rec="'+recIdx+'" data-brand="'+brand+'" onchange="onBrandInputChange(this)"></td><td class="tgt-col nd">—</td>';}).join('');
-    const fy=arr.reduce((s,v)=>s+(+v||0),0);
-    return '<tr class="row-input"><td class="mc">'+label+'</td>'+cells+'<td class="fy-col">'+fmtC(fy,dec)+'</td><td class="fy-col tgt-col nd">—</td></tr>';
+  // Computed row — always safe
+  function bCmpR(label,rawArr,cls,dec){
+    const arr=sa(rawArr);
+    const cells=vis.map(i=>'<td class="'+cls+'" style="border-left:1px solid var(--border2)">'+fmtC(arr[i],dec)+'</td><td class="tgt-col nd">—</td>').join('');
+    const fy=arr.reduce((s,v)=>s+v,0);
+    return '<tr class="row-computed"><td class="mc">'+label+'</td>'+cells+'<td class="fy-col '+cls+'">'+fmtC(fy,dec)+'</td><td class="fy-col tgt-col nd">—</td></tr>';
   }
-  function bCmp(label,arr,cls,dec,tA){
-    const cells=vis.map(i=>{const tv=tA?tA[i]:null;return'<td class="'+cls+'" style="border-left:1px solid var(--border2)">'+fmtC(arr[i],dec)+'</td>'+(tv!=null?'<td class="tgt-col '+cls+'">'+fmtC(tv,dec)+'</td>':'<td class="tgt-col nd">—</td>');}).join('');
-    const fy=arr.reduce((s,v)=>s+(+v||0),0),fyT=tA?tA.reduce((s,v)=>s+(+v||0),0):null;
+  // Computed row with targets (for summary)
+  function bCmpT(label,rawArr,cls,dec,tgtArr){
+    const arr=sa(rawArr);
+    const cells=vis.map(i=>{const tv=tgtArr?tgtArr[i]:null;return'<td class="'+cls+'" style="border-left:1px solid var(--border2)">'+fmtC(arr[i],dec)+'</td>'+(tv!=null?'<td class="tgt-col '+cls+'">'+fmtC(tv,dec)+'</td>':'<td class="tgt-col nd">—</td>');}).join('');
+    const fy=arr.reduce((s,v)=>s+v,0),fyT=tgtArr?tgtArr.reduce((s,v)=>s+v,0):null;
     return '<tr class="row-computed"><td class="mc">'+label+'</td>'+cells+'<td class="fy-col '+cls+'">'+fmtC(fy,dec)+'</td><td class="fy-col tgt-col '+cls+'">'+(fyT!=null?fmtC(fyT,dec):'—')+'</td></tr>';
   }
-  function bPct(label,nA,dA,cls,tN,tD){
-    const cells=vis.map(i=>{const v=dA[i]?pct(nA[i],dA[i]):0;const tv=(tN&&tD&&tD[i])?pct(tN[i],tD[i]):null;return'<td class="'+cls+' cv-pct" style="border-left:1px solid var(--border2)">'+fmtP(v)+'</td>'+(tv!=null?'<td class="tgt-col cv-pct">'+fmtP(tv)+'</td>':'<td class="tgt-col nd">—</td>');}).join('');
-    const fn=nA.reduce((s,v)=>s+v,0),fd=dA.reduce((s,v)=>s+v,0),tfn=tN?tN.reduce((s,v)=>s+v,0):0,tfd=tD?tD.reduce((s,v)=>s+v,0):0;
-    return '<tr class="row-margin"><td class="mc">'+label+'</td>'+cells+'<td class="fy-col '+cls+' cv-pct">'+fmtP(fd?pct(fn,fd):0)+'</td><td class="fy-col tgt-col cv-pct">'+(tfd?fmtP(pct(tfn,tfd)):'—')+'</td></tr>';
+  // Percent row
+  function bPctR(label,rawN,rawD,cls){
+    const nA=sa(rawN),dA=sa(rawD);
+    const cells=vis.map(i=>'<td class="'+cls+' cv-pct" style="border-left:1px solid var(--border2)">'+fmtP(dA[i]?pct(nA[i],dA[i]):0)+'</td><td class="tgt-col nd">—</td>').join('');
+    const fn=nA.reduce((s,v)=>s+v,0),fd=dA.reduce((s,v)=>s+v,0);
+    return '<tr class="row-margin"><td class="mc">'+label+'</td>'+cells+'<td class="fy-col '+cls+' cv-pct">'+fmtP(fd?pct(fn,fd):0)+'</td><td class="fy-col tgt-col nd">—</td></tr>';
   }
   function sec(lbl){return'<tr class="row-section"><td colspan="'+nc+'">'+lbl+'</td></tr>';}
   function bhdr(lbl,col){return'<tr style="background:'+col+'"><td colspan="'+nc+'" style="padding:6px 12px;font-size:12px;font-weight:700;color:#fff;letter-spacing:.5px">'+lbl+'</td></tr>';}
-  function totalTable(d,label,tRevM,tMktgM,tCCM,tGM,tGPM,tLeadsM){
-    const gm=d.gm,gpm=d.gpm;
-    return '<table class="pl-table" style="border:2px solid var(--blue);margin-bottom:18px"><thead>'+colHdrs()+'</thead><tbody>'
-      +bhdr('◈ '+label,'#0c2a4a')
-      +bCmp('Triggered Leads',d.trig_leads,'cv',0,tLeadsM)
-      +bCmp('Total Mktg Cost (Lacs)',d.mktg_cost,'cv-mktg',1,tMktgM)
-      +bCmp('Revenue (Lacs)',d.rev,'cv-rev',1,tRevM)
-      +bCmp('CC Cost (Lacs)',d.cc,'cv-mktg',2,tCCM)
-      +bCmp('Abs GM',gm,'cv-gm',1,tGM)
-      +bPct('GM%',gm,d.rev,'cv-gm',tGM,tRevM)
-      +bCmp('Abs GPM',gpm,gpm.some(v=>v<0)?'cv-neg':'cv-gpm',1,tGPM)
-      +bPct('GPM%',gpm,d.rev,'cv-gpm',tGPM,tRevM)
-      +'</tbody></table>';
-  }
-  function brandTable(brand,br,bd,adType,brandLabel,col){
-    const gm=bd.gm,gpm=bd.gpm;
-    let rev='';
-    const brDMS=Array(12).fill(0).map((_,i)=>+(br.dms_retails&&br.dms_retails[i])||0),brVoC=Array(12).fill(0).map((_,i)=>+(br.voc_retails&&br.voc_retails[i])||0);
-    const brGCr=Array(12).fill(0).map((_,i)=>+(br.google_cr_pct&&br.google_cr_pct[i])||0),brMCr=Array(12).fill(0).map((_,i)=>+(br.meta_cr_pct&&br.meta_cr_pct[i])||0);
-    const brOvCr=Array(12).fill(0).map((_,i)=>+(br.overall_cr_pct&&br.overall_cr_pct[i])||0);
-    console.log('[TVS brandTable]',brand,'dms_retails raw:',JSON.stringify(br.dms_retails),'brDMS:',brDMS,'voc_retails raw:',JSON.stringify(br.voc_retails),'brVoC:',brVoC);
-    if(adType==='CPS')rev=sec('REVENUE (CAC × Retails)')
-      +bInp('CAC (Rs/Retail)','','cac',br.cac,'1',brand)
-      +bInp('DMS Retails','','dms_retails',brDMS,'1',brand)
-      +bInp('VoC Retails','','voc_retails',brVoC,'1',brand)
-      +bCmp('= Total Retails (DMS + VoC)',brDMS.map((d,i)=>d+(brVoC[i]||0)),'cv',0)
-      +bPct('DMS Cr%',brDMS,bd.trig_leads,'cv-pct')
-      +bPct('VoC Cr%',brVoC,bd.trig_leads,'cv-pct')
-      +bInp('Overall Cr% (%)','cpl-input','overall_cr_pct',brOvCr,'0.01',brand)
-      +bCmp('= Revenue (Lacs)',bd.rev,'cv-rev',1)
-      +sec('ROAS INPUTS (Ad Revenue)')
-      +bInp('Google Expected Cr% (%)','cpl-input','google_cr_pct',brGCr,'0.01',brand)
-      +bCmp('Google Rev from Ads (Lacs)',bd.google_rev,'cv-rev',2)
-      +bInp('Meta Expected Cr% (%)','cpl-input','meta_cr_pct',brMCr,'0.01',brand)
-      +bCmp('Meta Rev from Ads (Lacs)',bd.meta_rev,'cv-rev',2);
-    else if(adType==='Media Leads')rev=sec('REVENUE (CPL × Leads)')
-      +bInp('CPL Charged (Rs/Lead)','cpl-input','cpl_rate',br.cpl_rate,'1',brand)
-      +bInp('Total Leads (count)','','total_leads',br.total_leads,'1',brand)
-      +bCmp('= Revenue (Lacs)',bd.rev,'cv-rev',1)
-      +sec('ROAS INPUTS (Ad Revenue)')
-      +bInp('Google Expected Cr% (%)','cpl-input','google_cr_pct',brGCr,'0.01',brand)
-      +bCmp('Google Rev from Ads (Lacs)',bd.google_rev,'cv-rev',2)
-      +bInp('Meta Expected Cr% (%)','cpl-input','meta_cr_pct',brMCr,'0.01',brand)
-      +bCmp('Meta Rev from Ads (Lacs)',bd.meta_rev,'cv-rev',2);
-    else if(adType==='CC contract')rev=sec('REVENUE (SeatCost × Seats)')+bInp('Seat Cost (Rs Abs)','cpl-input','seat_cost',br.seat_cost,'1',brand)+bInp('No. of Seats','','seats',br.seats,'1',brand)+bCmp('= Revenue (Lacs)',bd.rev,'cv-rev',1);
-    return '<table class="pl-table" style="margin-bottom:14px"><thead>'+colHdrs()+'</thead><tbody>'
-      +bhdr('▸ '+brandLabel,col)
-      +sec('LEADS')
-      +bInp('Google Leads','','google_leads',br.google_leads,'1',brand)
-      +bInp('Meta Leads','','meta_leads',br.meta_leads,'1',brand)
-      +bCmp('= Paid Leads',bd.paid_leads,'cv',0)
-      +bInp('Organic Leads','','organic_leads',br.organic_leads,'1',brand)
-      +bCmp('= Triggered',bd.trig_leads,'cv',0)
-      +sec('MKTG COST')
-      +bInp('Google CPL (Rs)','cpl-input','google_cpl',br.google_cpl,'1',brand)
-      +bCmp('Google Mktg (Lacs)',bd.google_mktg,'cv-mktg',1)
-      +bInp('Meta CPL (Rs)','cpl-input','meta_cpl',br.meta_cpl,'1',brand)
-      +bCmp('Meta Mktg (Lacs)',bd.meta_mktg,'cv-mktg',1)
-      +bCmp('= Total Mktg',bd.mktg_cost,'cv-mktg',1)
-      +rev
-      +sec('CC COST')
-      +bInp('CC Seats','','cc_seats',br.cc_seats,'1',brand)
-      +bInp('CC Per Seat (Rs Abs)','cpl-input','cc_seat_cost',br.cc_seat_cost,'1',brand)
-      +bCmp('= CC Cost (Lacs)',bd.cc,'cv-mktg',2)
-      +sec('AI BOT COST')
-      +bInp('AI Per Lead Cost (Rs Abs)','cpl-input','ai_per_lead_cost',br.ai_per_lead_cost||Array(12).fill(0),'1',brand)
-      +bInp('Leads Processed by AI (count)','','ai_leads_processed',br.ai_leads_processed||Array(12).fill(0),'1',brand)
-      +bCmp('= AI Bot Cost (Lacs)',bd.ai_cost,'cv-mktg',2)
-      +sec('P&L')
-      +bCmp('GM = Rev − Mktg',gm,'cv-gm',1)
-      +bPct('GM%',gm,bd.rev,'cv-gm')
-      +bCmp('GPM = GM − CC − AI Cost',gpm,gpm.some(v=>v<0)?'cv-neg':'cv-gpm',1)
-      +bPct('GPM%',gpm,bd.rev,'cv-gpm')
-      +'</tbody></table>';
-  }
-  function filterBar(){
-    const qBtns=['Q1 (Apr-Jun)','Q2 (Jul-Sep)','Q3 (Oct-Dec)','Q4 (Jan-Mar)','All Months'].map((lbl,qi)=>{
-      const active=qi===modalMonthFilter?'style="background:var(--blue2);color:#fff;border-color:var(--blue)"':'';;
-      return `<button class="pchip" ${active} onclick="setModalQFilter(${recIdx},${qi})">${lbl}</button>`;
-    }).join('');
-    return `<div style="display:flex;gap:6px;align-items:center;margin-bottom:12px;flex-wrap:wrap"><span style="font-size:10px;color:var(--text2);font-weight:700">Show months:</span>${qBtns}</div>`;
-  }
+
+  // Quarter filter bar
+  const qBtns=['Q1 (Apr-Jun)','Q2 (Jul-Sep)','Q3 (Oct-Dec)','Q4 (Jan-Mar)','All Months'].map((lbl,qi)=>{
+    const active=qi===modalMonthFilter?'style="background:var(--blue2);color:#fff;border-color:var(--blue)"':'';
+    return`<button class="pchip" ${active} onclick="setModalQFilter(${recIdx},${qi})">${lbl}</button>`;
+  }).join('');
+  const filterBar=`<div style="display:flex;gap:6px;align-items:center;margin-bottom:12px;flex-wrap:wrap"><span style="font-size:10px;color:var(--text2);font-weight:700">Show months:</span>${qBtns}</div>`;
+
   const tRevM=t.rev.monthly,tMktgM=t.mktg.monthly,tCCM=t.cc.monthly;
   const tGM=tRevM.map((r,i)=>r-tMktgM[i]),tGPM=tGM.map((g,i)=>g-tCCM[i]);
   const tLeadsM=t.leads.monthly.map(v=>Math.round(v*100000));
+  const gm=sa(d.gm),gpm=sa(d.gpm);
+
+  // ── Summary table (account-level totals) ──
+  const summaryTable='<table class="pl-table" style="border:2px solid var(--blue);margin-bottom:18px"><thead>'+colHdrs+'</thead><tbody>'
+    +bhdr('◈ TOTAL — TVS All Brands','#0c2a4a')
+    +bCmpT('Triggered Leads',d.trig_leads,'cv',0,tLeadsM)
+    +bCmpT('Total Mktg Cost (Lacs)',d.mktg_cost,'cv-mktg',1,tMktgM)
+    +bCmpT('Revenue (Lacs)',d.rev,'cv-rev',1,tRevM)
+    +bCmpT('CC Cost (Lacs)',d.cc,'cv-mktg',2,tCCM)
+    +bCmpT('Abs GM',gm,'cv-gm',1,tGM)
+    +bCmpT('Abs GPM',gpm,gpm.some(v=>v<0)?'cv-neg':'cv-gpm',1,tGPM)
+    +'</tbody></table>';
+
   const COLS={Commuter:'#1a3a5c',Premium:'#2a1a5c',Scooter:'#1a4a3a',Moped:'#3a2a0a',EV:'#1a5c3a'};
-  let html=filterBar()+'<div style="overflow-x:auto">';
-  html+=totalTable(d,'TOTAL — TVS All Brands',tRevM,tMktgM,tCCM,tGM,tGPM,tLeadsM);
+
+  let html=filterBar+'<div style="overflow-x:auto">'+summaryTable;
+
   TVS_BRANDS.forEach(brand=>{
-    const br=a.brands[brand],bd=deriveActuals(br,adType);
-    html+=brandTable(brand,br,bd,adType,TVS_BRAND_LABELS[brand],COLS[brand]||'#1a3a5c');
+    const br=a.brands[brand];
+    // Convert ALL firebase objects to safe arrays up-front
+    const brDMS=sa(br.dms_retails),brVoC=sa(br.voc_retails);
+    const brRetails=brDMS.map((d,i)=>d+brVoC[i]);
+    const brCAC=sa(br.cac);
+    const brGLd=sa(br.google_leads),brMLd=sa(br.meta_leads),brOLd=sa(br.organic_leads);
+    const brGCpl=sa(br.google_cpl),brMCpl=sa(br.meta_cpl);
+    const brGCr=sa(br.google_cr_pct),brMCr=sa(br.meta_cr_pct),brOvCr=sa(br.overall_cr_pct);
+    const brCCSt=sa(br.cc_seats),brCCSc=sa(br.cc_seat_cost);
+    const brAiPLC=sa(br.ai_per_lead_cost),brAiLP=sa(br.ai_leads_processed);
+    // Derive P&L from safe arrays (avoids deriveActuals Firebase issues)
+    const paidLd=brGLd.map((g,i)=>g+brMLd[i]);
+    const trigLd=paidLd.map((p,i)=>p+brOLd[i]);
+    const gMktg=brGLd.map((g,i)=>g*brGCpl[i]/100000);
+    const mMktg=brMLd.map((m,i)=>m*brMCpl[i]/100000);
+    const mktgCost=gMktg.map((g,i)=>g+mMktg[i]);
+    const brRev=brRetails.map((r,i)=>brCAC[i]*r/100000);
+    const gRev=brGLd.map((g,i)=>brGCr[i]>0?Math.round(g*brGCr[i]/100)*brCAC[i]/100000:0);
+    const mRev=brMLd.map((m,i)=>brMCr[i]>0?Math.round(m*brMCr[i]/100)*brCAC[i]/100000:0);
+    const ccCost=brCCSt.some(v=>v>0)||brCCSc.some(v=>v>0)?brCCSt.map((s,i)=>s*brCCSc[i]/100000):sa(br.cc).map(v=>v/100000);
+    const aiCost=brAiPLC.map((c,i)=>c*brAiLP[i]/100000);
+    const brGM=brRev.map((r,i)=>r-mktgCost[i]);
+    const brGPM=brGM.map((g,i)=>g-ccCost[i]-aiCost[i]);
+
+    html+='<table class="pl-table" style="border:2px solid '+(COLS[brand]||'#1a3a5c')+';margin-bottom:18px"><thead>'+colHdrs+'</thead><tbody>';
+    html+=bhdr('▸ '+TVS_BRAND_LABELS[brand],COLS[brand]||'#1a3a5c');
+    html+=sec('── LEADS ──');
+    html+=bInpR('Google Leads (count)','','google_leads',brGLd,'1',brand,'');
+    html+=bInpR('Meta Leads (count)','','meta_leads',brMLd,'1',brand,'');
+    html+=bCmpR('= Paid Leads (count)',paidLd,'cv',0);
+    html+=bInpR('Organic Leads (count)','','organic_leads',brOLd,'1',brand,'');
+    html+=bCmpR('= Triggered Leads (count)',trigLd,'cv',0);
+    html+=sec('── MARKETING COST ──');
+    html+=bInpR('Google Trigger CPL (Rs/Lead)','cpl-input','google_cpl',brGCpl,'1',brand,'');
+    html+=bCmpR('Google Mktg Cost (Rs Lacs)',gMktg,'cv-mktg',1);
+    html+=bInpR('Meta Trigger CPL (Rs/Lead)','cpl-input','meta_cpl',brMCpl,'1',brand,'');
+    html+=bCmpR('Meta Mktg Cost (Rs Lacs)',mMktg,'cv-mktg',1);
+    html+=bCmpR('= Total Mktg Cost (G + M)',mktgCost,'cv-mktg',1);
+    html+=sec('── REVENUE (CPS: CAC × Retails) ──');
+    html+=bInpR('CAC — Rate Charged (Rs/Retail)','','cac',brCAC,'1',brand,'Revenue driver');
+    html+=bInpR('DMS Retails','','dms_retails',brDMS,'1',brand,'DMS channel retails');
+    html+=bInpR('VoC Retails','','voc_retails',brVoC,'1',brand,'Voice-of-Customer retails');
+    html+=bCmpR('= Total Retails (DMS + VoC)',brRetails,'cv',0);
+    html+=bPctR('DMS Cr% = DMS / Triggered Leads',brDMS,trigLd,'cv-pct');
+    html+=bPctR('VoC Cr% = VoC / Triggered Leads',brVoC,trigLd,'cv-pct');
+    html+=bInpR('Overall Cr% = Retails / Triggered Leads (%)','cpl-input','overall_cr_pct',brOvCr,'0.01',brand,'');
+    html+=bCmpR('= Revenue (Rs Lacs)',brRev,'cv-rev',1);
+    html+=sec('── ROAS INPUTS (Ad Revenue) ──');
+    html+=bInpR('Google Expected Cr% (%)','cpl-input','google_cr_pct',brGCr,'0.01',brand,'');
+    html+=bCmpR('Google Revenue from Ads (Rs Lacs)',gRev,'cv-rev',2);
+    html+=bInpR('Meta Expected Cr% (%)','cpl-input','meta_cr_pct',brMCr,'0.01',brand,'');
+    html+=bCmpR('Meta Revenue from Ads (Rs Lacs)',mRev,'cv-rev',2);
+    html+=sec('── CC COST ──');
+    html+=bInpR('CC Seats (count)','','cc_seats',brCCSt,'1',brand,'');
+    html+=bInpR('CC Per Seat Cost (Rs Absolute)','cpl-input','cc_seat_cost',brCCSc,'1',brand,'');
+    html+=bCmpR('= CC Cost (Rs Lacs)',ccCost,'cv-mktg',2);
+    html+=sec('── AI BOT COST ──');
+    html+=bInpR('AI Per Lead Cost (Rs Absolute)','cpl-input','ai_per_lead_cost',brAiPLC,'1',brand,'');
+    html+=bInpR('Total Leads Processed by AI (count)','','ai_leads_processed',brAiLP,'1',brand,'');
+    html+=bCmpR('= AI Bot Cost (Rs Lacs)',aiCost,'cv-mktg',2);
+    html+=sec('── P&L SUMMARY ──');
+    html+=bCmpR('Abs GM = Rev − Mktg Cost',brGM,'cv-gm',1);
+    html+=bPctR('GM %',brGM,brRev,'cv-gm');
+    html+=bCmpR('Abs GPM = GM − CC − AI Cost',brGPM,brGPM.some(v=>v<0)?'cv-neg':'cv-gpm',1);
+    html+=bPctR('GPM %',brGPM,brRev,'cv-gpm');
+    html+='</tbody></table>';
   });
+
   html+='</div>';
   document.getElementById('modal-content').innerHTML=html;
 }
