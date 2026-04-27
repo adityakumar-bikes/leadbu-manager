@@ -143,6 +143,12 @@ body.light .pchip[style*="blue2"]{background:#2563eb!important;border-color:#1d4
 body.light .fy-col{color:var(--text1)!important}
 /* tgt-col readable */
 body.light .tgt-col{color:var(--text2)}
+/* cv (pos-soft green) is near-invisible on light bg */
+body.light .cv{color:#059669!important}
+body.light .cv-pct{color:var(--text1)!important}
+/* Brand/section header rows — ensure bg paints on the td not just tr */
+body.light .pl-table tr[style*="background"] td{background:inherit}
+body.light .pl-table .mc{background:var(--bg3)!important}
 /* Audit overlay */
 body.light .audit-v2-overlay{background:var(--bg2)}
 body.light td[style*="background:#0a0"]{background:#f0fdf4!important}
@@ -2557,7 +2563,7 @@ function renderBajajModal(recIdx){
     return '<tr class="row-margin"><td class="mc">'+label+'</td>'+cells+'<td class="fy-col '+cls+' cv-pct">'+fmtP(fd?pct(fn,fd):0)+'</td><td class="fy-col tgt-col cv-pct">'+(tfd?fmtP(pct(tfn,tfd)):'—')+'</td></tr>';
   }
   function sec(lbl){return'<tr class="row-section"><td colspan="'+nc+'">'+lbl+'</td></tr>';}
-  function bhdr(lbl,col){return'<tr style="background:'+col+'"><td colspan="'+nc+'" style="padding:6px 12px;font-size:12px;font-weight:700;color:#fff;letter-spacing:.5px">'+lbl+'</td></tr>';}
+  function bhdr(lbl,col){return'<tr><td colspan="'+nc+'" style="padding:6px 12px;font-size:12px;font-weight:700;color:#fff;letter-spacing:.5px;background:'+col+'">'+lbl+'</td></tr>';}
   function totalTable(d,label,tRevM,tMktgM,tCCM,tGM,tGPM,tLeadsM){
     const gm=d.gm,gpm=d.gpm;
     return '<table class="pl-table" style="border:2px solid var(--blue);margin-bottom:18px"><thead>'+colHdrs()+'</thead><tbody>'
@@ -2686,7 +2692,7 @@ function renderTVSModal(recIdx){
     return '<tr class="row-margin"><td class="mc">'+label+'</td>'+cells+'<td class="fy-col '+cls+' cv-pct">'+fmtP(fd?pct(fn,fd):0)+'</td><td class="fy-col tgt-col nd">—</td></tr>';
   }
   function sec(lbl){return'<tr class="row-section"><td colspan="'+nc+'">'+lbl+'</td></tr>';}
-  function bhdr(lbl,col){return'<tr style="background:'+col+'"><td colspan="'+nc+'" style="padding:6px 12px;font-size:12px;font-weight:700;color:#fff;letter-spacing:.5px">'+lbl+'</td></tr>';}
+  function bhdr(lbl,col){return'<tr><td colspan="'+nc+'" style="padding:6px 12px;font-size:12px;font-weight:700;color:#fff;letter-spacing:.5px;background:'+col+'">'+lbl+'</td></tr>';}
 
   // Quarter filter bar
   const qBtns=['Q1 (Apr-Jun)','Q2 (Jul-Sep)','Q3 (Oct-Dec)','Q4 (Jan-Mar)','All Months'].map((lbl,qi)=>{
@@ -2829,7 +2835,7 @@ function renderREModal(recIdx){
     return '<tr class="row-margin"><td class="mc">'+label+'</td>'+cells+'<td class="fy-col '+cls+' cv-pct">'+fmtP(fd?pct(fn,fd):0)+'</td><td class="fy-col tgt-col cv-pct">'+(tfd?fmtP(pct(tfn,tfd)):'—')+'</td></tr>';
   }
   function sec(lbl){return'<tr class="row-section"><td colspan="'+nc+'">'+lbl+'</td></tr>';}
-  function bhdr(lbl,col){return'<tr style="background:'+col+'"><td colspan="'+nc+'" style="padding:6px 12px;font-size:12px;font-weight:700;color:#fff;letter-spacing:.5px">'+lbl+'</td></tr>';}
+  function bhdr(lbl,col){return'<tr><td colspan="'+nc+'" style="padding:6px 12px;font-size:12px;font-weight:700;color:#fff;letter-spacing:.5px;background:'+col+'">'+lbl+'</td></tr>';}
   function totalTable(d,label,tRevM,tMktgM,tCCM,tGM,tGPM,tLeadsM){
     const gm=d.gm,gpm=d.gpm;
     // Sum leads_processed across all sub-brands for CC contract
