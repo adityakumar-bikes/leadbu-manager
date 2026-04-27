@@ -61,6 +61,43 @@
   --shadow:0 2px 8px rgba(0,0,0,.35),0 1px 2px rgba(0,0,0,.3);
   --shadow-lg:0 12px 40px rgba(0,0,0,.55),0 2px 8px rgba(0,0,0,.4);
 }
+/* ── LIGHT THEME OVERRIDES ── */
+body.light{
+  --bg:#f3f3f8;
+  --bg2:#ffffff;
+  --bg3:#ebebf2;
+  --bg4:#e2e2ec;
+  --bg-grad:radial-gradient(1200px 600px at 50% -200px,rgba(99,102,241,.04),transparent 60%),#f3f3f8;
+  --border:#dcdce8;
+  --border2:#cbcbda;
+  --border3:#b5b5c8;
+  --text1:#09090f;
+  --text:#252535;
+  --text2:#58586e;
+  --text3:#8e8ea0;
+  --shadow-sm:0 1px 2px rgba(0,0,0,.06);
+  --shadow:0 2px 8px rgba(0,0,0,.07),0 1px 2px rgba(0,0,0,.05);
+  --shadow-lg:0 12px 40px rgba(0,0,0,.10),0 2px 8px rgba(0,0,0,.07);
+  --accent-soft:rgba(99,102,241,.08);
+  --accent-glow:rgba(99,102,241,.14);
+  --pos-bg:rgba(16,185,129,.08);
+  --neg-bg:rgba(239,68,68,.08);
+  --warn-bg:rgba(245,158,11,.08);
+  --info-bg:rgba(59,130,246,.08);
+}
+body.light .hdr{background:linear-gradient(180deg,#fafafd 0%,#f5f5fb 100%);box-shadow:0 1px 0 rgba(0,0,0,.06) inset}
+body.light .ctrl-bar{background:#f0f0f6}
+body.light .btn-dim{background:#e5e5ef;border-color:#ccccd8;color:var(--text)}
+body.light .btn-dim:hover{background:#d8d8e8}
+body.light select,body.light input[type=text],body.light input[type=number]{background:var(--bg2);color:var(--text1);border-color:var(--border2)}
+body.light .kpi{background:#fff}
+body.light .nav-tab{color:var(--text2)}
+body.light .nav-tab.active{color:var(--accent2)}
+body.light .chart-card{background:#fff}
+body.light .modal-overlay .modal-box{background:#fff}
+body.light .tbl-wrap table tr:hover td{background:#f0f0f8}
+body.light .pchip{background:var(--bg3);border-color:var(--border2);color:var(--text)}
+
 html,body{background:var(--bg);color:var(--text);font-size:13px;font-feature-settings:"cv11","ss01","ss03";-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
 body{font-family:'Inter','Segoe UI',system-ui,sans-serif;background:var(--bg-grad);color:var(--text);min-height:100vh;letter-spacing:-0.005em}
 .mono{font-family:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace;font-feature-settings:"tnum","zero"}
@@ -439,6 +476,10 @@ canvas{max-height:260px}
       </div>
     </div>
     <div class="hdr-right">
+      <button id="theme-toggle" class="btn btn-dim" onclick="toggleTheme()" title="Toggle light / dark theme" style="padding:6px 9px;min-width:0">
+        <svg id="theme-icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        <svg id="theme-icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;display:none"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+      </button>
       <button class="btn btn-green" onclick="saveActuals()" title="Save changes">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
         Save
@@ -3286,7 +3327,13 @@ function renderMktg(rows){
 // ═══════════════════════════
 const CI={};
 function dc(id){if(CI[id]){CI[id].destroy();delete CI[id];}}
-const CO={responsive:true,plugins:{legend:{labels:{color:'#8b949e',font:{size:10}}}},scales:{x:{ticks:{color:'#8b949e',font:{size:9}},grid:{color:'#1e2d45'}},y:{ticks:{color:'#8b949e',font:{size:9}},grid:{color:'#1e2d45'}}}};
+// CO() returns chart base options using current theme colours
+function CO(){
+  const isLight=document.body.classList.contains('light');
+  const tc=isLight?'#58586e':'#8b949e';
+  const gc=isLight?'#dcdce8':'#1e2d45';
+  return {responsive:true,plugins:{legend:{labels:{color:tc,font:{size:10}}}},scales:{x:{ticks:{color:tc,font:{size:9}},grid:{color:gc}},y:{ticks:{color:tc,font:{size:9}},grid:{color:gc}}}};
+}
 
 function renderCharts(rows){
   // Defensive: some target rows have a degenerate {fy:0} cc/leads block instead of full monthly arrays
@@ -3322,11 +3369,17 @@ function renderCharts(rows){
   const orgM=MONTHS.map((_,i)=>rows.reduce((s,{a})=>s+(a.organic_leads[i]||0),0));
   const tLeadsM=MONTHS.map((_,i)=>rows.reduce((s,{t})=>s+mArr(t,'leads')[i],0)*100000);
 
+  // Theme-aware helpers
+  const isLight=document.body.classList.contains('light');
+  const tc=isLight?'#58586e':'#8b949e';
+  const gc=isLight?'#dcdce8':'#1e2d45';
+  const co=CO();
+
   // Dual-axis options factory (left=Lacs, right=%)
-  const dualOpts=()=>({...CO,scales:{
-    x:{ticks:{color:'#8b949e',font:{size:9}},grid:{color:'#1e2d45'}},
-    y:{position:'left',ticks:{color:'#8b949e',font:{size:9}},grid:{color:'#1e2d45'}},
-    y1:{position:'right',grid:{drawOnChartArea:false},ticks:{color:'#8b949e',font:{size:9},callback:v=>v.toFixed(0)+'%'}},
+  const dualOpts=()=>({...co,scales:{
+    x:{ticks:{color:tc,font:{size:9}},grid:{color:gc}},
+    y:{position:'left',ticks:{color:tc,font:{size:9}},grid:{color:gc}},
+    y1:{position:'right',grid:{drawOnChartArea:false},ticks:{color:tc,font:{size:9},callback:v=>v.toFixed(0)+'%'}},
   }});
 
   // 1. Revenue
@@ -3334,7 +3387,7 @@ function renderCharts(rows){
     {label:'TGT Rev',data:tRM,backgroundColor:'#1d4ed888',borderColor:'#3b82f6',borderWidth:1},
     {label:'ACT Rev',data:aRM,backgroundColor:'#14532d88',borderColor:'#22c55e',borderWidth:1},
     {label:'LY Rev',data:lyRM,type:'line',borderColor:'#6b7280',borderWidth:2,pointRadius:2,fill:false},
-  ]},options:{...CO}});
+  ]},options:{...co}});
 
   // 2. GM abs + GM%
   dc('c-gm');CI['c-gm']=new Chart(document.getElementById('c-gm'),{type:'bar',data:{labels:MONTHS,datasets:[
@@ -3362,7 +3415,7 @@ function renderCharts(rows){
     {label:'Rev ACT',data:aRM,type:'line',borderColor:'#22c55e',borderDash:[4,3],fill:false,tension:.3,pointRadius:2,borderWidth:2},
     {label:'Mktg TGT',data:tMM,backgroundColor:'#ef444855',borderColor:'#ef4444',borderWidth:1},
     {label:'Mktg ACT',data:aMM,backgroundColor:'#ef4444aa',borderColor:'#f87171',borderWidth:1},
-  ]},options:{...CO}});
+  ]},options:{...co}});
 
   // 5. CC Cost vs Revenue
   dc('c-cc');CI['c-cc']=new Chart(document.getElementById('c-cc'),{type:'bar',data:{labels:MONTHS,datasets:[
@@ -3370,19 +3423,20 @@ function renderCharts(rows){
     {label:'Rev ACT',data:aRM,type:'line',borderColor:'#22c55e',borderDash:[4,3],fill:false,tension:.3,pointRadius:2,borderWidth:2},
     {label:'CC TGT',data:tCM,backgroundColor:'#f9731655',borderColor:'#f97316',borderWidth:1},
     {label:'CC ACT',data:aCM,backgroundColor:'#f97316aa',borderColor:'#fb923c',borderWidth:1},
-  ]},options:{...CO}});
+  ]},options:{...co}});
 
   dc('c-leads');CI['c-leads']=new Chart(document.getElementById('c-leads'),{type:'bar',data:{labels:MONTHS,datasets:[
     {label:'Google Leads',data:googleM,backgroundColor:'#4285f499',stack:'a'},
     {label:'Meta Leads',data:metaM,backgroundColor:'#1877f299',stack:'a'},
     {label:'Organic Leads',data:orgM,backgroundColor:'#14b8a699',stack:'a'},
     {label:'TGT Trig Leads',data:tLeadsM,type:'line',borderColor:'#c084fc',fill:false,tension:.3,pointRadius:3,borderWidth:2},
-  ]},options:{...CO,scales:{...CO.scales,y:{...CO.scales.y,ticks:{...CO.scales.y.ticks,callback:v=>v.toFixed(2)}}}}});
+  ]},options:{...co,scales:{...co.scales,y:{...co.scales.y,ticks:{...co.scales.y.ticks,callback:v=>v.toFixed(2)}}}}});
 
   const cm={};rows.forEach(({t})=>{cm[t.client]=(cm[t.client]||0)+t.rev.fy;});
   const ce=Object.entries(cm).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]).slice(0,12);
   const COLS=['#3b82f6','#22c55e','#eab308','#ef4444','#a855f7','#f97316','#14b8a6','#e879f9','#60a5fa','#4ade80','#facc15','#f87171'];
-  dc('c-clients');CI['c-clients']=new Chart(document.getElementById('c-clients'),{type:'doughnut',data:{labels:ce.map(([k])=>k),datasets:[{data:ce.map(([,v])=>+v.toFixed(1)),backgroundColor:COLS,borderColor:'#0d1117',borderWidth:2}]},options:{responsive:true,plugins:{legend:{position:'right',labels:{color:'#8b949e',font:{size:9},padding:5}}}}});
+  const bgBorder=isLight?'#f3f3f8':'#0d1117';
+  dc('c-clients');CI['c-clients']=new Chart(document.getElementById('c-clients'),{type:'doughnut',data:{labels:ce.map(([k])=>k),datasets:[{data:ce.map(([,v])=>+v.toFixed(1)),backgroundColor:COLS,borderColor:bgBorder,borderWidth:2}]},options:{responsive:true,plugins:{legend:{position:'right',labels:{color:tc,font:{size:9},padding:5}}}}});
 
   const qRT=QTRS.map((_,q)=>rows.reduce((s,{t})=>s+qArr(t,'rev')[q],0));
   const qRA=QTRS.map((_,q)=>rows.reduce((s,{d})=>s+(d.rev_q[q]||0),0));
@@ -3394,7 +3448,7 @@ function renderCharts(rows){
     {label:'Rev TGT',data:qRT,backgroundColor:'#1d4ed866'},{label:'Rev ACT',data:qRA,backgroundColor:'#1d4ed8cc'},
     {label:'GM TGT',data:qRT.map((r,i)=>r-qMT[i]),backgroundColor:'#14532d66'},{label:'GM ACT',data:qRA.map((r,i)=>r-qMA[i]),backgroundColor:'#14532dcc'},
     {label:'GPM TGT',data:qRT.map((r,i)=>(r-qMT[i])-qCT[i]),backgroundColor:'#78350f66'},{label:'GPM ACT',data:qRA.map((r,i)=>(r-qMA[i])-qCA[i]),backgroundColor:'#78350fcc'},
-  ]},options:{...CO}});
+  ]},options:{...co}});
 }
 
 // ═══════════════════════════
@@ -4119,7 +4173,7 @@ function renderOverview(){
         {label:'ACT',data:aRM,backgroundColor:'#34d39955',borderColor:'#34d399',borderWidth:1},
         {label:'LY',data:lyRM,type:'line',borderColor:'#fbbf2499',borderWidth:1.5,backgroundColor:'transparent',pointRadius:3,pointBackgroundColor:'#fbbf24',tension:.3},
       ]},
-      options:{...CO,scales:{x:{ticks:{color:'#8b949e',font:{size:9}},grid:{color:'#1e2d4533'}},y:{ticks:{color:'#8b949e',font:{size:9}},grid:{color:'#1e2d4533'}}}}
+      options:{...CO(),scales:{x:{ticks:{color:document.body.classList.contains('light')?'#58586e':'#8b949e',font:{size:9}},grid:{color:document.body.classList.contains('light')?'#dcdce855':'#1e2d4533'}},y:{ticks:{color:document.body.classList.contains('light')?'#58586e':'#8b949e',font:{size:9}},grid:{color:document.body.classList.contains('light')?'#dcdce855':'#1e2d4533'}}}}
     });
   }
 
@@ -4983,6 +5037,30 @@ function deleteNewClient(id){
   saveNewClients(loadNewClients().filter(nc=>nc.id!==id));
   renderClients();
 }
+
+// ═══════════════════════════
+// THEME TOGGLE (dark / light)
+// ═══════════════════════════
+function applyTheme(theme){
+  const isLight=(theme==='light');
+  document.body.classList.toggle('light',isLight);
+  const moon=document.getElementById('theme-icon-moon');
+  const sun=document.getElementById('theme-icon-sun');
+  if(moon) moon.style.display=isLight?'none':'block';
+  if(sun)  sun.style.display=isLight?'block':'none';
+  // Re-render charts so grid/label colours update
+  if(VIEW==='charts'){ const rows=getFiltered(); renderCharts(rows); }
+}
+function toggleTheme(){
+  const next=document.body.classList.contains('light')?'dark':'light';
+  localStorage.setItem('leadbu_theme',next);
+  applyTheme(next);
+}
+// Init theme on load
+(function(){
+  const saved=localStorage.getItem('leadbu_theme')||'dark';
+  applyTheme(saved);
+})();
 
 </script>
 
