@@ -2674,9 +2674,9 @@ function renderTVSModal(recIdx){
   function brandTable(brand,br,bd,adType,brandLabel,col){
     const gm=bd.gm,gpm=bd.gpm;
     let rev='';
-    const brDMS=br.dms_retails||Array(12).fill(0),brVoC=br.voc_retails||Array(12).fill(0);
-    const brGCr=br.google_cr_pct||Array(12).fill(0),brMCr=br.meta_cr_pct||Array(12).fill(0);
-    const brOvCr=br.overall_cr_pct||Array(12).fill(0);
+    const brDMS=Array(12).fill(0).map((_,i)=>+(br.dms_retails&&br.dms_retails[i])||0),brVoC=Array(12).fill(0).map((_,i)=>+(br.voc_retails&&br.voc_retails[i])||0);
+    const brGCr=Array(12).fill(0).map((_,i)=>+(br.google_cr_pct&&br.google_cr_pct[i])||0),brMCr=Array(12).fill(0).map((_,i)=>+(br.meta_cr_pct&&br.meta_cr_pct[i])||0);
+    const brOvCr=Array(12).fill(0).map((_,i)=>+(br.overall_cr_pct&&br.overall_cr_pct[i])||0);
     if(adType==='CPS')rev=sec('REVENUE (CAC × Retails)')
       +bInp('CAC (Rs/Retail)','','cac',br.cac,'1',brand)
       +bInp('DMS Retails','','dms_retails',brDMS,'1',brand)
@@ -2813,9 +2813,9 @@ function renderREModal(recIdx){
   function brandTable(brand,br,bd,adType,brandLabel,col){
     const gm=bd.gm,gpm=bd.gpm;
     let rev='';
-    const brDMS=br.dms_retails||Array(12).fill(0),brVoC=br.voc_retails||Array(12).fill(0);
-    const brGCr=br.google_cr_pct||Array(12).fill(0),brMCr=br.meta_cr_pct||Array(12).fill(0);
-    const brOvCr=br.overall_cr_pct||Array(12).fill(0);
+    const brDMS=Array(12).fill(0).map((_,i)=>+(br.dms_retails&&br.dms_retails[i])||0),brVoC=Array(12).fill(0).map((_,i)=>+(br.voc_retails&&br.voc_retails[i])||0);
+    const brGCr=Array(12).fill(0).map((_,i)=>+(br.google_cr_pct&&br.google_cr_pct[i])||0),brMCr=Array(12).fill(0).map((_,i)=>+(br.meta_cr_pct&&br.meta_cr_pct[i])||0);
+    const brOvCr=Array(12).fill(0).map((_,i)=>+(br.overall_cr_pct&&br.overall_cr_pct[i])||0);
     if(adType==='CPS')rev=sec('REVENUE (CAC x Retails)')
       +bInp('CAC (Rs/Retail)','','cac',br.cac,'1',brand)
       +bInp('DMS Retails','','dms_retails',brDMS,'1',brand)
