@@ -533,7 +533,7 @@ canvas{max-height:260px}
       <div class="brand-mark">🏍️</div>
       <div class="brand-text">
         <div class="t1">Bike AOP Tracker</div>
-        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.0.56</span> <span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
+        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.0.57</span> <span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
       </div>
     </div>
     <div class="hdr-right">
@@ -2224,7 +2224,7 @@ function renderModal(recIdx){
   const t=TARGETS[recIdx];
   if(t.client===BAJAJ_CLIENT){renderBajajModal(recIdx);return;}
   if(t.client===TVS_CLIENT){renderTVSModal(recIdx);return;}
-  if(t.client===RE_CLIENT){renderREModal(recIdx);return;}
+  if(t.client===RE_CLIENT && t.ad_type!=='CC contract'){renderREModal(recIdx);return;}
   const a=ACTUALS[recIdx];
   const d=deriveActuals(a, t.ad_type);
   const vis=getVisibleMonths();
