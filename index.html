@@ -533,7 +533,7 @@ canvas{max-height:260px}
       <div class="brand-mark">🏍️</div>
       <div class="brand-text">
         <div class="t1">Bike AOP Tracker</div>
-        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L</div>
+        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.0.54</span> <span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
       </div>
     </div>
     <div class="hdr-right">
@@ -1542,9 +1542,12 @@ function saveActuals(){
   _fbSaveTimer=setTimeout(()=>{
     if(_fbRef){
       _fbLocalUpdate=true;
+      const _saveTs=new Date().toISOString();
       _fbRef.set(ACTUALS).then(()=>{
         el.textContent='✅ Saved & Synced';
         setTimeout(()=>{ el.classList.remove('show'); el.textContent='✅ Saved'; },2500);
+        updateLastSaved(_saveTs);
+        try{_fbDb.ref('meta/lastSaved').set(_saveTs);}catch(e){}
       }).catch(err=>{
         // Firebase write failed – fallback to localStorage
         localStorage.setItem(ACT_KEY,JSON.stringify(ACTUALS));
@@ -1559,6 +1562,15 @@ function saveActuals(){
       setTimeout(()=>el.classList.remove('show'),2000);
     }
   },1500);
+}
+function updateLastSaved(isoStr){
+  const el=document.getElementById('hdr-updated');
+  if(!el||!isoStr)return;
+  const d=new Date(isoStr);
+  const pad=n=>String(n).padStart(2,'0');
+  const dateStr=pad(d.getDate())+'/'+pad(d.getMonth()+1)+'/'+d.getFullYear();
+  const timeStr=pad(d.getHours())+':'+pad(d.getMinutes());
+  el.textContent='· Updated '+dateStr+' '+timeStr;
 }
 function backupActuals(){
   const payload={
@@ -3735,6 +3747,7 @@ _fbRef.on('value', snapshot=>{
   _fbFirstLoad=false;
   initUserLabel();
   setPage(PAGE);
+  try{_fbDb.ref('meta/lastSaved').once('value',s=>{if(s.val())updateLastSaved(s.val());});}catch(e){}
   registerPresence(); // announce this user as active
   // Hide loading overlay on first successful load
   const ov=document.getElementById('fb-loading');
