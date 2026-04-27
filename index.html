@@ -108,10 +108,10 @@ body{font-family:'Inter','Segoe UI',system-ui,sans-serif;background:var(--bg-gra
   position:sticky;top:0;z-index:50;
   box-shadow:0 1px 0 rgba(255,255,255,0.03) inset;
 }
-.hdr-top{padding:14px 22px 10px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.hdr-top{padding:8px 22px 6px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
 .brand{display:flex;align-items:center;gap:11px}
 .brand-mark{
-  width:34px;height:34px;border-radius:9px;
+  width:30px;height:30px;border-radius:8px;
   background:linear-gradient(135deg,#6366f1,#8b5cf6 60%,#ec4899);
   display:flex;align-items:center;justify-content:center;
   font-size:18px;line-height:1;
@@ -123,11 +123,13 @@ body{font-family:'Inter','Segoe UI',system-ui,sans-serif;background:var(--bg-gra
 .hdr-right{display:flex;gap:7px;align-items:center;flex-wrap:wrap}
 /* ── CONTEXT STRIP ── */
 .ctx-strip{
-  padding:7px 22px;display:flex;align-items:center;gap:18px;flex-wrap:wrap;
+  padding:5px 22px;display:flex;align-items:center;gap:14px;flex-wrap:nowrap;
   background:linear-gradient(180deg,rgba(99,102,241,.04),transparent);
   border-top:1px solid var(--border);
-  font-size:11.5px;
+  font-size:11.5px;overflow:hidden;
 }
+.ctx-left{display:flex;align-items:center;gap:14px;flex:1;min-width:0;overflow:hidden}
+.ctx-right{display:flex;align-items:center;gap:8px;flex-shrink:0;margin-left:auto}
 .ctx-item{display:flex;align-items:center;gap:6px;color:var(--text2)}
 .ctx-item .lbl{font-size:10px;text-transform:uppercase;letter-spacing:.07em;font-weight:600;color:var(--text3)}
 .ctx-item .val{color:var(--text);font-weight:600}
@@ -146,7 +148,7 @@ body{font-family:'Inter','Segoe UI',system-ui,sans-serif;background:var(--bg-gra
 /* ── KPI BAR ── */
 .kpi-bar{
   display:grid;grid-template-columns:repeat(7,minmax(150px,1fr));gap:10px;
-  padding:14px 22px;background:transparent;
+  padding:10px 22px;background:transparent;
   border-bottom:1px solid var(--border);
 }
 @media (max-width:1280px){.kpi-bar{grid-template-columns:repeat(4,1fr)}}
@@ -238,13 +240,13 @@ input[type="checkbox"]{accent-color:var(--accent2);width:14px;height:14px}
 .page-nav{
   display:flex;align-items:center;gap:4px;
   padding:0 22px;background:var(--bg);
-  border-bottom:1px solid var(--border);
+  border-top:1px solid var(--border);border-bottom:1px solid var(--border);
 }
 .pnav{
-  position:relative;padding:13px 18px 12px;cursor:pointer;
-  font-size:13px;font-weight:600;color:var(--text2);
+  position:relative;padding:9px 16px 8px;cursor:pointer;
+  font-size:12.5px;font-weight:600;color:var(--text2);
   border-bottom:2px solid transparent;margin-bottom:-1px;
-  transition:color .12s;display:inline-flex;align-items:center;gap:8px;
+  transition:color .12s;display:inline-flex;align-items:center;gap:7px;
   letter-spacing:-0.01em;
 }
 .pnav svg{width:16px;height:16px;opacity:.8}
@@ -503,64 +505,66 @@ canvas{max-height:260px}
     </div>
   </div>
   <div class="ctx-strip">
-    <div class="ctx-item">
-      <span class="ctx-dot" id="conn-dot" title="Live sync"></span>
-      <span class="lbl">Status</span>
-      <span class="val" id="conn-label">Live</span>
+    <div class="ctx-left">
+      <div class="ctx-item">
+        <span class="ctx-dot" id="conn-dot" title="Live sync"></span>
+        <span class="lbl">Status</span>
+        <span class="val" id="conn-label">Live</span>
+      </div>
+      <div class="ctx-sep"></div>
+      <div class="ctx-item">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text3)"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        <span class="lbl">Period</span>
+        <span class="val">Apr'26 → Mar'27</span>
+      </div>
+      <div class="ctx-sep"></div>
+      <div class="ctx-item">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text3)"><path d="M3 21h18M5 21V7l8-4v18M19 21V11l-6-4"/><path d="M9 9v.01M9 12v.01M9 15v.01M9 18v.01"/></svg>
+        <span class="lbl">BU</span>
+        <span class="val">BikeDekho · Lead</span>
+      </div>
+      <div class="ctx-sep"></div>
+      <div class="ctx-item">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text3)"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        <span class="lbl">Units</span>
+        <span class="val">Rs Lacs · Leads in Lacs</span>
+      </div>
+      <div class="ctx-sep"></div>
+      <span class="badge"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg><span class="num" id="rec-count">—</span> accounts</span>
+      <span class="save-ok" id="save-ok"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Saved</span>
     </div>
-    <div class="ctx-sep"></div>
-    <div class="ctx-item">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text3)"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-      <span class="lbl">Period</span>
-      <span class="val">Apr'26 → Mar'27</span>
-    </div>
-    <div class="ctx-sep"></div>
-    <div class="ctx-item">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text3)"><path d="M3 21h18M5 21V7l8-4v18M19 21V11l-6-4"/><path d="M9 9v.01M9 12v.01M9 15v.01M9 18v.01"/></svg>
-      <span class="lbl">BU</span>
-      <span class="val">BikeDekho · Lead</span>
-    </div>
-    <div class="ctx-sep"></div>
-    <div class="ctx-item">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text3)"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-      <span class="lbl">Units</span>
-      <span class="val">Rs Lacs · Leads in Lacs</span>
-    </div>
-    <div class="ctx-sep"></div>
-    <span class="badge"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg><span class="num" id="rec-count">—</span> accounts</span>
-    <span class="save-ok" id="save-ok"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Saved</span>
-    <!-- ── Active users presence strip ── -->
-    <div id="active-users-strip" style="display:none;align-items:center;gap:8px;padding:2px 10px;background:var(--pos-bg);border:1px solid rgba(52,211,153,0.2);border-radius:20px;margin-left:4px"></div>
-    <div style="margin-left:auto;display:flex;gap:6px;align-items:center">
-      <button class="btn btn-dim" id="user-btn" onclick="promptUserName()" title="Click to change your name">
+    <div class="ctx-right">
+      <!-- ── Active users presence strip ── -->
+      <div id="active-users-strip" style="display:none;align-items:center;gap:8px;padding:2px 10px;background:var(--pos-bg);border:1px solid rgba(52,211,153,0.2);border-radius:20px"></div>
+      <div class="ctx-sep"></div>
+      <button class="btn btn-dim" id="user-btn" onclick="promptUserName()" title="Click to change your name" style="padding:4px 9px">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
         <span id="user-label">Set Name</span>
       </button>
-      <button class="btn btn-dim" onclick="openAuditV2Preview()" title="View change history">
+      <button class="btn btn-dim" onclick="openAuditV2Preview()" title="View change history" style="padding:4px 9px">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
         Audit
       </button>
     </div>
   </div>
-</div>
-
-<!-- PAGE NAV (top-level) -->
-<div class="page-nav">
-  <div class="pnav active" data-p="overview" onclick="setPage('overview')">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>
-    Overview
-    <span class="pn-sub">Executive</span>
-  </div>
-  <div class="pnav" data-p="tracker" onclick="setPage('tracker')">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l4-4 4 4 5-5"/></svg>
-    AOP Tracker
-    <span class="pn-sub">Monthly entry</span>
-  </div>
-  <div class="pnav" data-p="clients" onclick="setPage('clients')">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V7l8-4v18"/><path d="M19 21V11l-6-4"/><path d="M9 9h.01M9 13h.01M9 17h.01"/></svg>
-    Clients &amp; Contracts
-    <span class="pn-sub">Master data</span>
-    <span class="pn-badge" id="pn-client-count">—</span>
+  <!-- PAGE NAV — inside .hdr so it scrolls with the sticky header -->
+  <div class="page-nav">
+    <div class="pnav active" data-p="overview" onclick="setPage('overview')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>
+      Overview
+      <span class="pn-sub">Executive</span>
+    </div>
+    <div class="pnav" data-p="tracker" onclick="setPage('tracker')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l4-4 4 4 5-5"/></svg>
+      AOP Tracker
+      <span class="pn-sub">Monthly entry</span>
+    </div>
+    <div class="pnav" data-p="clients" onclick="setPage('clients')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V7l8-4v18"/><path d="M19 21V11l-6-4"/><path d="M9 9h.01M9 13h.01M9 17h.01"/></svg>
+      Clients &amp; Contracts
+      <span class="pn-sub">Master data</span>
+      <span class="pn-badge" id="pn-client-count">—</span>
+    </div>
   </div>
 </div>
 
