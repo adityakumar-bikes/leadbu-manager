@@ -95,8 +95,39 @@ body.light .nav-tab{color:var(--text2)}
 body.light .nav-tab.active{color:var(--accent2)}
 body.light .chart-card{background:#fff}
 body.light .modal-overlay .modal-box{background:#fff}
-body.light .tbl-wrap table tr:hover td{background:#f0f0f8}
+body.light .tbl-wrap table tr:hover td{background:#eeeef6}
 body.light .pchip{background:var(--bg3);border-color:var(--border2);color:var(--text)}
+/* Table rows */
+body.light .sub-row td{background:#e8e8f0;color:var(--text1)}
+body.light .sub-row td.dc{background:#e8e8f0}
+body.light .row-section td{background:#ededf5!important;color:var(--accent2)}
+body.light .row-total td{background:#e2e2ec!important;color:var(--text1)}
+body.light .row-total td:first-child{background:#e2e2ec!important}
+body.light .fy-col{background:rgba(99,102,241,.07)!important}
+body.light .tgt-col{background:rgba(0,0,0,0.03)}
+/* P&L modal */
+body.light .modal-hdr{background:linear-gradient(180deg,#f8f8fd,#f3f3f9)}
+body.light .modal-footer{background:var(--bg3)}
+body.light .pl-table tr:hover td:first-child{background:#e4e4f0}
+body.light .pl-input{background:rgba(99,102,241,.07);border-color:rgba(99,102,241,.25);color:var(--accent2)}
+body.light .pl-input:hover{background:rgba(99,102,241,.12);border-color:rgba(99,102,241,.40)}
+body.light .pl-input:focus{background:rgba(99,102,241,.15);border-color:var(--accent2)}
+body.light .pl-input.cpl-input{background:rgba(234,88,12,.06);border-color:rgba(234,88,12,.25);color:#c2410c}
+body.light .pl-input.cpl-input:hover{background:rgba(234,88,12,.10)}
+/* Table th bg overrides for leads/mktg (hardcoded dark hex → light) */
+body.light th[style*="background:#0a2040"]{background:#dbeafe!important}
+body.light th[style*="background:#0a2a10"]{background:#dcfce7!important}
+body.light th[style*="background:#1a1a30"]{background:#eef2ff!important}
+body.light th[style*="background:#2a1020"]{background:#fce7f3!important}
+body.light th[style*="background:#2a1a00"]{background:#fff7ed!important}
+body.light th[style*="background:#1a2a0a"]{background:#f0fdf4!important}
+body.light th[style*="background:#2a001a"]{background:#fdf2f8!important}
+/* Team structure cards */
+body.light div[style*="background:#161b22"]{background:#ffffff!important;color:var(--text1)!important}
+/* Audit overlay */
+body.light .audit-v2-overlay{background:var(--bg2)}
+body.light td[style*="background:#0a0"]{background:#f0fdf4!important}
+body.light td[style*="background:#800"]{background:#fef2f2!important}
 
 html,body{background:var(--bg);color:var(--text);font-size:13px;font-feature-settings:"cv11","ss01","ss03";-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
 body{font-family:'Inter','Segoe UI',system-ui,sans-serif;background:var(--bg-grad);color:var(--text);min-height:100vh;letter-spacing:-0.005em}
@@ -2894,17 +2925,19 @@ function renderLeads(rows){
   html+='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">';
 
   // Column headers - 4 sections: Total | Mktg | Google | Meta | Organic
+  const _lt=document.body.classList.contains('light');
   const thBase='padding:6px 8px;text-align:center;font-size:11px;border-bottom:2px solid var(--border2);border-left:1px solid var(--border2)';
   const th2='padding:4px 8px;text-align:right;font-size:10px;color:var(--text3);border-bottom:1px solid var(--border2)';
+  const _bg=(dark,light)=>_lt?light:dark;
   html+='<thead>'
     +'<tr>'
     +'<th rowspan="2" style="text-align:left;padding:6px 10px;position:sticky;left:0;z-index:2;background:var(--bg3);border-bottom:2px solid var(--border2);min-width:140px">Account</th>'
     +'<th rowspan="2" style="text-align:left;padding:6px 6px;background:var(--bg3);border-bottom:2px solid var(--border2);font-size:10px;color:var(--text3)">Type</th>'
-    +'<th colspan="3" style="'+thBase+';background:#0a2040;color:#58a6ff">Total Triggered Leads</th>'
-    +'<th colspan="3" style="'+thBase+';background:#0a2a10;color:#3fb950">Mktg Triggered Leads</th>'
-    +'<th colspan="2" style="'+thBase+';background:#1a1a30;color:#a0a0ff">Google Leads (ACT)</th>'
-    +'<th colspan="2" style="'+thBase+';background:#2a1020;color:#ff80a0">Meta Leads (ACT)</th>'
-    +'<th colspan="3" style="'+thBase+';background:#2a1a00;color:#f0883e">Organic Leads</th>'
+    +'<th colspan="3" style="'+thBase+';background:'+_bg('#0a2040','#dbeafe')+';color:#58a6ff">Total Triggered Leads</th>'
+    +'<th colspan="3" style="'+thBase+';background:'+_bg('#0a2a10','#dcfce7')+';color:#3fb950">Mktg Triggered Leads</th>'
+    +'<th colspan="2" style="'+thBase+';background:'+_bg('#1a1a30','#eef2ff')+';color:'+_bg('#a0a0ff','#6366f1')+'">Google Leads (ACT)</th>'
+    +'<th colspan="2" style="'+thBase+';background:'+_bg('#2a1020','#fce7f3')+';color:'+_bg('#ff80a0','#db2777')+'">Meta Leads (ACT)</th>'
+    +'<th colspan="3" style="'+thBase+';background:'+_bg('#2a1a00','#fff7ed')+';color:#f0883e">Organic Leads</th>'
     +'</tr><tr>'
     +['TGT','ACT','ACH%','TGT','ACT','ACH%','ACT','ACH%','ACT','ACH%','TGT','ACT','ACH%'].map((h,i)=>{
       const bgs=['#0a2040','#0a2040','#0a2040','#0a2a10','#0a2a10','#0a2a10','#1a1a30','#1a1a30','#2a1020','#2a1020','#2a1400','#2a1400','#2a1400'];
@@ -3035,6 +3068,8 @@ function renderMktg(rows){
   };
 
   // Table header
+  const _ltM=document.body.classList.contains('light');
+  const _bgM=(dark,light)=>_ltM?light:dark;
   const thB='padding:6px 8px;text-align:center;font-size:10px;border-bottom:2px solid var(--border2);border-left:1px solid var(--border2)';
   const thS='padding:4px 6px;text-align:right;font-size:9px;color:var(--text3);border-bottom:1px solid var(--border2)';
 
@@ -3044,11 +3079,11 @@ function renderMktg(rows){
     +'<tr>'
     +'<th rowspan="2" style="text-align:left;padding:6px 10px;position:sticky;left:0;z-index:2;background:var(--bg3);border-bottom:2px solid var(--border2);min-width:130px">Account</th>'
     +'<th rowspan="2" style="text-align:left;padding:6px 6px;background:var(--bg3);border-bottom:2px solid var(--border2);font-size:10px;color:var(--text3);min-width:55px">Type</th>'
-    +'<th colspan="3" style="'+thB+';background:#0a2a10;color:#3fb950">Mktg Leads (L)</th>'
-    +'<th colspan="2" style="'+thB+';background:#1a2a0a;color:#8eca5a">TCPL (Rs/Lead)</th>'
-    +'<th colspan="2" style="'+thB+';background:#0a2040;color:#58a6ff">Google</th>'
-    +'<th colspan="2" style="'+thB+';background:#2a001a;color:#ff80a0">Meta</th>'
-    +'<th colspan="2" style="'+thB+';background:#2a1a00;color:#f0883e">ROAS</th>'
+    +'<th colspan="3" style="'+thB+';background:'+_bgM('#0a2a10','#dcfce7')+';color:#3fb950">Mktg Leads (L)</th>'
+    +'<th colspan="2" style="'+thB+';background:'+_bgM('#1a2a0a','#f0fdf4')+';color:'+_bgM('#8eca5a','#4d7c0f')+'">TCPL (Rs/Lead)</th>'
+    +'<th colspan="2" style="'+thB+';background:'+_bgM('#0a2040','#dbeafe')+';color:#58a6ff">Google</th>'
+    +'<th colspan="2" style="'+thB+';background:'+_bgM('#2a001a','#fdf2f8')+';color:'+_bgM('#ff80a0','#db2777')+'">Meta</th>'
+    +'<th colspan="2" style="'+thB+';background:'+_bgM('#2a1a00','#fff7ed')+';color:#f0883e">ROAS</th>'
     +'</tr><tr>'
     +['TGT','ACT','Contrib%','TGT','ACT','Leads(L)','CPL(Rs)','Leads(L)','CPL(Rs)','Google','Meta'].map((h,i)=>{
       const bgs=['#0a2a10','#0a2a10','#0a2a10','#1a2a0a','#1a2a0a','#0a2040','#0a2040','#2a001a','#2a001a','#2a1a00','#2a1a00'];
@@ -3687,15 +3722,17 @@ function renderTeam(){
   });
 
   // ── Org Chart ──
+  const _ltT=document.body.classList.contains('light');
+  const _cardBg=_ltT?'var(--bg2)':'#161b22';
   let html='<div style="padding:16px 0 8px">';
   html+='<h3 style="color:var(--text1);margin:0 0 16px;font-size:14px;font-weight:700">&#128202; Organisation Structure</h3>';
   html+='<div style="display:flex;flex-direction:column;align-items:center;gap:0">';
-  html+=`<div style="background:#161b22;border:2px solid #f0883e;border-radius:8px;padding:10px 24px;text-align:center;min-width:160px">
+  html+=`<div style="background:${_cardBg};border:2px solid #f0883e;border-radius:8px;padding:10px 24px;text-align:center;min-width:160px">
     <div style="font-weight:700;color:#f0883e;font-size:13px">${TEAM_HIERARCHY.bh.name}</div>
     <div style="font-size:10px;color:var(--text3)">${TEAM_HIERARCHY.bh.role}</div>
   </div>`;
   html+='<div style="width:2px;height:16px;background:var(--border2)"></div>';
-  html+=`<div style="background:#161b22;border:2px solid #d29922;border-radius:8px;padding:10px 24px;text-align:center;min-width:160px">
+  html+=`<div style="background:${_cardBg};border:2px solid #d29922;border-radius:8px;padding:10px 24px;text-align:center;min-width:160px">
     <div style="font-weight:700;color:#d29922;font-size:13px">${TEAM_HIERARCHY.bl.name}</div>
     <div style="font-size:10px;color:var(--text3)">${TEAM_HIERARCHY.bl.role}</div>
   </div>`;
@@ -3703,7 +3740,7 @@ function renderTeam(){
   html+='<div style="display:flex;gap:32px;align-items:flex-start">';
   TEAM_HIERARCHY.pods.forEach(pod=>{
     html+=`<div style="display:flex;flex-direction:column;align-items:center;gap:0">
-      <div style="background:#161b22;border:2px solid ${pod.color};border-radius:8px;padding:10px 20px;text-align:center;min-width:130px">
+      <div style="background:${_cardBg};border:2px solid ${pod.color};border-radius:8px;padding:10px 20px;text-align:center;min-width:130px">
         <div style="font-weight:700;color:${pod.color};font-size:13px">${pod.name}</div>
         <div style="font-size:10px;color:var(--text3)">${pod.role}</div>
       </div>`;
