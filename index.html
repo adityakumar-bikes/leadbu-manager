@@ -533,7 +533,7 @@ canvas{max-height:260px}
       <div class="brand-mark">🏍️</div>
       <div class="brand-text">
         <div class="t1">Bike AOP Tracker</div>
-        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.0.57</span> <span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
+        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.0.58</span> <span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
       </div>
     </div>
     <div class="hdr-right">
@@ -4009,6 +4009,18 @@ function renderTeam(){
 // ═══════════════════════════
 // OVERVIEW PAGE
 // ═══════════════════════════
+// Overview filter state
+let _ovFAdType='',_ovFClient='',_ovFCat='',_ovFQtr=-1,_ovFMonth=-1;
+function applyOvFilter(f,v){
+  if(f==='adtype')_ovFAdType=v;
+  else if(f==='client')_ovFClient=v;
+  else if(f==='cat')_ovFCat=v;
+  else if(f==='qtr'){const qi=+v;if(qi<0||_ovFQtr===qi){_ovFQtr=-1;_ovFMonth=-1;}else{_ovFQtr=qi;_ovFMonth=-1;}}
+  else if(f==='month'){const mi=+v;if(mi<0||_ovFMonth===mi){_ovFMonth=-1;}else{_ovFMonth=mi;_ovFQtr=Math.floor(mi/3);}}
+  renderOverview();
+}
+function clearOvFilters(){_ovFAdType='';_ovFClient='';_ovFCat='';_ovFQtr=-1;_ovFMonth=-1;renderOverview();}
+
 function renderOverview(){
   const el=document.getElementById('page-overview');
   if(!el)return;
@@ -4024,81 +4036,91 @@ function renderOverview(){
     ...newTargets.map(t=>({t,a:emptyAct(),d:deriveActuals(emptyAct(),t.ad_type)})),
   ];
 
-  // FY TGT aggregates
-  const tRevFY=allRows.reduce((s,{t})=>s+t.rev.fy,0);
-  const tMktgFY=allRows.reduce((s,{t})=>s+t.mktg.fy,0);
-  const tCCFY=allRows.reduce((s,{t})=>s+(t.cc?t.cc.fy:0),0);
-  const tLeadsFY=allRows.reduce((s,{t})=>s+(t.leads?t.leads.fy:0),0);
+  // ── Dimension filter ──
+  const filteredRows=allRows.filter(({t})=>{
+    if(_ovFAdType&&t.ad_type!==_ovFAdType)return false;
+    if(_ovFClient&&t.client!==_ovFClient)return false;
+    if(_ovFCat&&t.cat!==_ovFCat)return false;
+    return true;
+  });
+
+  // ── Period helpers ──
+  const QMON=[[0,1,2],[3,4,5],[6,7,8],[9,10,11]];
+  const periodMonths=_ovFMonth>=0?[_ovFMonth]:(_ovFQtr>=0?QMON[_ovFQtr]:Array.from({length:12},(_,i)=>i));
+  const periodLabel=_ovFMonth>=0?MONTHS[_ovFMonth]:(_ovFQtr>=0?QTRS[_ovFQtr]+' FY27':'FY27');
+  const isFullYear=_ovFQtr<0&&_ovFMonth<0;
+  const pSum=arr=>periodMonths.reduce((s,i)=>s+(+arr[i]||0),0);
+
+  // ── Period TGT aggregates ──
+  const tRevFY=filteredRows.reduce((s,{t})=>s+pSum(mArr(t,'rev')),0);
+  const tMktgFY=filteredRows.reduce((s,{t})=>s+pSum(mArr(t,'mktg')),0);
+  const tCCFY=filteredRows.reduce((s,{t})=>s+pSum(mArr(t,'cc')),0);
   const tGMFY=tRevFY-tMktgFY;
   const tGPMFY=tGMFY-tCCFY;
   const tGMpctFY=tRevFY>0?tGMFY/tRevFY*100:0;
   const tGPMpctFY=tRevFY>0?tGPMFY/tRevFY*100:0;
 
-  // FY ACT aggregates
-  const aRevFY=allRows.reduce((s,{d})=>s+d.rev_fy,0);
-  const aMktgFY=allRows.reduce((s,{d})=>s+d.mktg_fy,0);
-  const aCCFY=allRows.reduce((s,{d})=>s+d.cc_fy,0);
-  const aLeadsFY=allRows.reduce((s,{d})=>s+d.trig_fy,0);
+  // ── Period ACT aggregates ──
+  const aRevFY=filteredRows.reduce((s,{d})=>s+pSum(d.rev),0);
+  const aMktgFY=filteredRows.reduce((s,{d})=>s+pSum(d.mktg_cost),0);
+  const aCCFY=filteredRows.reduce((s,{d})=>s+pSum(d.cc),0);
+  const aLeadsFY=filteredRows.reduce((s,{d})=>s+pSum(d.trig_leads),0);
   const aGMFY=aRevFY-aMktgFY;
   const aGPMFY=aGMFY-aCCFY;
   const aGMpctFY=aRevFY>0?aGMFY/aRevFY*100:0;
   const aGPMpctFY=aRevFY>0?aGPMFY/aRevFY*100:0;
 
-  // LY aggregates
-  const lyRevFY=allRows.reduce((s,{t})=>s+(t.rev.fy_smly||0),0);
-  const lyMktgFY=allRows.reduce((s,{t})=>s+(t.mktg.fy_smly||0),0);
-  const lyCCFY=allRows.reduce((s,{t})=>s+(t.cc&&t.cc.fy_smly?t.cc.fy_smly:0),0);
+  // ── Period LY aggregates ──
+  const lyRevFY=filteredRows.reduce((s,{t})=>s+pSum(sArr(t,'rev')),0);
+  const lyMktgFY=filteredRows.reduce((s,{t})=>s+pSum(sArr(t,'mktg')),0);
+  const lyCCFY=filteredRows.reduce((s,{t})=>s+pSum(sArr(t,'cc')),0);
   const lyGMFY=lyRevFY-lyMktgFY;
   const lyGPMFY=lyGMFY-lyCCFY;
 
   const hasAct=aRevFY>0||aMktgFY>0;
 
-  // YTD position (FY27 starts Apr 2026)
+  // ── YTD / Progress period ──
   const now=new Date();
   const fyStart=new Date(2026,3,1);
   const mElapsed=Math.max(0,Math.min(11,(now.getFullYear()-fyStart.getFullYear())*12+(now.getMonth()-fyStart.getMonth())));
-  const ytdMonths=mElapsed+1;
-
-  const ytdRevTGT=allRows.reduce((s,{t})=>{
-    const m=mArr(t,'rev');return s+m.slice(0,ytdMonths).reduce((a,v)=>a+v,0);
-  },0);
-  const ytdRevACT=allRows.reduce((s,{d})=>s+d.rev.slice(0,ytdMonths).reduce((a,v)=>a+v,0),0);
+  const ytdMonthCount=mElapsed+1;
+  // If full year with no filters → show YTD; if period selected → show that period
+  const ytdPeriodMonths=isFullYear?Array.from({length:ytdMonthCount},(_,i)=>i):periodMonths;
+  const ytdRevTGT=filteredRows.reduce((s,{t})=>{const m=mArr(t,'rev');return s+ytdPeriodMonths.reduce((ss,i)=>ss+(m[i]||0),0);},0);
+  const ytdRevACT=filteredRows.reduce((s,{d})=>s+ytdPeriodMonths.reduce((ss,i)=>ss+(d.rev[i]||0),0),0);
   const ytdAchPct=ytdRevTGT>0?ytdRevACT/ytdRevTGT*100:0;
 
-  // Quarterly aggregates
-  const tRevQ=QTRS.map((_,qi)=>allRows.reduce((s,{t})=>s+(qArr(t,'rev')[qi]||0),0));
-  const tMktgQ=QTRS.map((_,qi)=>allRows.reduce((s,{t})=>s+(qArr(t,'mktg')[qi]||0),0));
-  const tCCQ=QTRS.map((_,qi)=>allRows.reduce((s,{t})=>s+(t.cc&&t.cc.qtrs?t.cc.qtrs[qi]||0:0),0));
-  const aRevQ=QTRS.map((_,qi)=>allRows.reduce((s,{d})=>s+(d.rev_q[qi]||0),0));
-  const aMktgQ=QTRS.map((_,qi)=>allRows.reduce((s,{d})=>s+(d.mktg_q[qi]||0),0));
-  const aCCQ=QTRS.map((_,qi)=>allRows.reduce((s,{d})=>s+(d.cc_q[qi]||0),0));
+  // ── Quarterly aggregates (always all 4, from filteredRows) ──
+  const tRevQ=QTRS.map((_,qi)=>filteredRows.reduce((s,{t})=>s+(qArr(t,'rev')[qi]||0),0));
+  const tMktgQ=QTRS.map((_,qi)=>filteredRows.reduce((s,{t})=>s+(qArr(t,'mktg')[qi]||0),0));
+  const tCCQ=QTRS.map((_,qi)=>filteredRows.reduce((s,{t})=>s+(t.cc&&t.cc.qtrs?t.cc.qtrs[qi]||0:0),0));
+  const aRevQ=QTRS.map((_,qi)=>filteredRows.reduce((s,{d})=>s+(d.rev_q[qi]||0),0));
+  const aMktgQ=QTRS.map((_,qi)=>filteredRows.reduce((s,{d})=>s+(d.mktg_q[qi]||0),0));
+  const aCCQ=QTRS.map((_,qi)=>filteredRows.reduce((s,{d})=>s+(d.cc_q[qi]||0),0));
   const tGMQ=tRevQ.map((r,i)=>r-tMktgQ[i]);
   const aGMQ=aRevQ.map((r,i)=>r-aMktgQ[i]);
   const tGPMQ=tGMQ.map((g,i)=>g-tCCQ[i]);
   const aGPMQ=aGMQ.map((g,i)=>g-aCCQ[i]);
 
-  // Monthly chart data
-  const tRM=MONTHS.map((_,i)=>allRows.reduce((s,{t})=>s+mArr(t,'rev')[i],0));
-  const aRM=MONTHS.map((_,i)=>allRows.reduce((s,{d})=>s+(d.rev[i]||0),0));
-  const lyRM=MONTHS.map((_,i)=>allRows.reduce((s,{t})=>s+sArr(t,'rev')[i],0));
+  // ── Monthly chart (always 12 months, from filteredRows) ──
+  const tRM=MONTHS.map((_,i)=>filteredRows.reduce((s,{t})=>s+(mArr(t,'rev')[i]||0),0));
+  const aRM=MONTHS.map((_,i)=>filteredRows.reduce((s,{d})=>s+(d.rev[i]||0),0));
+  const lyRM=MONTHS.map((_,i)=>filteredRows.reduce((s,{t})=>s+(sArr(t,'rev')[i]||0),0));
 
-  // Mktg efficiency
-  const tcpl=aLeadsFY>0?(aMktgFY*100000)/aLeadsFY:0;
-  const tTcpl=tLeadsFY>0&&tMktgFY>0?(tMktgFY*100000)/(tLeadsFY*100000):0;
+  // ── Mktg efficiency ──
   const roas=aMktgFY>0?aRevFY/aMktgFY:0;
   const tRoas=tMktgFY>0?tRevFY/tMktgFY:0;
-  const totalRetails=allRows.reduce((s,{a})=>s+(a.retails||[]).reduce((x,v)=>x+(+v||0),0),0);
-  const convRate=aLeadsFY>0&&totalRetails>0?totalRetails/aLeadsFY*100:0;
+  const totalRetails=filteredRows.reduce((s,{a})=>s+pSum(a.retails||Array(12).fill(0)),0);
 
-  // Watchlist — clients off track
+  // ── Watchlist (from filteredRows + periodMonths) ──
   const clientMap={};
-  allRows.forEach(({t,d})=>{
+  filteredRows.forEach(({t,d})=>{
     const k=t.client;
     if(!clientMap[k])clientMap[k]={tRev:0,aRev:0,tMktg:0,aMktg:0,tCC:0,aCC:0};
     const cm=clientMap[k];
-    cm.tRev+=t.rev.fy;cm.aRev+=d.rev_fy;
-    cm.tMktg+=t.mktg.fy;cm.aMktg+=d.mktg_fy;
-    cm.tCC+=(t.cc?t.cc.fy:0);cm.aCC+=d.cc_fy;
+    cm.tRev+=pSum(mArr(t,'rev'));cm.aRev+=pSum(d.rev);
+    cm.tMktg+=pSum(mArr(t,'mktg'));cm.aMktg+=pSum(d.mktg_cost);
+    cm.tCC+=pSum(mArr(t,'cc'));cm.aCC+=pSum(d.cc);
   });
   const watchlist=Object.entries(clientMap).map(([c,v])=>{
     const tGM=v.tRev-v.tMktg,aGM=v.aRev-v.aMktg;
@@ -4112,12 +4134,51 @@ function renderOverview(){
   }).filter(({issues,tRevFY})=>issues.length>0&&tRevFY>0)
     .sort((a,b)=>a.ach-b.ach).slice(0,8);
 
+  // ── Unique values for filter dropdowns ──
+  const uniqueClients=[...new Set(allRows.map(r=>r.t.client))].sort();
+  const uniqueCats=[...new Set(allRows.map(r=>r.t.cat).filter(Boolean))].sort();
+  const hasFilters=!!(_ovFAdType||_ovFClient||_ovFCat||_ovFQtr>=0||_ovFMonth>=0);
+
   // ── Build HTML ──
   let html=`<div style="padding:20px 22px;display:flex;flex-direction:column;gap:20px">`;
 
-  // Headline KPIs
+  // ── FILTER BAR ──
+  const selStyle='font-size:11px;background:var(--bg3);color:var(--text1);border:1px solid var(--border2);border-radius:6px;padding:3px 8px;cursor:pointer';
+  html+=`<div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:12px 16px;display:flex;flex-direction:column;gap:10px">
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      <span style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;white-space:nowrap;min-width:52px">Quarter</span>
+      <button class="pchip${_ovFQtr<0?' active':''}" onclick="applyOvFilter('qtr','-1')">Full Year</button>
+      ${QTRS.map((q,qi)=>`<button class="pchip${_ovFQtr===qi?' active':''}" onclick="applyOvFilter('qtr','${qi}')">${q}</button>`).join('')}
+      <div style="width:1px;height:18px;background:var(--border2);margin:0 4px"></div>
+      <span style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;white-space:nowrap">Cat</span>
+      <select onchange="applyOvFilter('cat',this.value)" style="${selStyle}">
+        <option value="">All</option>
+        ${uniqueCats.map(c=>`<option value="${c}"${_ovFCat===c?' selected':''}>${c}</option>`).join('')}
+      </select>
+      <span style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;white-space:nowrap">Client</span>
+      <select onchange="applyOvFilter('client',this.value)" style="${selStyle}">
+        <option value="">All</option>
+        ${uniqueClients.map(c=>`<option value="${c}"${_ovFClient===c?' selected':''}>${c}</option>`).join('')}
+      </select>
+      <span style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;white-space:nowrap">Ad Type</span>
+      <select onchange="applyOvFilter('adtype',this.value)" style="${selStyle}">
+        <option value="">All</option>
+        <option value="CPS"${_ovFAdType==='CPS'?' selected':''}>CPS</option>
+        <option value="Media Leads"${_ovFAdType==='Media Leads'?' selected':''}>Media Leads</option>
+        <option value="CC contract"${_ovFAdType==='CC contract'?' selected':''}>CC Contract</option>
+      </select>
+      ${hasFilters?`<button onclick="clearOvFilters()" style="font-size:10px;padding:3px 10px;border-radius:6px;background:rgba(251,113,133,.1);color:var(--neg);border:1px solid rgba(251,113,133,.3);cursor:pointer;font-weight:700;margin-left:4px">✕ Clear</button>`:''}
+    </div>
+    ${_ovFQtr>=0?`<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      <span style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;white-space:nowrap;min-width:52px">Month</span>
+      <button class="pchip${_ovFMonth<0?' active':''}" onclick="applyOvFilter('month','-1')">All ${QTRS[_ovFQtr]}</button>
+      ${QMON[_ovFQtr].map(mi=>`<button class="pchip${_ovFMonth===mi?' active':''}" onclick="applyOvFilter('month','${mi}')">${MONTHS[mi]}</button>`).join('')}
+    </div>`:''}
+  </div>`;
+
+  // ── Headline KPIs ──
   html+=`<section>
-    <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px">FY27 Performance Summary</div>
+    <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px">Performance Summary — ${periodLabel}${hasFilters&&(_ovFClient||_ovFAdType||_ovFCat)?' · <span style="color:var(--accent);font-style:normal">'+[_ovFClient,_ovFAdType,_ovFCat].filter(Boolean).join(' / ')+'</span>':''}</div>
     <div style="display:grid;grid-template-columns:repeat(7,minmax(130px,1fr));gap:10px">`;
   const kpis=[
     {label:'Revenue',cls:'rev',color:'var(--m-rev)',tgt:tRevFY,act:aRevFY,ly:lyRevFY,isPct:false},
@@ -4144,34 +4205,36 @@ function renderOverview(){
   });
   html+=`</div></section>`;
 
-  // Per-adType YTD and GM aggregates
+  // ── Per-adType YTD/Period stats ──
   const AD_TYPES_OV=['CPS','Media Leads','CC contract'];
   const AT_LABEL={'CPS':'CPS','Media Leads':'Media Leads','CC contract':'CC Contract'};
   const AT_COLOR={'CPS':'var(--accent)','Media Leads':'var(--warn)','CC contract':'var(--m-cc)'};
   const ytdByType={}, gmByType={};
   AD_TYPES_OV.forEach(at=>{
-    const rows=allRows.filter(({t})=>t.ad_type===at);
-    const ytdTgt=rows.reduce((s,{t})=>{const m=mArr(t,'rev');return s+m.slice(0,ytdMonths).reduce((a,v)=>a+v,0);},0);
-    const ytdAct=rows.reduce((s,{d})=>s+d.rev.slice(0,ytdMonths).reduce((a,v)=>a+v,0),0);
-    const tRevAt=rows.reduce((s,{t})=>s+t.rev.fy,0);
-    const tMktgAt=rows.reduce((s,{t})=>s+t.mktg.fy,0);
-    const aRevAt=rows.reduce((s,{d})=>s+d.rev_fy,0);
-    const aMktgAt=rows.reduce((s,{d})=>s+d.mktg_fy,0);
+    const rows=filteredRows.filter(({t})=>t.ad_type===at);
+    const ytdTgt=rows.reduce((s,{t})=>{const m=mArr(t,'rev');return s+ytdPeriodMonths.reduce((ss,i)=>ss+(m[i]||0),0);},0);
+    const ytdAct=rows.reduce((s,{d})=>s+ytdPeriodMonths.reduce((ss,i)=>ss+(d.rev[i]||0),0),0);
+    const tRevAt=rows.reduce((s,{t})=>s+pSum(mArr(t,'rev')),0);
+    const tMktgAt=rows.reduce((s,{t})=>s+pSum(mArr(t,'mktg')),0);
+    const aRevAt=rows.reduce((s,{d})=>s+pSum(d.rev),0);
+    const aMktgAt=rows.reduce((s,{d})=>s+pSum(d.mktg_cost),0);
     ytdByType[at]={tgt:ytdTgt,act:ytdAct,ach:ytdTgt>0?ytdAct/ytdTgt*100:0};
     gmByType[at]={tRev:tRevAt,aRev:aRevAt,tGM:tRevAt-tMktgAt,aGM:aRevAt-aMktgAt,
       tGMp:tRevAt>0?(tRevAt-tMktgAt)/tRevAt*100:0,
       aGMp:aRevAt>0?(aRevAt-aMktgAt)/aRevAt*100:0};
   });
 
-  // YTD Progress + GM Summary
+  // ── Revenue Progress + GM Summary ──
   html+=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">`;
 
-  // ── YTD Revenue Progress by ad type ──
+  // Revenue Progress by ad type
+  const progressTitle=isFullYear?'YTD Revenue Progress':`Revenue Progress — ${periodLabel}`;
+  const progressSub=isFullYear?`${MONTHS[mElapsed]} · Month ${ytdMonthCount}/12`:periodLabel;
   const ytdColor=ytdAchPct>=90?'var(--pos)':ytdAchPct>=70?'var(--warn)':'var(--neg)';
   html+=`<div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:18px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
-      <div style="font-size:12px;font-weight:700;color:var(--text1)">YTD Revenue Progress</div>
-      <div style="font-size:11px;color:var(--text2)">${MONTHS[mElapsed]} · Month ${ytdMonths}/12</div>
+      <div style="font-size:12px;font-weight:700;color:var(--text1)">${progressTitle}</div>
+      <div style="font-size:11px;color:var(--text2)">${progressSub}</div>
     </div>
     <div style="display:flex;justify-content:space-between;margin-bottom:12px">
       <div><div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:2px">Actual</div>
@@ -4198,13 +4261,13 @@ function renderOverview(){
   html+=`</div>
     <div style="display:flex;justify-content:space-between;margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
       <div style="font-size:11px;color:var(--text2)">Overall: <span style="font-weight:700;color:${ytdColor}">${ytdAchPct.toFixed(1)}%</span></div>
-      <div style="font-size:11px;color:var(--text3)">${(100/12*ytdMonths).toFixed(1)}% of year elapsed</div>
+      ${isFullYear?`<div style="font-size:11px;color:var(--text3)">${(100/12*ytdMonthCount).toFixed(1)}% of year elapsed</div>`:`<div style="font-size:11px;color:var(--text3)">${periodLabel}</div>`}
     </div>
   </div>`;
 
   // ── GM Summary by ad type ──
   html+=`<div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:18px">
-    <div style="font-size:12px;font-weight:700;color:var(--text1);margin-bottom:14px">GM Summary — FY27</div>
+    <div style="font-size:12px;font-weight:700;color:var(--text1);margin-bottom:14px">GM Summary — ${periodLabel}</div>
     <div style="display:flex;flex-direction:column;gap:10px">`;
   AD_TYPES_OV.forEach(at=>{
     const {tRev,aRev,tGM,aGM,tGMp,aGMp}=gmByType[at];
@@ -4229,23 +4292,28 @@ function renderOverview(){
   });
   html+=`</div></div></div>`;
 
-  // Quarterly Snapshot
+  // ── Quarterly Snapshot ──
   html+=`<section>
     <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px">Quarterly Snapshot — FY27</div>
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">`;
   QTRS.forEach((q,qi)=>{
     const tR=tRevQ[qi],aR=aRevQ[qi];
-    const tGM=tGMQ[qi],aGM=aGMQ[qi];
+    const tGMv=tGMQ[qi],aGMv=aGMQ[qi];
     const tGP=tGPMQ[qi],aGP=aGPMQ[qi];
-    const tGMp=tR>0?tGM/tR*100:0,aGMp=aR>0?aGM/aR*100:0;
+    const tGMp=tR>0?tGMv/tR*100:0,aGMp=aR>0?aGMv/aR*100:0;
     const tGPp=tR>0?tGP/tR*100:0,aGPp=aR>0?aGP/aR*100:0;
     const qAch=tR>0&&hasAct?aR/tR*100:null;
     const qC=qAch!==null?(qAch>=90?'var(--pos)':qAch>=70?'var(--warn)':'var(--neg)'):'var(--accent)';
-    html+=`<div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:16px;position:relative;overflow:hidden">
-      <div style="position:absolute;top:0;left:0;right:0;height:2px;background:${qC};opacity:.6"></div>
+    const isSelQtr=_ovFQtr===qi;
+    const selBorder=isSelQtr?`border:2px solid var(--blue);`:`border:1px solid var(--border);`;
+    html+=`<div style="background:var(--bg2);${selBorder}border-radius:12px;padding:16px;position:relative;overflow:hidden;cursor:pointer" onclick="applyOvFilter('qtr','${qi}')">
+      <div style="position:absolute;top:0;left:0;right:0;height:3px;background:${isSelQtr?'var(--blue)':qC};opacity:${isSelQtr?'1':'.6'}"></div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-        <span style="font-size:14px;font-weight:700;color:var(--text1)">${q}</span>
-        ${qAch!==null?`<span style="font-size:11px;font-weight:700;color:${qC}">${qAch.toFixed(0)}%</span>`:''}
+        <span style="font-size:14px;font-weight:700;color:${isSelQtr?'var(--blue)':'var(--text1)'}">${q}</span>
+        <div style="display:flex;align-items:center;gap:6px">
+          ${isSelQtr?`<span style="font-size:9px;padding:1px 6px;border-radius:4px;background:var(--blue2);color:var(--blue);font-weight:700">ACTIVE</span>`:''}
+          ${qAch!==null?`<span style="font-size:11px;font-weight:700;color:${qC}">${qAch.toFixed(0)}%</span>`:''}
+        </div>
       </div>
       <div style="display:flex;flex-direction:column;gap:7px">
         <div style="display:flex;justify-content:space-between"><span style="font-size:10.5px;color:var(--text3)">Rev TGT</span><span style="font-size:12px;font-weight:600;color:var(--m-rev);font-family:'JetBrains Mono',monospace">${fmt(tR)}</span></div>
@@ -4263,9 +4331,11 @@ function renderOverview(){
   });
   html+=`</div></section>`;
 
-  // Monthly Chart
+  // ── Monthly Chart ──
+  // Highlight selected months in the chart via background colors
+  const chartHighlight=periodMonths;
   html+=`<section>
-    <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px">Monthly Revenue — Target vs Actual vs LY</div>
+    <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px">Monthly Revenue — Target vs Actual vs LY${!isFullYear?' <span style="color:var(--blue);font-style:normal;font-size:10px">('+periodLabel+' highlighted)</span>':''}</div>
     <div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:16px">
       <canvas id="ov-rev-chart" style="max-height:220px"></canvas>
     </div>
@@ -4311,14 +4381,20 @@ function renderOverview(){
   dc('ov-rev-chart');
   const canvas=document.getElementById('ov-rev-chart');
   if(canvas){
+    const isLt=document.body.classList.contains('light');
+    // Per-bar colors: highlight selected period months
+    const tgtBg=MONTHS.map((_,i)=>chartHighlight.includes(i)?'#818cf8bb':'#818cf833');
+    const tgtBd=MONTHS.map((_,i)=>chartHighlight.includes(i)?'#818cf8':'#818cf855');
+    const actBg=MONTHS.map((_,i)=>chartHighlight.includes(i)?'#34d399bb':'#34d39933');
+    const actBd=MONTHS.map((_,i)=>chartHighlight.includes(i)?'#34d399':'#34d39955');
     CI['ov-rev-chart']=new Chart(canvas,{
       type:'bar',
       data:{labels:MONTHS,datasets:[
-        {label:'TGT',data:tRM,backgroundColor:'#818cf844',borderColor:'#818cf8',borderWidth:1},
-        {label:'ACT',data:aRM,backgroundColor:'#34d39955',borderColor:'#34d399',borderWidth:1},
+        {label:'TGT',data:tRM,backgroundColor:isFullYear?'#818cf844':tgtBg,borderColor:isFullYear?'#818cf8':tgtBd,borderWidth:1},
+        {label:'ACT',data:aRM,backgroundColor:isFullYear?'#34d39955':actBg,borderColor:isFullYear?'#34d399':actBd,borderWidth:1},
         {label:'LY',data:lyRM,type:'line',borderColor:'#fbbf2499',borderWidth:1.5,backgroundColor:'transparent',pointRadius:3,pointBackgroundColor:'#fbbf24',tension:.3},
       ]},
-      options:{...CO(),scales:{x:{ticks:{color:document.body.classList.contains('light')?'#58586e':'#8b949e',font:{size:9}},grid:{color:document.body.classList.contains('light')?'#dcdce855':'#1e2d4533'}},y:{ticks:{color:document.body.classList.contains('light')?'#58586e':'#8b949e',font:{size:9}},grid:{color:document.body.classList.contains('light')?'#dcdce855':'#1e2d4533'}}}}
+      options:{...CO(),scales:{x:{ticks:{color:isLt?'#58586e':'#8b949e',font:{size:9}},grid:{color:isLt?'#dcdce855':'#1e2d4533'}},y:{ticks:{color:isLt?'#58586e':'#8b949e',font:{size:9}},grid:{color:isLt?'#dcdce855':'#1e2d4533'}}}}
     });
   }
 
