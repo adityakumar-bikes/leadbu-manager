@@ -2624,6 +2624,8 @@ function renderBajajModal(recIdx){
 function renderTVSModal(recIdx){
   const t=TARGETS[recIdx],a=ACTUALS[recIdx];
   if(!a.brands)a.brands={};TVS_BRANDS.forEach(b=>{if(!a.brands[b])a.brands[b]=newBrandRec();});
+  // Sync each brand's retails from DMS+VoC (fixes stale direct-entry values)
+  TVS_BRANDS.forEach(b=>{const br=a.brands[b];if(!br)return;const dms=br.dms_retails||Array(12).fill(0);const voc=br.voc_retails||Array(12).fill(0);br.retails=dms.map((d,i)=>d+(+(voc[i]||0)));});
   recomputeBrandTotals(recIdx,TVS_BRANDS);
   const d=deriveActuals(a,t.ad_type);
   const vis=getVisibleMonths(),nc=vis.length*2+3,adType=t.ad_type;
@@ -2755,6 +2757,8 @@ function renderREModal(recIdx){
   const t=TARGETS[recIdx],a=ACTUALS[recIdx];
   if(!a.brands)a.brands={};
   RE_BRANDS.forEach(b=>{if(!a.brands[b])a.brands[b]=newBrandRec();});
+  // Sync each brand's retails from DMS+VoC
+  RE_BRANDS.forEach(b=>{const br=a.brands[b];if(!br)return;const dms=br.dms_retails||Array(12).fill(0);const voc=br.voc_retails||Array(12).fill(0);br.retails=dms.map((d,i)=>d+(+(voc[i]||0)));});
   recomputeBrandTotals(recIdx,RE_BRANDS);
   const d=deriveActuals(a,t.ad_type);
   const vis=getVisibleMonths(),nc=vis.length*2+3,adType=t.ad_type;
