@@ -2486,8 +2486,12 @@ function onBrandInputChange(inp){
   const BRANDS_FOR=ri===TARGETS.findIndex(t=>t.client===TVS_CLIENT)?TVS_BRANDS:
                    ri===TARGETS.findIndex(t=>t.client===RE_CLIENT)?RE_BRANDS:BAJAJ_BRANDS;
   if(!ACTUALS[ri].brands[brand])ACTUALS[ri].brands[brand]=newBrandRec();
+  // Ensure every field exists (Firebase may omit fields added later)
+  const _nr=newBrandRec();
+  Object.keys(_nr).forEach(k=>{if(ACTUALS[ri].brands[brand][k]==null)ACTUALS[ri].brands[brand][k]=_nr[k];});
   const _oldBV=+(ACTUALS[ri].brands[brand][field]&&ACTUALS[ri].brands[brand][field][mi])||0;
   logChange(ri,field,mi,_oldBV,v,brand);
+  if(!ACTUALS[ri].brands[brand][field])ACTUALS[ri].brands[brand][field]=Array(12).fill(0);
   ACTUALS[ri].brands[brand][field][mi]=v;
 
   // DMS/VoC → auto-sum retails
@@ -2624,7 +2628,11 @@ function renderBajajModal(recIdx){
 function renderTVSModal(recIdx){
   const t=TARGETS[recIdx],a=ACTUALS[recIdx];
   if(!a.brands)a.brands={};
-  TVS_BRANDS.forEach(b=>{if(!a.brands[b])a.brands[b]=newBrandRec();});
+  const _tvsNR=newBrandRec();
+  TVS_BRANDS.forEach(b=>{
+    if(!a.brands[b])a.brands[b]=newBrandRec();
+    else Object.keys(_tvsNR).forEach(k=>{if(a.brands[b][k]==null)a.brands[b][k]=_tvsNR[k];});
+  });
   // Sync brand retails & recompute totals
   TVS_BRANDS.forEach(b=>{
     const br=a.brands[b];if(!br)return;
@@ -2784,7 +2792,11 @@ function renderTVSModal(recIdx){
 function renderREModal(recIdx){
   const t=TARGETS[recIdx],a=ACTUALS[recIdx];
   if(!a.brands)a.brands={};
-  RE_BRANDS.forEach(b=>{if(!a.brands[b])a.brands[b]=newBrandRec();});
+  const _reNR=newBrandRec();
+  RE_BRANDS.forEach(b=>{
+    if(!a.brands[b])a.brands[b]=newBrandRec();
+    else Object.keys(_reNR).forEach(k=>{if(a.brands[b][k]==null)a.brands[b][k]=_reNR[k];});
+  });
   // Sync each brand's retails from DMS+VoC
   RE_BRANDS.forEach(b=>{const br=a.brands[b];if(!br)return;const dms=Array(12).fill(0).map((_,i)=>+(br.dms_retails&&br.dms_retails[i])||0);const voc=Array(12).fill(0).map((_,i)=>+(br.voc_retails&&br.voc_retails[i])||0);br.retails=dms.map((d,i)=>d+voc[i]);});
   recomputeBrandTotals(recIdx,RE_BRANDS);
