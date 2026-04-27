@@ -52,6 +52,7 @@
   /* yellow alias used in audit */
   --yellow:#fbbf24;
   --blue:#60a5fa;
+  --blue2:#3b82f6;
   --green:#34d399;
   --red:#fb7185;
   --orange:#fb923c;
@@ -125,6 +126,23 @@ body.light th[style*="background:#1a2a0a"]{background:#f0fdf4!important}
 body.light th[style*="background:#2a001a"]{background:#fdf2f8!important}
 /* Team structure cards */
 body.light div[style*="background:#161b22"]{background:#ffffff!important;color:var(--text1)!important}
+/* P&L modal — row label colours in light theme */
+body.light .row-computed td:first-child{color:#059669}        /* was pos-soft=#6ee7b7, near-invisible */
+body.light .row-margin td:first-child{color:#b45309}          /* was warn=#fbbf24, yellow on white */
+body.light .row-input td:first-child{color:#1d4ed8}           /* was info=#60a5fa, deepen for contrast */
+/* Computed value cell colours */
+body.light .cv-gm{color:#059669}                              /* emerald deepened */
+body.light .cv-gpm{color:#b45309}                             /* amber deepened */
+body.light .cv-mktg{color:#c2410c}                            /* orange deepened */
+body.light .cv-rev{color:#4338ca}                             /* indigo deepened */
+body.light .cv-neg{color:#be123c}                             /* rose deepened */
+/* Active modal quarter-filter button — --blue2 was undefined so colour:#fff was invisible */
+body.light .pchip[style*="color:#fff"]{color:#fff!important}  /* keep white text */
+body.light .pchip[style*="blue2"]{background:#2563eb!important;border-color:#1d4ed8!important}
+/* FY column in light theme needs readable text */
+body.light .fy-col{color:var(--text1)!important}
+/* tgt-col readable */
+body.light .tgt-col{color:var(--text2)}
 /* Audit overlay */
 body.light .audit-v2-overlay{background:var(--bg2)}
 body.light td[style*="background:#0a0"]{background:#f0fdf4!important}
