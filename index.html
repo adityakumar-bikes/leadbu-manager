@@ -533,7 +533,7 @@ canvas{max-height:260px}
       <div class="brand-mark">🏍️</div>
       <div class="brand-text">
         <div class="t1">Bike AOP Tracker</div>
-        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.0.55</span> <span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
+        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.0.56</span> <span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
       </div>
     </div>
     <div class="hdr-right">
@@ -2397,6 +2397,8 @@ function renderModal(recIdx){
     +inputRow('Total Leads Processed by AI (count)','','ai_leads_processed',aAiLP,'1','Absolute count of leads handled by AI')
     +compRow('= AI Bot Cost (Rs Lacs)',d.ai_cost,'cv-mktg',2)
     +sectionRow('── P&L SUMMARY ──')
+    +(adType==='CPS'?compRow('Total Retails (count)',a.retails||Array(12).fill(0),'cv',0):'')
+    +(adType==='CPS'?pctRow('Overall Cr%',a.retails||Array(12).fill(0),d.trig_leads,'cv-pct'):'')
     +compRow('Abs GM = Rev − Mktg Cost',gmArr,'cv-gm',1,tGM)
     +pctRow('GM %',gmArr,d.rev,'cv-gm',tGM,tRevM)
     +compRow('Abs GPM = GM − CC − AI Cost',gpmArr,gpmArr.some(v=>v<0)?'cv-neg':'cv-gpm',1,tGPM)
@@ -2580,11 +2582,14 @@ function renderBajajModal(recIdx){
   }
   function sec(lbl){return'<tr class="row-section"><td colspan="'+nc+'">'+lbl+'</td></tr>';}
   function bhdr(lbl,col){return'<tr><td colspan="'+nc+'" style="padding:6px 12px;font-size:12px;font-weight:700;color:#fff;letter-spacing:.5px;background:'+col+'">'+lbl+'</td></tr>';}
-  function totalTable(d,label,tRevM,tMktgM,tCCM,tGM,tGPM,tLeadsM){
+  function totalTable(d,label,tRevM,tMktgM,tCCM,tGM,tGPM,tLeadsM,aRetails){
     const gm=d.gm,gpm=d.gpm;
+    const saR=aRetails?Array(12).fill(0).map((_,i)=>+(aRetails&&aRetails[i])||0):null;
     return '<table class="pl-table" style="border:2px solid var(--blue);margin-bottom:18px"><thead>'+colHdrs()+'</thead><tbody>'
       +bhdr('◈ '+label,'#0c2a4a')
       +bCmp('Triggered Leads',d.trig_leads,'cv',0,tLeadsM)
+      +(saR?bCmp('Total Retails (count)',saR,'cv',0):'')
+      +(saR?bPct('Overall Cr%',saR,d.trig_leads,'cv-pct'):'')
       +bCmp('Total Mktg Cost (Lacs)',d.mktg_cost,'cv-mktg',1,tMktgM)
       +bCmp('Revenue (Lacs)',d.rev,'cv-rev',1,tRevM)
       +bCmp('CC Cost (Lacs)',d.cc,'cv-mktg',2,tCCM)
@@ -2639,7 +2644,7 @@ function renderBajajModal(recIdx){
   const tLeadsM=t.leads.monthly.map(v=>Math.round(v*100000));
   const COLS={MC:'#1e3a5f',PB:'#3b1f5f',Triumph:'#1f3d2e',Chetak:'#3d2a1f',CV:'#3d1f2e'};
   let html=filterBar()+'<div style="overflow-x:auto">';
-  html+=totalTable(d,'TOTAL — ALL BRANDS',tRevM,tMktgM,tCCM,tGM,tGPM,tLeadsM);
+  html+=totalTable(d,'TOTAL — ALL BRANDS',tRevM,tMktgM,tCCM,tGM,tGPM,tLeadsM,adType==='CPS'?a.retails:null);
   BAJAJ_BRANDS.forEach(brand=>{
     const br=a.brands[brand],bd=deriveActuals(br,adType);
     html+=brandTable(brand,br,bd,adType,BAJAJ_BRAND_LABELS[brand],COLS[brand]||'#1e3a5f');
@@ -2724,9 +2729,12 @@ function renderTVSModal(recIdx){
   const gm=sa(d.gm),gpm=sa(d.gpm);
 
   // ── Summary table (account-level totals) ──
+  const _tvsRetails=sa(a.retails);
   const summaryTable='<table class="pl-table" style="border:2px solid var(--blue);margin-bottom:18px"><thead>'+colHdrs+'</thead><tbody>'
     +bhdr('◈ TOTAL — TVS All Brands','#0c2a4a')
     +bCmpT('Triggered Leads',d.trig_leads,'cv',0,tLeadsM)
+    +(adType==='CPS'?bCmpT('Total Retails (count)',_tvsRetails,'cv',0):'')
+    +(adType==='CPS'?bPctR('Overall Cr%',_tvsRetails,sa(d.trig_leads),'cv-pct'):'')
     +bCmpT('Total Mktg Cost (Lacs)',d.mktg_cost,'cv-mktg',1,tMktgM)
     +bCmpT('Revenue (Lacs)',d.rev,'cv-rev',1,tRevM)
     +bCmpT('CC Cost (Lacs)',d.cc,'cv-mktg',2,tCCM)
@@ -2951,7 +2959,7 @@ function renderREModal(recIdx){
   const tLeadsM=t.leads.monthly.map(v=>Math.round(v*100000));
   const COLS={ICE:'#4a1a0a',EV:'#1a3a1a'};
   let html=filterBar()+'<div style="overflow-x:auto">';
-  html+=totalTable(d,'TOTAL — RE ICE + EV Flying Flea',tRevM,tMktgM,tCCM,tGM,tGPM,tLeadsM);
+  html+=totalTable(d,'TOTAL — RE ICE + EV Flying Flea',tRevM,tMktgM,tCCM,tGM,tGPM,tLeadsM,adType==='CPS'?a.retails:null);
   RE_BRANDS.forEach(brand=>{
     const br=a.brands[brand],bd=deriveActuals(br,adType);
     html+=brandTable(brand,br,bd,adType,RE_BRAND_LABELS[brand],COLS[brand]||'#4a1a0a');
@@ -3015,7 +3023,7 @@ function renderLeads(rows){
   let html='<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:16px">'+pb+'</div>';
   html+='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">';
 
-  // Column headers - 4 sections: Total | Mktg | Google | Meta | Organic
+  // Column headers: Total | Mktg | Google | Meta | Organic | Non-MS
   const _lt=document.body.classList.contains('light');
   const thBase='padding:6px 8px;text-align:center;font-size:11px;border-bottom:2px solid var(--border2);border-left:1px solid var(--border2)';
   const th2='padding:4px 8px;text-align:right;font-size:10px;color:var(--text3);border-bottom:1px solid var(--border2)';
@@ -3029,15 +3037,16 @@ function renderLeads(rows){
     +'<th colspan="2" style="'+thBase+';background:'+_bg('#1a1a30','#eef2ff')+';color:'+_bg('#a0a0ff','#6366f1')+'">Google Leads (ACT)</th>'
     +'<th colspan="2" style="'+thBase+';background:'+_bg('#2a1020','#fce7f3')+';color:'+_bg('#ff80a0','#db2777')+'">Meta Leads (ACT)</th>'
     +'<th colspan="3" style="'+thBase+';background:'+_bg('#2a1a00','#fff7ed')+';color:#f0883e">Organic Leads</th>'
+    +'<th colspan="2" style="'+thBase+';background:'+_bg('#1a2a0a','#f0fdf4')+';color:'+_bg('#6ee7b7','#059669')+'">Non-MS Leads (ACT)</th>'
     +'</tr><tr>'
-    +['TGT','ACT','ACH%','TGT','ACT','ACH%','ACT','ACH%','ACT','ACH%','TGT','ACT','ACH%'].map((h,i)=>{
-      const bgs=['#0a2040','#0a2040','#0a2040','#0a2a10','#0a2a10','#0a2a10','#1a1a30','#1a1a30','#2a1020','#2a1020','#2a1400','#2a1400','#2a1400'];
+    +['TGT','ACT','ACH%','TGT','ACT','ACH%','ACT','ACH%','ACT','ACH%','TGT','ACT','ACH%','ACT','ACH%'].map((h,i)=>{
+      const bgs=['#0a2040','#0a2040','#0a2040','#0a2a10','#0a2a10','#0a2a10','#1a1a30','#1a1a30','#2a1020','#2a1020','#2a1400','#2a1400','#2a1400','#1a2a0a','#1a2a0a'];
       return '<th style="'+th2+';background:'+bgs[i]+';border-left:1px solid var(--border2);min-width:60px">'+h+'</th>';
     }).join('')
     +'</tr></thead><tbody>';
 
   // Totals accumulators
-  let [gTT,gTA,gMT,gMA,gGL,gML_,gOT,gOA]=[0,0,0,0,0,0,0,0];
+  let [gTT,gTA,gMT,gMA,gGL,gML_,gOT,gOA,gNMS]=[0,0,0,0,0,0,0,0,0];
 
   let lastClient='';
   rows.forEach(({t,a,d},ri)=>{
@@ -3049,13 +3058,14 @@ function renderLeads(rows){
     const mktgA=getSlice(d.paid_leads,LEADS_PERIOD)/100000;
     const goolA=getSlice(d.google_leads,LEADS_PERIOD)/100000;
     const metaA=getSlice(d.meta_leads,LEADS_PERIOD)/100000;
-    const orgA=getSlice(d.organic_leads||Array(12).fill(0),LEADS_PERIOD)/100000;
+    const orgA=getSlice(a.organic_leads||Array(12).fill(0),LEADS_PERIOD)/100000;
+    const nmsA=getSlice(a.non_ms_leads||Array(12).fill(0),LEADS_PERIOD)/100000;
 
     const fZeroL=document.getElementById('f-zeros').value==='1';
-    if(fZeroL&&totT===0) return; // zeros filter: hide accounts with no leads target
-    if(!fZeroL&&totT===0&&totA===0) return; // always hide fully blank
+    if(fZeroL&&totT===0) return;
+    if(!fZeroL&&totT===0&&totA===0) return;
 
-    gTT+=totT;gTA+=totA;gMT+=mktgT;gMA+=mktgA;gGL+=goolA;gML_+=metaA;gOT+=orgT;gOA+=orgA;
+    gTT+=totT;gTA+=totA;gMT+=mktgT;gMA+=mktgA;gGL+=goolA;gML_+=metaA;gOT+=orgT;gOA+=orgA;gNMS+=nmsA;
 
     const isNewClient=t.client!==lastClient;
     if(isNewClient) lastClient=t.client;
@@ -3069,6 +3079,7 @@ function renderLeads(rows){
       +td(goolA,'#a0a0ff')+fAch(mktgT,goolA)
       +td(metaA,'#ff80a0')+fAch(mktgT,metaA)
       +td(orgT)+td(orgA,'var(--blue)')+fAch(orgT,orgA)
+      +td(nmsA,'#6ee7b7')+fAch(totT,nmsA)
       +'</tr>';
   });
 
@@ -3080,6 +3091,7 @@ function renderLeads(rows){
     +td(gGL,'#a0a0ff')+fAch(gMT,gGL)
     +td(gML_,'#ff80a0')+fAch(gMT,gML_)
     +td(gOT)+td(gOA,'var(--blue)')+fAch(gOT,gOA)
+    +td(gNMS,'#6ee7b7')+fAch(gTT,gNMS)
     +'</tr>';
 
   html+='</tbody></table></div>';
