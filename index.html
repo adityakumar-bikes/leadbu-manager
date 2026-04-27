@@ -2136,7 +2136,7 @@ function render(){
   let hRow1=`<tr><th class="dim-h c0" colspan="5" style="min-width:336px;text-align:left">Account — ${label}</th>`;
   let hRow2=`<tr><th class="dim-h c0">Cat</th><th class="dim-h c1">Fuel</th><th class="dim-h c2">Client</th><th class="dim-h c3">AdType/BTL</th><th class="dim-h c4" style="text-align:center;font-size:9px">P&L</th>`;
   METRICS.forEach(m=>{
-    hRow1+=`<th colspan="${cols.length}" style="text-align:center;color:#fff;border-top:3px solid ${m.color};background:var(--bg2);font-size:11px">${m.label}</th>`;
+    hRow1+=`<th colspan="${cols.length}" style="text-align:center;color:${document.body.classList.contains('light')?m.color:'#fff'};border-top:3px solid ${m.color};background:var(--bg2);font-size:11px">${m.label}</th>`;
     cols.forEach(c=>hRow2+=`<th style="border-top:2px solid ${m.color};font-size:9px">${c}</th>`);
   });
   hRow1+='</tr>';hRow2+='</tr>';
