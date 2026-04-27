@@ -162,7 +162,7 @@ body{font-family:'Inter','Segoe UI',system-ui,sans-serif;background:var(--bg-gra
 }
 .ctx-left{display:flex;align-items:center;gap:14px;flex:1;min-width:0;overflow:hidden}
 .ctx-right{display:flex;align-items:center;gap:8px;flex-shrink:0;margin-left:auto}
-.ctx-item{display:flex;align-items:center;gap:6px;color:var(--text2)}
+.ctx-item{display:flex;align-items:center;gap:6px;color:var(--text2);white-space:nowrap;flex-shrink:0}
 .ctx-item .lbl{font-size:10px;text-transform:uppercase;letter-spacing:.07em;font-weight:600;color:var(--text3)}
 .ctx-item .val{color:var(--text);font-weight:600}
 .ctx-dot{width:6px;height:6px;border-radius:50%;background:var(--pos);box-shadow:0 0 8px var(--pos);animation:pulse 2s ease-in-out infinite}
@@ -175,6 +175,7 @@ body{font-family:'Inter','Segoe UI',system-ui,sans-serif;background:var(--bg-gra
   background:var(--bg3);border:1px solid var(--border2);
   padding:3px 9px;border-radius:999px;font-size:10.5px;color:var(--text);
   font-weight:600;display:inline-flex;align-items:center;gap:5px;
+  white-space:nowrap;flex-shrink:0;
 }
 .badge .num{color:var(--accent);font-variant-numeric:tabular-nums}
 /* ── KPI BAR ── */
@@ -564,7 +565,7 @@ canvas{max-height:260px}
         <span class="val">Rs Lacs · Leads in Lacs</span>
       </div>
       <div class="ctx-sep"></div>
-      <span class="badge"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg><span class="num" id="rec-count">—</span> accounts</span>
+      <span class="badge"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg><span class="num" id="rec-count">— accounts</span></span>
       <span class="save-ok" id="save-ok"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Saved</span>
     </div>
     <div class="ctx-right">
