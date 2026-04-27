@@ -804,6 +804,7 @@ function newActualRec(){
     meta_leads:Array(12).fill(0),    // Meta Leads (Lacs)
     meta_cpl:Array(12).fill(0),      // Meta Trigger CPL (Rs/Lead)
     organic_leads:Array(12).fill(0), // Organic Leads (Lacs)
+    non_ms_leads:Array(12).fill(0),  // Non-MS Leads (count)
     // Legacy field kept for migration compat (now computed)
     paid_leads:Array(12).fill(0),
     mktg_cpl:Array(12).fill(0),
@@ -1714,8 +1715,9 @@ function deriveActuals(a, adType){
   const google_cpl=a.google_cpl||Array(12).fill(0);
   const meta_cpl=a.meta_cpl||Array(12).fill(0);
   const organic_leads=a.organic_leads||Array(12).fill(0);
+  const non_ms_leads=a.non_ms_leads||Array(12).fill(0);
   const paid_leads=google_leads.map((g,i)=>g+(meta_leads[i]||0));
-  const tl=paid_leads.map((p,i)=>p+(organic_leads[i]||0)); // absolute count
+  const tl=paid_leads.map((p,i)=>p+(organic_leads[i]||0)+(non_ms_leads[i]||0)); // absolute count
   // Mktg Cost (Rs Lacs) = CPL(Rs/lead) × Leads(absolute) / 100000
   const google_mktg=google_leads.map((g,i)=>g*(google_cpl[i]||0)/100000);
   const meta_mktg=meta_leads.map((m,i)=>m*(meta_cpl[i]||0)/100000);
@@ -2039,7 +2041,7 @@ function newBrandRec(){
   return {
     google_leads:Array(12).fill(0),google_cpl:Array(12).fill(0),
     meta_leads:Array(12).fill(0),meta_cpl:Array(12).fill(0),
-    organic_leads:Array(12).fill(0),
+    organic_leads:Array(12).fill(0),non_ms_leads:Array(12).fill(0),
     cac:Array(12).fill(0),retails:Array(12).fill(0),
     cpl_rate:Array(12).fill(0),total_leads:Array(12).fill(0),
     seat_cost:Array(12).fill(0),seats:Array(12).fill(0),
@@ -2361,6 +2363,7 @@ function renderModal(recIdx){
   const aGcp=a.google_cpl||Array(12).fill(0);
   const aMcp=a.meta_cpl||Array(12).fill(0);
   const aLP=a.leads_processed||Array(12).fill(0);
+  const aNMS=a.non_ms_leads||Array(12).fill(0);
 
   const isCC=(adType==='CC contract');
   const leadsSection=isCC
@@ -2371,6 +2374,7 @@ function renderModal(recIdx){
       +inputRow('Meta Leads (count)','','meta_leads',aMtd,'1','Absolute count')
       +compRow('= Paid Leads (count)',d.paid_leads,'cv',0)
       +inputRow('Organic Leads (count)','','organic_leads',a.organic_leads,'1','')
+      +inputRow('Non-MS Leads (count)','','non_ms_leads',aNMS,'1','Leads from non-MS sources')
       +compRow('= Triggered Leads (count)',d.trig_leads,'cv',0,tLeadsM)
       +sectionRow('── MARKETING COST ──')
       +inputRow('Google Trigger CPL (Rs/Lead)','cpl-input','google_cpl',aGcp,'1','')
@@ -2478,7 +2482,7 @@ function saveModal(){
 function recomputeBrandTotals(recIdx,BRANDS){
   const a=ACTUALS[recIdx]; if(!a.brands)return;
   const get=(b,f,i)=>(+(a.brands[b]&&a.brands[b][f]&&a.brands[b][f][i])||0);
-  ['google_leads','meta_leads','organic_leads','retails','total_leads','seats','cc_seats','google_rev','meta_rev','dms_retails','voc_retails','ai_leads_processed'].forEach(f=>{
+  ['google_leads','meta_leads','organic_leads','non_ms_leads','retails','total_leads','seats','cc_seats','google_rev','meta_rev','dms_retails','voc_retails','ai_leads_processed'].forEach(f=>{
     a[f]=Array(12).fill(0).map((_,i)=>BRANDS.reduce((s,b)=>s+get(b,f,i),0));
   });
   const wtd=(f,wf)=>Array(12).fill(0).map((_,i)=>{const den=a[wf][i];return den>0?BRANDS.reduce((s,b)=>s+get(b,wf,i)*get(b,f,i),0)/den:0;});
@@ -2603,6 +2607,7 @@ function renderBajajModal(recIdx){
       +bInp('Meta Leads','','meta_leads',br.meta_leads,'1',brand)
       +bCmp('= Paid Leads',bd.paid_leads,'cv',0)
       +bInp('Organic Leads','','organic_leads',br.organic_leads,'1',brand)
+      +bInp('Non-MS Leads','','non_ms_leads',br.non_ms_leads||Array(12).fill(0),'1',brand)
       +bCmp('= Triggered',bd.trig_leads,'cv',0)
       +sec('MKTG COST')
       +bInp('Google CPL (Rs)','cpl-input','google_cpl',br.google_cpl,'1',brand)
@@ -2739,14 +2744,14 @@ function renderTVSModal(recIdx){
     const brDMS=sa(br.dms_retails),brVoC=sa(br.voc_retails);
     const brRetails=brDMS.map((d,i)=>d+brVoC[i]);
     const brCAC=sa(br.cac);
-    const brGLd=sa(br.google_leads),brMLd=sa(br.meta_leads),brOLd=sa(br.organic_leads);
+    const brGLd=sa(br.google_leads),brMLd=sa(br.meta_leads),brOLd=sa(br.organic_leads),brNMS=sa(br.non_ms_leads);
     const brGCpl=sa(br.google_cpl),brMCpl=sa(br.meta_cpl);
     const brGCr=sa(br.google_cr_pct),brMCr=sa(br.meta_cr_pct),brOvCr=sa(br.overall_cr_pct);
     const brCCSt=sa(br.cc_seats),brCCSc=sa(br.cc_seat_cost);
     const brAiPLC=sa(br.ai_per_lead_cost),brAiLP=sa(br.ai_leads_processed);
     // Derive P&L from safe arrays (avoids deriveActuals Firebase issues)
     const paidLd=brGLd.map((g,i)=>g+brMLd[i]);
-    const trigLd=paidLd.map((p,i)=>p+brOLd[i]);
+    const trigLd=paidLd.map((p,i)=>p+brOLd[i]+brNMS[i]);
     const gMktg=brGLd.map((g,i)=>g*brGCpl[i]/100000);
     const mMktg=brMLd.map((m,i)=>m*brMCpl[i]/100000);
     const mktgCost=gMktg.map((g,i)=>g+mMktg[i]);
@@ -2765,6 +2770,7 @@ function renderTVSModal(recIdx){
     html+=bInpR('Meta Leads (count)','','meta_leads',brMLd,'1',brand,'');
     html+=bCmpR('= Paid Leads (count)',paidLd,'cv',0);
     html+=bInpR('Organic Leads (count)','','organic_leads',brOLd,'1',brand,'');
+    html+=bInpR('Non-MS Leads (count)','','non_ms_leads',brNMS,'1',brand,'Leads from non-MS sources');
     html+=bCmpR('= Triggered Leads (count)',trigLd,'cv',0);
     html+=sec('── MARKETING COST ──');
     html+=bInpR('Google Trigger CPL (Rs/Lead)','cpl-input','google_cpl',brGCpl,'1',brand,'');
@@ -2906,6 +2912,7 @@ function renderREModal(recIdx){
         +bInp('Meta Leads','','meta_leads',br.meta_leads,'1',brand)
         +bCmp('= Paid Leads',bd.paid_leads,'cv',0)
         +bInp('Organic Leads','','organic_leads',br.organic_leads,'1',brand)
+        +bInp('Non-MS Leads','','non_ms_leads',br.non_ms_leads||Array(12).fill(0),'1',brand)
         +bCmp('= Triggered',bd.trig_leads,'cv',0)
         +sec('MKTG COST')
         +bInp('Google CPL (Rs)','cpl-input','google_cpl',br.google_cpl,'1',brand)
