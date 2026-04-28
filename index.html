@@ -533,7 +533,7 @@ canvas{max-height:260px}
       <div class="brand-mark">🏍️</div>
       <div class="brand-text">
         <div class="t1">Bike AOP Tracker</div>
-        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.0.60</span> <span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
+        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.0.61</span> <span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
       </div>
     </div>
     <div class="hdr-right">
@@ -4015,16 +4015,19 @@ function renderTeam(){
 // OVERVIEW PAGE
 // ═══════════════════════════
 // Overview filter state
-let _ovFAdType='',_ovFClient='',_ovFCat='',_ovFQtr=-1,_ovFMonth=-1;
+let _ovFAdType=[],_ovFClient='',_ovFCat='',_ovFQtr=-1,_ovFMonth=-1; // _ovFAdType is multi-select array
 function applyOvFilter(f,v){
-  if(f==='adtype')_ovFAdType=v;
+  if(f==='adtype'){
+    if(v===''){_ovFAdType=[];}                                          // 'All' clears selection
+    else{const i=_ovFAdType.indexOf(v);if(i>=0)_ovFAdType=_ovFAdType.filter(x=>x!==v);else _ovFAdType=[..._ovFAdType,v];}
+  }
   else if(f==='client')_ovFClient=v;
   else if(f==='cat')_ovFCat=v;
   else if(f==='qtr'){const qi=+v;if(qi<0||_ovFQtr===qi){_ovFQtr=-1;_ovFMonth=-1;}else{_ovFQtr=qi;_ovFMonth=-1;}}
   else if(f==='month'){const mi=+v;if(mi<0||_ovFMonth===mi){_ovFMonth=-1;}else{_ovFMonth=mi;_ovFQtr=Math.floor(mi/3);}}
   renderOverview();
 }
-function clearOvFilters(){_ovFAdType='';_ovFClient='';_ovFCat='';_ovFQtr=-1;_ovFMonth=-1;renderOverview();}
+function clearOvFilters(){_ovFAdType=[];_ovFClient='';_ovFCat='';_ovFQtr=-1;_ovFMonth=-1;renderOverview();}
 
 function renderOverview(){
   const el=document.getElementById('page-overview');
@@ -4043,7 +4046,7 @@ function renderOverview(){
 
   // ── Dimension filter ──
   const filteredRows=allRows.filter(({t})=>{
-    if(_ovFAdType&&t.ad_type!==_ovFAdType)return false;
+    if(_ovFAdType.length>0&&!_ovFAdType.includes(t.ad_type))return false;
     if(_ovFClient&&t.client!==_ovFClient)return false;
     if(_ovFCat&&t.cat!==_ovFCat)return false;
     return true;
@@ -4142,7 +4145,7 @@ function renderOverview(){
   // ── Unique values for filter dropdowns ──
   const uniqueClients=[...new Set(allRows.map(r=>r.t.client))].sort();
   const uniqueCats=[...new Set(allRows.map(r=>r.t.cat).filter(Boolean))].sort();
-  const hasFilters=!!(_ovFAdType||_ovFClient||_ovFCat||_ovFQtr>=0||_ovFMonth>=0);
+  const hasFilters=!!(_ovFAdType.length>0||_ovFClient||_ovFCat||_ovFQtr>=0||_ovFMonth>=0);
 
   // ── Build HTML ──
   let html=`<div style="padding:20px 22px;display:flex;flex-direction:column;gap:20px">`;
@@ -4165,13 +4168,12 @@ function renderOverview(){
         <option value="">All</option>
         ${uniqueClients.map(c=>`<option value="${c}"${_ovFClient===c?' selected':''}>${c}</option>`).join('')}
       </select>
+      <div style="width:1px;height:18px;background:var(--border2);margin:0 2px"></div>
       <span style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;white-space:nowrap">Ad Type</span>
-      <select onchange="applyOvFilter('adtype',this.value)" style="${selStyle}">
-        <option value="">All</option>
-        <option value="CPS"${_ovFAdType==='CPS'?' selected':''}>CPS</option>
-        <option value="Media Leads"${_ovFAdType==='Media Leads'?' selected':''}>Media Leads</option>
-        <option value="CC contract"${_ovFAdType==='CC contract'?' selected':''}>CC Contract</option>
-      </select>
+      <button class="pchip${_ovFAdType.length===0?' active':''}" onclick="applyOvFilter('adtype','')">All</button>
+      <button class="pchip${_ovFAdType.includes('CPS')?' active':''}" onclick="applyOvFilter('adtype','CPS')">CPS</button>
+      <button class="pchip${_ovFAdType.includes('Media Leads')?' active':''}" onclick="applyOvFilter('adtype','Media Leads')">Media Leads</button>
+      <button class="pchip${_ovFAdType.includes('CC contract')?' active':''}" onclick="applyOvFilter('adtype','CC contract')">CC Contract</button>
       ${hasFilters?`<button onclick="clearOvFilters()" style="font-size:10px;padding:3px 10px;border-radius:6px;background:rgba(251,113,133,.1);color:var(--neg);border:1px solid rgba(251,113,133,.3);cursor:pointer;font-weight:700;margin-left:4px">✕ Clear</button>`:''}
     </div>
     ${_ovFQtr>=0?`<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
@@ -4183,7 +4185,7 @@ function renderOverview(){
 
   // ── Headline KPIs ──
   html+=`<section>
-    <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px">Performance Summary — ${periodLabel}${hasFilters&&(_ovFClient||_ovFAdType||_ovFCat)?' · <span style="color:var(--accent);font-style:normal">'+[_ovFClient,_ovFAdType,_ovFCat].filter(Boolean).join(' / ')+'</span>':''}</div>
+    <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px">Performance Summary — ${periodLabel}${hasFilters&&(_ovFClient||_ovFAdType.length>0||_ovFCat)?' · <span style="color:var(--accent);font-style:normal">'+[_ovFClient,..._ovFAdType,_ovFCat].filter(Boolean).join(' / ')+'</span>':''}</div>
     <div style="display:grid;grid-template-columns:repeat(7,minmax(130px,1fr));gap:10px">`;
   const kpis=[
     {label:'Revenue',cls:'rev',color:'var(--m-rev)',tgt:tRevFY,act:aRevFY,ly:lyRevFY,isPct:false},
