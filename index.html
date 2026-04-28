@@ -533,7 +533,7 @@ canvas{max-height:260px}
       <div class="brand-mark">🏍️</div>
       <div class="brand-text">
         <div class="t1">Bike AOP Tracker</div>
-        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.0.58</span> <span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
+        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.0.59</span> <span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
       </div>
     </div>
     <div class="hdr-right">
@@ -3228,10 +3228,11 @@ function renderMktg(rows){
     const googRoas=googSpend>0&&googRevA>0?(googRevA/googSpend):0;
     const metaRoas=metaSpend>0&&metaRevA>0?(metaRevA/metaSpend):0;
 
-    // Skip fully zero rows
+    // Skip fully zero rows — check mktgLT *and* mktgSpendT so accounts like HMSI RW
+    // (which have mktg spend target but zero mktg_leads target) are not incorrectly hidden
     const fZeroM=document.getElementById('f-zeros').value==='1';
-    if(fZeroM&&mktgLT===0) return; // zeros filter: hide accounts with no mktg target
-    if(!fZeroM&&mktgLT===0&&paidL===0&&googL===0&&metaL===0) return; // always hide fully blank
+    if(fZeroM&&mktgLT===0&&mktgSpendT===0) return; // zeros filter: hide only if both leads-TGT and spend-TGT are 0
+    if(!fZeroM&&mktgLT===0&&mktgSpendT===0&&paidL===0&&googL===0&&metaL===0) return; // always hide truly blank
 
     gMktgLT+=mktgLT;gPaidL+=paidL;gTrigL+=trigL;
     gMktgSpendT+=mktgSpendT;gMktgSpendA+=mktgSpendA;
