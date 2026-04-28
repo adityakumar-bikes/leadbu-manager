@@ -533,7 +533,7 @@ canvas{max-height:260px}
       <div class="brand-mark">🏍️</div>
       <div class="brand-text">
         <div class="t1">Bike AOP Tracker</div>
-        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.0.61</span> <span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
+        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.0.62</span> <span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
       </div>
     </div>
     <div class="hdr-right">
@@ -648,7 +648,12 @@ canvas{max-height:260px}
   <div class="ctrl-grp"><span class="ctrl-lbl">Cat:</span><select id="f-cat"><option value="">All</option><option>Bikes</option><option>TBL</option></select></div>
   <div class="ctrl-grp"><span class="ctrl-lbl">Fuel:</span><select id="f-fuel"><option value="">All</option><option>ICE</option><option>EV</option><option>TBL</option></select></div>
   <div class="ctrl-grp"><span class="ctrl-lbl">Client:</span><select id="f-client"><option value="">All</option></select></div>
-  <div class="ctrl-grp"><span class="ctrl-lbl">Ad Type:</span><select id="f-adtype"><option value="">All</option><option>CPS</option><option>Media Leads</option><option>CC contract</option></select></div>
+  <div class="ctrl-grp" style="gap:4px"><span class="ctrl-lbl">Ad Type:</span>
+    <button id="fat-all" class="pchip active" style="padding:3px 8px;font-size:10.5px" onclick="toggleAdType('')">All</button>
+    <button id="fat-cps" class="pchip" style="padding:3px 8px;font-size:10.5px" onclick="toggleAdType('CPS')">CPS</button>
+    <button id="fat-ml"  class="pchip" style="padding:3px 8px;font-size:10.5px" onclick="toggleAdType('Media Leads')">Media Leads</button>
+    <button id="fat-cc"  class="pchip" style="padding:3px 8px;font-size:10.5px" onclick="toggleAdType('CC contract')">CC</button>
+  </div>
   <div class="ctrl-grp"><span class="ctrl-lbl">BTL:</span><select id="f-btl"><option value="">All</option></select></div>
   <div class="ctrl-grp"><span class="ctrl-lbl">BA:</span><select id="f-ba"><option value="">All</option></select></div>
   <div class="ctrl-grp"><span class="ctrl-lbl">Zeros:</span><select id="f-zeros"><option value="0">Show all</option><option value="1" selected>Hide zero TGT</option></select></div>
@@ -1797,6 +1802,16 @@ function deriveActuals(a, adType){
 // ═══════════════════════════
 let VIEW='fy',PERIOD=0,DISP_MODE='tgt',SHOW_LY=false;
 let PAGE='overview';
+let _fAdTypes=[]; // multi-select ad type for tracker
+function toggleAdType(v){
+  if(!v){_fAdTypes=[];}
+  else{const i=_fAdTypes.indexOf(v);if(i>=0)_fAdTypes=_fAdTypes.filter(x=>x!==v);else _fAdTypes=[..._fAdTypes,v];}
+  document.getElementById('fat-all').classList.toggle('active',_fAdTypes.length===0);
+  document.getElementById('fat-cps').classList.toggle('active',_fAdTypes.includes('CPS'));
+  document.getElementById('fat-ml').classList.toggle('active',_fAdTypes.includes('Media Leads'));
+  document.getElementById('fat-cc').classList.toggle('active',_fAdTypes.includes('CC contract'));
+  render();
+}
 try{const _p=localStorage.getItem('aop_page'); if(_p) PAGE=_p;}catch(e){}
 
 // Dropdowns
@@ -1810,12 +1825,12 @@ bas.forEach(b=>{const o=document.createElement('option');o.value=b;o.textContent
 
 function getFiltered(){
   const fCat=document.getElementById('f-cat').value,fFuel=document.getElementById('f-fuel').value;
-  const fCli=document.getElementById('f-client').value,fAdt=document.getElementById('f-adtype').value;
+  const fCli=document.getElementById('f-client').value;
   const fBtl=document.getElementById('f-btl').value,fZero=document.getElementById('f-zeros').value==='1';
   const fBa=document.getElementById('f-ba')?document.getElementById('f-ba').value:'';
   const filtered=TARGETS.map((t,i)=>({t,a:ACTUALS[i],d:deriveActuals(ACTUALS[i],t.ad_type),i})).filter(({t})=>{
     if(fCat&&t.cat!==fCat)return false;if(fFuel&&t.fuel!==fFuel)return false;
-    if(fCli&&t.client!==fCli)return false;if(fAdt&&t.ad_type!==fAdt)return false;
+    if(fCli&&t.client!==fCli)return false;if(_fAdTypes.length>0&&!_fAdTypes.includes(t.ad_type))return false;
     if(fBtl&&t.btl!==fBtl)return false;if(fBa&&t.ba!==fBa)return false;if(fZero&&t.rev.fy===0)return false;
     return true;
   });
@@ -1873,7 +1888,15 @@ function getFiltered(){
   });
   return merged;
 }
-function resetFilters(){['f-cat','f-fuel','f-client','f-adtype','f-btl','f-ba','f-zeros'].forEach(id=>document.getElementById(id).value='');render();}
+function resetFilters(){
+  _fAdTypes=[];
+  document.getElementById('fat-all').classList.add('active');
+  document.getElementById('fat-cps').classList.remove('active');
+  document.getElementById('fat-ml').classList.remove('active');
+  document.getElementById('fat-cc').classList.remove('active');
+  ['f-cat','f-fuel','f-client','f-btl','f-ba','f-zeros'].forEach(id=>document.getElementById(id).value='');
+  render();
+}
 function setPage(p){
   PAGE=p;
   try{localStorage.setItem('aop_page',p);}catch(e){}
@@ -3714,7 +3737,7 @@ function renderActiveUsers(snapshot){
 _fbDb.ref('presence/fy27').on('value', snap=>renderActiveUsers(snap));
 
 // Wire up filters + modal close (non-data setup, safe to do immediately)
-['f-cat','f-fuel','f-client','f-adtype','f-btl','f-ba','f-zeros'].forEach(id=>document.getElementById(id).addEventListener('change',render));
+['f-cat','f-fuel','f-client','f-btl','f-ba','f-zeros'].forEach(id=>document.getElementById(id).addEventListener('change',render));
 document.getElementById('modal').addEventListener('click',e=>{if(e.target===document.getElementById('modal'))closeModal();});
 buildPeriodBar();
 
