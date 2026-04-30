@@ -533,7 +533,7 @@ canvas{max-height:260px}
       <div class="brand-mark">🏍️</div>
       <div class="brand-text">
         <div class="t1">Bike AOP Tracker</div>
-        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.0.63</span> <span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
+        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.0.64</span> <span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
       </div>
     </div>
     <div class="hdr-right">
@@ -2615,6 +2615,7 @@ function renderBajajModal(recIdx){
       +(saR?bPct('Overall Cr%',saR,d.trig_leads,'cv-pct'):'')
       +bCmp('Total Mktg Cost (Lacs)',d.mktg_cost,'cv-mktg',1,tMktgM)
       +bCmp('Revenue (Lacs)',d.rev,'cv-rev',1,tRevM)
+      +bCmp('Total CC Seats (count)',Array(12).fill(0).map((_,i)=>+(a.cc_seats&&a.cc_seats[i])||0),'cv',0)
       +bCmp('CC Cost (Lacs)',d.cc,'cv-mktg',2,tCCM)
       +bCmp('Abs GM',gm,'cv-gm',1,tGM)
       +bPct('GM%',gm,d.rev,'cv-gm',tGM,tRevM)
@@ -2760,6 +2761,7 @@ function renderTVSModal(recIdx){
     +(adType==='CPS'?bPctR('Overall Cr%',_tvsRetails,sa(d.trig_leads),'cv-pct'):'')
     +bCmpT('Total Mktg Cost (Lacs)',d.mktg_cost,'cv-mktg',1,tMktgM)
     +bCmpT('Revenue (Lacs)',d.rev,'cv-rev',1,tRevM)
+    +bCmpR('Total CC Seats (count)',a.cc_seats,'cv',0)
     +bCmpT('CC Cost (Lacs)',d.cc,'cv-mktg',2,tCCM)
     +bCmpT('Abs GM',gm,'cv-gm',1,tGM)
     +bCmpT('Abs GPM',gpm,gpm.some(v=>v<0)?'cv-neg':'cv-gpm',1,tGPM)
@@ -2901,6 +2903,7 @@ function renderREModal(recIdx){
       +bhdr('◈ '+label,'#2a1a0a')
       +leadsRow
       +bCmp('Revenue (Lacs)',d.rev,'cv-rev',1,tRevM)
+      +bCmp('Total CC Seats (count)',Array(12).fill(0).map((_,i)=>+(a.cc_seats&&a.cc_seats[i])||0),'cv',0)
       +bCmp('CC Cost (Lacs)',d.cc,'cv-mktg',2,tCCM)
       +bCmp('Abs GM',gm,'cv-gm',1,tGM)
       +bPct('GM%',gm,d.rev,'cv-gm',tGM,tRevM)
