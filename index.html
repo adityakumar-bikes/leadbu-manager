@@ -136,6 +136,8 @@ body.light .cv-gpm{color:#b45309}                             /* amber deepened 
 body.light .cv-mktg{color:#c2410c}                            /* orange deepened */
 body.light .cv-rev{color:#4338ca}                             /* indigo deepened */
 body.light .cv-neg{color:#be123c}                             /* rose deepened */
+body.light .cv-adj{color:#b45309}
+body.light .cv-rev-total{color:#4338ca;font-weight:700}
 /* Active modal quarter-filter button — --blue2 was undefined so colour:#fff was invisible */
 body.light .pchip[style*="color:#fff"]{color:#fff!important}  /* keep white text */
 body.light .pchip[style*="blue2"]{background:#2563eb!important;border-color:#1d4ed8!important}
@@ -483,6 +485,8 @@ tbody tr:hover td{background:var(--bg2)}
 .cv-gpm{color:var(--warn)}
 .cv-pct{font-weight:700}
 .cv-neg{color:var(--neg)}
+.cv-adj{color:var(--warn)}
+.cv-rev-total{color:var(--accent);font-weight:700}
 /* QTY / FY totals column */
 .fy-col{background:#1a1a25!important;color:var(--text1);font-weight:700;border-left:2px solid var(--accent3)!important}
 .fy-col input{background:rgba(99,102,241,.14);color:var(--accent)}
@@ -533,7 +537,7 @@ canvas{max-height:260px}
       <div class="brand-mark">🏍️</div>
       <div class="brand-text">
         <div class="t1">Bike AOP Tracker</div>
-        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.0.64</span> <span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
+        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.0.65</span> <span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
       </div>
     </div>
     <div class="hdr-right">
@@ -840,6 +844,8 @@ function newActualRec(){
     ai_leads_processed:Array(12).fill(0), // count of leads processed by AI
     // Piaggio-specific retainer (Rs Lacs/month, added to CPS revenue)
     piaggio_retainer:Array(12).fill(0),
+    rev_adj: Array(12).fill(0),           // Revenue adjustment (Rs Lacs, +/-)
+    rev_adj_comment: Array(12).fill(''),  // Per-month comment for the adjustment
   };
 }
 // migrateActuals: shape-checks and migrates raw data (from Firebase or backup)
@@ -2083,6 +2089,8 @@ function newBrandRec(){
     // AI Bot Cost
     ai_per_lead_cost:Array(12).fill(0),   // Rs per lead (Absolute)
     ai_leads_processed:Array(12).fill(0), // count of leads processed by AI
+    rev_adj: Array(12).fill(0),
+    rev_adj_comment: Array(12).fill(''),
   };
 }
 
@@ -2322,6 +2330,15 @@ function renderModal(recIdx){
     return '<tr class="row-section"><td colspan="'+nc+'">'+label+'</td></tr>';
   }
 
+  function textRow(label,field,arr){
+    const cells=vis.map(i=>{
+      const v=(arr&&arr[i])||'';
+      const esc=String(v).replace(/"/g,'&quot;');
+      return '<td style="border-left:1px solid var(--border2)"><input type="text" class="pl-input" style="font-size:9px;padding:1px 3px;width:100%;background:rgba(255,200,0,0.04)" value="'+esc+'" data-field="'+field+'" data-month="'+i+'" data-rec="'+recIdx+'" onchange="onRevAdjCommentChange(this)" placeholder="note..."></td><td class="tgt-col nd">—</td>';
+    }).join('');
+    return '<tr class="row-input"><td class="mc" style="font-style:italic;color:var(--text2)">'+label+'</td>'+cells+'<td class="fy-col nd">—</td><td class="fy-col tgt-col nd">—</td></tr>';
+  }
+
   // Pre-compute target arrays
   const tRevM=t.rev.monthly, tMktgM=t.mktg.monthly, tCCM=t.cc.monthly;
   const tGM=tRevM.map((r,i)=>r-tMktgM[i]);
@@ -2331,6 +2348,10 @@ function renderModal(recIdx){
   const ccSeatCost=a.cc_seat_cost||Array(12).fill(0);
   const gmArr=d.gm, gpmArr=d.gpm;
   const adType=t.ad_type;
+  const revAdj=(a.rev_adj||Array(12).fill(0)).map(v=>+(v)||0);
+  const revTotal=d.rev.map((r,i)=>r+revAdj[i]);
+  const gmTotal=revTotal.map((r,i)=>r-d.mktg_cost[i]);
+  const gpmTotal=gmTotal.map((g,i)=>g-d.cc[i]-d.ai_cost[i]);
 
   const showDMSVoC=(t.client===TVS_CLIENT||t.client===AMPERE_CLIENT);
   const isPiaggioRetainer=(t.client===PIAGGIO_CLIENT&&adType==='CPS');
@@ -2355,7 +2376,10 @@ function renderModal(recIdx){
       +dmsVoCRows
       +inputRow('Overall Cr% = Retails / Triggered Leads (%)','cpl-input','overall_cr_pct',aOvCr,'0.01','Enter Cr% to auto-calc Retails, or enter Retails above to auto-calc Cr%')
       +(isPiaggioRetainer?inputRow('Retainer Cost (Rs Lacs/month)','cv-rev','piaggio_retainer',aPR,'0.01','Fixed monthly retainer paid by Piaggio to BikeDekho — added to CAC×Retails revenue'):'')
-      +compRow(isPiaggioRetainer?'= Total Revenue (CAC×Retails + Retainer)':'= Revenue (Rs Lacs)',d.rev,'cv-rev',1,tRevM)
+      +compRow(isPiaggioRetainer?'= Calculated Revenue (CAC×Retails + Retainer)':'= Calculated Revenue (Rs Lacs)',d.rev,'cv-rev',1)
+      +inputRow('Revenue Adjustment (Lacs)','cv-adj','rev_adj',revAdj,'0.01','Enter positive (+) or negative (−) adjustment')
+      +textRow('Adj. Comment','rev_adj_comment',a.rev_adj_comment)
+      +compRow('= Total Revenue (Calc + Adj)',revTotal,'cv-rev-total',1,tRevM)
       +sectionRow('── ROAS INPUTS (Ad Revenue) ──')
       +inputRow('Google Expected Cr% (%)','cpl-input','google_cr_pct',aGCr,'0.01','Auto-computes Google Rev = Cr% × Google Leads × CAC')
       +compRow('Google Revenue from Ads (Rs Lacs)',d.google_rev,'cv-rev',2)
@@ -2365,7 +2389,10 @@ function renderModal(recIdx){
     revSection=sectionRow('── REVENUE (Media Leads: CPL × Total Leads) ──')
       +inputRow('CPL — Rate Charged (Rs/Lead)','cpl-input','cpl_rate',a.cpl_rate,'1','Revenue driver')
       +inputRow('Total Leads Delivered (count)','','total_leads',a.total_leads,'1','Absolute count')
-      +compRow('= Revenue (Rs Lacs)',d.rev,'cv-rev',1,tRevM)
+      +compRow('= Calculated Revenue (Rs Lacs)',d.rev,'cv-rev',1)
+      +inputRow('Revenue Adjustment (Lacs)','cv-adj','rev_adj',revAdj,'0.01','Enter positive (+) or negative (−) adjustment')
+      +textRow('Adj. Comment','rev_adj_comment',a.rev_adj_comment)
+      +compRow('= Total Revenue (Calc + Adj)',revTotal,'cv-rev-total',1,tRevM)
       +sectionRow('── ROAS INPUTS (Ad Revenue) ──')
       +inputRow('Google Expected Cr% (%)','cpl-input','google_cr_pct',aGCr,'0.01','Auto-computes Google Rev = Cr% × Google Leads × CPL')
       +compRow('Google Revenue from Ads (Rs Lacs)',d.google_rev,'cv-rev',2)
@@ -2375,7 +2402,10 @@ function renderModal(recIdx){
     revSection=sectionRow('── REVENUE (CC Contract: Seat Cost × Seats) ──')
       +inputRow('Seat Cost (Rs/seat — Absolute)','cpl-input','seat_cost',a.seat_cost,'1','e.g. 250000')
       +inputRow('No. of Seats','','seats',a.seats,'1','')
-      +compRow('= Revenue (Rs Lacs)',d.rev,'cv-rev',1,tRevM);
+      +compRow('= Calculated Revenue (Rs Lacs)',d.rev,'cv-rev',1)
+      +inputRow('Revenue Adjustment (Lacs)','cv-adj','rev_adj',revAdj,'0.01','Enter positive (+) or negative (−) adjustment')
+      +textRow('Adj. Comment','rev_adj_comment',a.rev_adj_comment)
+      +compRow('= Total Revenue (Calc + Adj)',revTotal,'cv-rev-total',1,tRevM);
   } else {
     revSection=sectionRow('── REVENUE ──')
       +compRow('Revenue (Rs Lacs)',d.rev,'cv-rev',1,tRevM);
@@ -2422,10 +2452,13 @@ function renderModal(recIdx){
     +sectionRow('── P&L SUMMARY ──')
     +(adType==='CPS'?compRow('Total Retails (count)',a.retails||Array(12).fill(0),'cv',0):'')
     +(adType==='CPS'?pctRow('Overall Cr%',a.retails||Array(12).fill(0),d.trig_leads,'cv-pct'):'')
-    +compRow('Abs GM = Rev − Mktg Cost',gmArr,'cv-gm',1,tGM)
-    +pctRow('GM %',gmArr,d.rev,'cv-gm',tGM,tRevM)
-    +compRow('Abs GPM = GM − CC − AI Cost',gpmArr,gpmArr.some(v=>v<0)?'cv-neg':'cv-gpm',1,tGPM)
-    +pctRow('GPM %',gpmArr,d.rev,'cv-gpm',tGPM,tRevM)
+    +compRow('Calculated Revenue (Rs Lacs)',d.rev,'cv-rev',1)
+    +compRow('Revenue Adjustment (Lacs)',revAdj,'cv-adj',1)
+    +compRow('= Total Revenue (Rs Lacs)',revTotal,'cv-rev-total',1)
+    +compRow('Abs GM = Total Rev − Mktg',gmTotal,'cv-gm',1,tGM)
+    +pctRow('GM %',gmTotal,revTotal,'cv-gm',tGM,tRevM)
+    +compRow('Abs GPM = GM − CC − AI',gpmTotal,gpmTotal.some(v=>v<0)?'cv-neg':'cv-gpm',1,tGPM)
+    +pctRow('GPM %',gpmTotal,revTotal,'cv-gpm',tGPM,tRevM)
     +'</tbody></table></div>';
 
   document.getElementById('modal-content').innerHTML=html;
@@ -2501,13 +2534,30 @@ function saveModal(){
   render();
 }
 
+function onRevAdjCommentChange(input){
+  const mi=parseInt(input.getAttribute('data-month'));
+  const ri=parseInt(input.getAttribute('data-rec'));
+  const brand=input.getAttribute('data-brand');
+  const v=input.value;
+  if(brand){
+    if(!ACTUALS[ri].brands)ACTUALS[ri].brands={};
+    if(!ACTUALS[ri].brands[brand])ACTUALS[ri].brands[brand]=newBrandRec();
+    if(!ACTUALS[ri].brands[brand].rev_adj_comment)ACTUALS[ri].brands[brand].rev_adj_comment=Array(12).fill('');
+    ACTUALS[ri].brands[brand].rev_adj_comment[mi]=v;
+  } else {
+    if(!ACTUALS[ri].rev_adj_comment)ACTUALS[ri].rev_adj_comment=Array(12).fill('');
+    ACTUALS[ri].rev_adj_comment[mi]=v;
+  }
+  saveActuals();
+}
+
 // ═══════════════════════════
 // BAJAJ BRAND P&L
 // ═══════════════════════════
 function recomputeBrandTotals(recIdx,BRANDS){
   const a=ACTUALS[recIdx]; if(!a.brands)return;
   const get=(b,f,i)=>(+(a.brands[b]&&a.brands[b][f]&&a.brands[b][f][i])||0);
-  ['google_leads','meta_leads','organic_leads','non_ms_leads','retails','total_leads','seats','cc_seats','google_rev','meta_rev','dms_retails','voc_retails','ai_leads_processed'].forEach(f=>{
+  ['google_leads','meta_leads','organic_leads','non_ms_leads','retails','total_leads','seats','cc_seats','google_rev','meta_rev','dms_retails','voc_retails','ai_leads_processed','rev_adj'].forEach(f=>{
     a[f]=Array(12).fill(0).map((_,i)=>BRANDS.reduce((s,b)=>s+get(b,f,i),0));
   });
   const wtd=(f,wf)=>Array(12).fill(0).map((_,i)=>{const den=a[wf][i];return den>0?BRANDS.reduce((s,b)=>s+get(b,wf,i)*get(b,f,i),0)/den:0;});
@@ -2605,30 +2655,48 @@ function renderBajajModal(recIdx){
   }
   function sec(lbl){return'<tr class="row-section"><td colspan="'+nc+'">'+lbl+'</td></tr>';}
   function bhdr(lbl,col){return'<tr><td colspan="'+nc+'" style="padding:6px 12px;font-size:12px;font-weight:700;color:#fff;letter-spacing:.5px;background:'+col+'">'+lbl+'</td></tr>';}
+  function bTxt(label,field,arr,brand){
+    const cells=vis.map(i=>{
+      const v=(arr&&arr[i])||'';
+      const esc=String(v).replace(/"/g,'&quot;');
+      return '<td style="border-left:1px solid var(--border2)"><input type="text" class="pl-input" style="font-size:9px;padding:1px 3px;width:100%;background:rgba(255,200,0,0.04)" value="'+esc+'" data-field="'+field+'" data-month="'+i+'" data-rec="'+recIdx+'" data-brand="'+brand+'" onchange="onRevAdjCommentChange(this)" placeholder="note..."></td><td class="tgt-col nd">—</td>';
+    }).join('');
+    return '<tr class="row-input"><td class="mc" style="font-style:italic;color:var(--text2)">'+label+'</td>'+cells+'<td class="fy-col nd">—</td><td class="fy-col tgt-col nd">—</td></tr>';
+  }
   function totalTable(d,label,tRevM,tMktgM,tCCM,tGM,tGPM,tLeadsM,aRetails){
     const gm=d.gm,gpm=d.gpm;
     const saR=aRetails?Array(12).fill(0).map((_,i)=>+(aRetails&&aRetails[i])||0):null;
+    const revAdjArr=Array(12).fill(0).map((_,i)=>+(a.rev_adj&&a.rev_adj[i])||0);
+    const revTotalArr=d.rev.map((r,i)=>r+revAdjArr[i]);
+    const gmTotal=revTotalArr.map((r,i)=>r-d.mktg_cost[i]);
+    const gpmTotal=gmTotal.map((g,i)=>g-d.cc[i]);
     return '<table class="pl-table" style="border:2px solid var(--blue);margin-bottom:18px"><thead>'+colHdrs()+'</thead><tbody>'
       +bhdr('◈ '+label,'#0c2a4a')
       +bCmp('Triggered Leads',d.trig_leads,'cv',0,tLeadsM)
       +(saR?bCmp('Total Retails (count)',saR,'cv',0):'')
       +(saR?bPct('Overall Cr%',saR,d.trig_leads,'cv-pct'):'')
       +bCmp('Total Mktg Cost (Lacs)',d.mktg_cost,'cv-mktg',1,tMktgM)
-      +bCmp('Revenue (Lacs)',d.rev,'cv-rev',1,tRevM)
+      +bCmp('Calculated Revenue (Lacs)',d.rev,'cv-rev',1)
+      +bCmp('Revenue Adjustment (Lacs)',revAdjArr,'cv-adj',1)
+      +bCmp('= Total Revenue (Calc+Adj)',revTotalArr,'cv-rev-total',1,tRevM)
       +bCmp('Total CC Seats (count)',Array(12).fill(0).map((_,i)=>+(a.cc_seats&&a.cc_seats[i])||0),'cv',0)
       +bCmp('CC Cost (Lacs)',d.cc,'cv-mktg',2,tCCM)
-      +bCmp('Abs GM',gm,'cv-gm',1,tGM)
-      +bPct('GM%',gm,d.rev,'cv-gm',tGM,tRevM)
-      +bCmp('Abs GPM',gpm,gpm.some(v=>v<0)?'cv-neg':'cv-gpm',1,tGPM)
-      +bPct('GPM%',gpm,d.rev,'cv-gpm',tGPM,tRevM)
+      +bCmp('Abs GM',gmTotal,'cv-gm',1,tGM)
+      +bPct('GM%',gmTotal,revTotalArr,'cv-gm',tGM,tRevM)
+      +bCmp('Abs GPM',gpmTotal,gpmTotal.some(v=>v<0)?'cv-neg':'cv-gpm',1,tGPM)
+      +bPct('GPM%',gpmTotal,revTotalArr,'cv-gpm',tGPM,tRevM)
       +'</tbody></table>';
   }
   function brandTable(brand,br,bd,adType,brandLabel,col){
     const gm=bd.gm,gpm=bd.gpm;
+    const brRevAdj=Array(12).fill(0).map((_,i)=>+(br.rev_adj&&br.rev_adj[i])||0);
+    const brRevTotal=bd.rev.map((r,i)=>r+brRevAdj[i]);
+    const brGmTotal=brRevTotal.map((r,i)=>r-bd.mktg_cost[i]);
+    const brGpmTotal=brGmTotal.map((g,i)=>g-bd.cc[i]);
     let rev='';
-    if(adType==='CPS')rev=sec('REVENUE (CAC × Retails)')+bInp('CAC (Rs/Retail)','','cac',br.cac,'1',brand)+bInp('Retails','','retails',br.retails,'1',brand)+bCmp('= Revenue (Lacs)',bd.rev,'cv-rev',1)+sec('ROAS INPUTS (Ad Revenue)')+bInp('Google Rev from Ads (Lacs)','cv-rev','google_rev',br.google_rev||Array(12).fill(0),'0.01',brand)+bInp('Meta Rev from Ads (Lacs)','cv-rev','meta_rev',br.meta_rev||Array(12).fill(0),'0.01',brand);
-    else if(adType==='Media Leads')rev=sec('REVENUE (CPL × Leads)')+bInp('CPL Charged (Rs/Lead)','cpl-input','cpl_rate',br.cpl_rate,'1',brand)+bInp('Total Leads (count)','','total_leads',br.total_leads,'1',brand)+bCmp('= Revenue (Lacs)',bd.rev,'cv-rev',1)+sec('ROAS INPUTS (Ad Revenue)')+bInp('Google Rev from Ads (Lacs)','cv-rev','google_rev',br.google_rev||Array(12).fill(0),'0.01',brand)+bInp('Meta Rev from Ads (Lacs)','cv-rev','meta_rev',br.meta_rev||Array(12).fill(0),'0.01',brand);
-    else if(adType==='CC contract')rev=sec('REVENUE (SeatCost × Seats)')+bInp('Seat Cost (Rs Abs)','cpl-input','seat_cost',br.seat_cost,'1',brand)+bInp('No. of Seats','','seats',br.seats,'1',brand)+bCmp('= Revenue (Lacs)',bd.rev,'cv-rev',1);
+    if(adType==='CPS')rev=sec('REVENUE (CAC × Retails)')+bInp('CAC (Rs/Retail)','','cac',br.cac,'1',brand)+bInp('Retails','','retails',br.retails,'1',brand)+bCmp('= Calculated Revenue (Lacs)',bd.rev,'cv-rev',1)+bInp('Revenue Adjustment (Lacs)','cv-adj','rev_adj',br.rev_adj||Array(12).fill(0),'0.01',brand)+bTxt('Adj. Comment','rev_adj_comment',br.rev_adj_comment||Array(12).fill(''),brand)+bCmp('= Total Revenue (Calc+Adj)',brRevTotal,'cv-rev-total',1)+sec('ROAS INPUTS (Ad Revenue)')+bInp('Google Rev from Ads (Lacs)','cv-rev','google_rev',br.google_rev||Array(12).fill(0),'0.01',brand)+bInp('Meta Rev from Ads (Lacs)','cv-rev','meta_rev',br.meta_rev||Array(12).fill(0),'0.01',brand);
+    else if(adType==='Media Leads')rev=sec('REVENUE (CPL × Leads)')+bInp('CPL Charged (Rs/Lead)','cpl-input','cpl_rate',br.cpl_rate,'1',brand)+bInp('Total Leads (count)','','total_leads',br.total_leads,'1',brand)+bCmp('= Calculated Revenue (Lacs)',bd.rev,'cv-rev',1)+bInp('Revenue Adjustment (Lacs)','cv-adj','rev_adj',br.rev_adj||Array(12).fill(0),'0.01',brand)+bTxt('Adj. Comment','rev_adj_comment',br.rev_adj_comment||Array(12).fill(''),brand)+bCmp('= Total Revenue (Calc+Adj)',brRevTotal,'cv-rev-total',1)+sec('ROAS INPUTS (Ad Revenue)')+bInp('Google Rev from Ads (Lacs)','cv-rev','google_rev',br.google_rev||Array(12).fill(0),'0.01',brand)+bInp('Meta Rev from Ads (Lacs)','cv-rev','meta_rev',br.meta_rev||Array(12).fill(0),'0.01',brand);
+    else if(adType==='CC contract')rev=sec('REVENUE (SeatCost × Seats)')+bInp('Seat Cost (Rs Abs)','cpl-input','seat_cost',br.seat_cost,'1',brand)+bInp('No. of Seats','','seats',br.seats,'1',brand)+bCmp('= Calculated Revenue (Lacs)',bd.rev,'cv-rev',1)+bInp('Revenue Adjustment (Lacs)','cv-adj','rev_adj',br.rev_adj||Array(12).fill(0),'0.01',brand)+bTxt('Adj. Comment','rev_adj_comment',br.rev_adj_comment||Array(12).fill(''),brand)+bCmp('= Total Revenue (Calc+Adj)',brRevTotal,'cv-rev-total',1);
     return '<table class="pl-table" style="margin-bottom:14px"><thead>'+colHdrs()+'</thead><tbody>'
       +bhdr('▸ '+brandLabel,col)
       +sec('LEADS')
@@ -2650,10 +2718,10 @@ function renderBajajModal(recIdx){
       +bInp('CC Per Seat (Rs Abs)','cpl-input','cc_seat_cost',br.cc_seat_cost,'1',brand)
       +bCmp('= CC Cost (Lacs)',bd.cc,'cv-mktg',2)
       +sec('P&L')
-      +bCmp('GM = Rev − Mktg',gm,'cv-gm',1)
-      +bPct('GM%',gm,bd.rev,'cv-gm')
-      +bCmp('GPM = GM − CC',gpm,gpm.some(v=>v<0)?'cv-neg':'cv-gpm',1)
-      +bPct('GPM%',gpm,bd.rev,'cv-gpm')
+      +bCmp('GM = Total Rev − Mktg',brGmTotal,'cv-gm',1)
+      +bPct('GM%',brGmTotal,brRevTotal,'cv-gm')
+      +bCmp('GPM = GM − CC',brGpmTotal,brGpmTotal.some(v=>v<0)?'cv-neg':'cv-gpm',1)
+      +bPct('GPM%',brGpmTotal,brRevTotal,'cv-gpm')
       +'</tbody></table>';
   }
   function filterBar(){
@@ -2739,6 +2807,14 @@ function renderTVSModal(recIdx){
   }
   function sec(lbl){return'<tr class="row-section"><td colspan="'+nc+'">'+lbl+'</td></tr>';}
   function bhdr(lbl,col){return'<tr><td colspan="'+nc+'" style="padding:6px 12px;font-size:12px;font-weight:700;color:#fff;letter-spacing:.5px;background:'+col+'">'+lbl+'</td></tr>';}
+  function bTxtR(label,field,arr,brand){
+    const cells=vis.map(i=>{
+      const v=(arr&&arr[i])||'';
+      const esc=String(v).replace(/"/g,'&quot;');
+      return '<td style="border-left:1px solid var(--border2)"><input type="text" class="pl-input" style="font-size:9px;padding:1px 3px;width:100%;background:rgba(255,200,0,0.04)" value="'+esc+'" data-field="'+field+'" data-month="'+i+'" data-rec="'+recIdx+'" data-brand="'+brand+'" onchange="onRevAdjCommentChange(this)" placeholder="note..."></td><td class="tgt-col nd">—</td>';
+    }).join('');
+    return '<tr class="row-input"><td class="mc" style="font-style:italic;color:var(--text2)">'+label+'</td>'+cells+'<td class="fy-col nd">—</td><td class="fy-col tgt-col nd">—</td></tr>';
+  }
 
   // Quarter filter bar
   const qBtns=['Q1 (Apr-Jun)','Q2 (Jul-Sep)','Q3 (Oct-Dec)','Q4 (Jan-Mar)','All Months'].map((lbl,qi)=>{
@@ -2751,6 +2827,10 @@ function renderTVSModal(recIdx){
   const tGM=tRevM.map((r,i)=>r-tMktgM[i]),tGPM=tGM.map((g,i)=>g-tCCM[i]);
   const tLeadsM=t.leads.monthly.map(v=>Math.round(v*100000));
   const gm=sa(d.gm),gpm=sa(d.gpm);
+  const _tvsRevAdj=sa(a.rev_adj);
+  const _tvsRevTotal=sa(d.rev).map((r,i)=>r+_tvsRevAdj[i]);
+  const _tvsGmTotal=_tvsRevTotal.map((r,i)=>r-sa(d.mktg_cost)[i]);
+  const _tvsGpmTotal=_tvsGmTotal.map((g,i)=>g-sa(d.cc)[i]);
 
   // ── Summary table (account-level totals) ──
   const _tvsRetails=sa(a.retails);
@@ -2760,11 +2840,13 @@ function renderTVSModal(recIdx){
     +(adType==='CPS'?bCmpT('Total Retails (count)',_tvsRetails,'cv',0):'')
     +(adType==='CPS'?bPctR('Overall Cr%',_tvsRetails,sa(d.trig_leads),'cv-pct'):'')
     +bCmpT('Total Mktg Cost (Lacs)',d.mktg_cost,'cv-mktg',1,tMktgM)
-    +bCmpT('Revenue (Lacs)',d.rev,'cv-rev',1,tRevM)
+    +bCmpR('Calculated Revenue (Lacs)',d.rev,'cv-rev',1)
+    +bCmpR('Revenue Adjustment (Lacs)',_tvsRevAdj,'cv-adj',1)
+    +bCmpT('= Total Revenue (Calc+Adj)',_tvsRevTotal,'cv-rev-total',1,tRevM)
     +bCmpR('Total CC Seats (count)',a.cc_seats,'cv',0)
     +bCmpT('CC Cost (Lacs)',d.cc,'cv-mktg',2,tCCM)
-    +bCmpT('Abs GM',gm,'cv-gm',1,tGM)
-    +bCmpT('Abs GPM',gpm,gpm.some(v=>v<0)?'cv-neg':'cv-gpm',1,tGPM)
+    +bCmpT('Abs GM',_tvsGmTotal,'cv-gm',1,tGM)
+    +bCmpT('Abs GPM',_tvsGpmTotal,_tvsGpmTotal.some(v=>v<0)?'cv-neg':'cv-gpm',1,tGPM)
     +'</tbody></table>';
 
   const COLS={Commuter:'#1a3a5c',Premium:'#2a1a5c',Scooter:'#1a4a3a',Moped:'#3a2a0a',EV:'#1a5c3a'};
@@ -2795,6 +2877,10 @@ function renderTVSModal(recIdx){
     const aiCost=brAiPLC.map((c,i)=>c*brAiLP[i]/100000);
     const brGM=brRev.map((r,i)=>r-mktgCost[i]);
     const brGPM=brGM.map((g,i)=>g-ccCost[i]-aiCost[i]);
+    const brRevAdj=sa(br.rev_adj);
+    const brRevTotal=brRev.map((r,i)=>r+brRevAdj[i]);
+    const brGMTotal=brRevTotal.map((r,i)=>r-mktgCost[i]);
+    const brGPMTotal=brGMTotal.map((g,i)=>g-ccCost[i]-aiCost[i]);
 
     html+='<table class="pl-table" style="border:2px solid '+(COLS[brand]||'#1a3a5c')+';margin-bottom:18px"><thead>'+colHdrs+'</thead><tbody>';
     html+=bhdr('▸ '+TVS_BRAND_LABELS[brand],COLS[brand]||'#1a3a5c');
@@ -2819,7 +2905,10 @@ function renderTVSModal(recIdx){
     html+=bPctR('DMS Cr% = DMS / Triggered Leads',brDMS,trigLd,'cv-pct');
     html+=bPctR('VoC Cr% = VoC / Triggered Leads',brVoC,trigLd,'cv-pct');
     html+=bInpR('Overall Cr% = Retails / Triggered Leads (%)','cpl-input','overall_cr_pct',brOvCr,'0.01',brand,'');
-    html+=bCmpR('= Revenue (Rs Lacs)',brRev,'cv-rev',1);
+    html+=bCmpR('= Calculated Revenue (Rs Lacs)',brRev,'cv-rev',1);
+    html+=bInpR('Revenue Adjustment (Lacs)','cv-adj','rev_adj',brRevAdj,'0.01',brand,'Enter positive or negative adjustment');
+    html+=bTxtR('Adj. Comment','rev_adj_comment',Array(12).fill('').map((_,i)=>(br.rev_adj_comment&&br.rev_adj_comment[i])||''),brand);
+    html+=bCmpR('= Total Revenue (Calc+Adj)',brRevTotal,'cv-rev-total',1);
     html+=sec('── ROAS INPUTS (Ad Revenue) ──');
     html+=bInpR('Google Expected Cr% (%)','cpl-input','google_cr_pct',brGCr,'0.01',brand,'');
     html+=bCmpR('Google Revenue from Ads (Rs Lacs)',gRev,'cv-rev',2);
@@ -2834,10 +2923,10 @@ function renderTVSModal(recIdx){
     html+=bInpR('Total Leads Processed by AI (count)','','ai_leads_processed',brAiLP,'1',brand,'');
     html+=bCmpR('= AI Bot Cost (Rs Lacs)',aiCost,'cv-mktg',2);
     html+=sec('── P&L SUMMARY ──');
-    html+=bCmpR('Abs GM = Rev − Mktg Cost',brGM,'cv-gm',1);
-    html+=bPctR('GM %',brGM,brRev,'cv-gm');
-    html+=bCmpR('Abs GPM = GM − CC − AI Cost',brGPM,brGPM.some(v=>v<0)?'cv-neg':'cv-gpm',1);
-    html+=bPctR('GPM %',brGPM,brRev,'cv-gpm');
+    html+=bCmpR('Abs GM = Rev − Mktg Cost',brGMTotal,'cv-gm',1);
+    html+=bPctR('GM %',brGMTotal,brRevTotal,'cv-gm');
+    html+=bCmpR('Abs GPM = GM − CC − AI Cost',brGPMTotal,brGPMTotal.some(v=>v<0)?'cv-neg':'cv-gpm',1);
+    html+=bPctR('GPM %',brGPMTotal,brRevTotal,'cv-gpm');
     html+='</tbody></table>';
   });
 
@@ -2887,12 +2976,24 @@ function renderREModal(recIdx){
   }
   function sec(lbl){return'<tr class="row-section"><td colspan="'+nc+'">'+lbl+'</td></tr>';}
   function bhdr(lbl,col){return'<tr><td colspan="'+nc+'" style="padding:6px 12px;font-size:12px;font-weight:700;color:#fff;letter-spacing:.5px;background:'+col+'">'+lbl+'</td></tr>';}
+  function bTxt(label,field,arr,brand){
+    const cells=vis.map(i=>{
+      const v=(arr&&arr[i])||'';
+      const esc=String(v).replace(/"/g,'&quot;');
+      return '<td style="border-left:1px solid var(--border2)"><input type="text" class="pl-input" style="font-size:9px;padding:1px 3px;width:100%;background:rgba(255,200,0,0.04)" value="'+esc+'" data-field="'+field+'" data-month="'+i+'" data-rec="'+recIdx+'" data-brand="'+brand+'" onchange="onRevAdjCommentChange(this)" placeholder="note..."></td><td class="tgt-col nd">—</td>';
+    }).join('');
+    return '<tr class="row-input"><td class="mc" style="font-style:italic;color:var(--text2)">'+label+'</td>'+cells+'<td class="fy-col nd">—</td><td class="fy-col tgt-col nd">—</td></tr>';
+  }
   function totalTable(d,label,tRevM,tMktgM,tCCM,tGM,tGPM,tLeadsM){
     const gm=d.gm,gpm=d.gpm;
     // Sum leads_processed across all sub-brands for CC contract
     const lpSum=Array(12).fill(0).map((_,i)=>RE_BRANDS.reduce((s,b)=>{
       const br=a.brands[b];return s+(br&&br.leads_processed?+(br.leads_processed[i]||0):0);},0));
     const reRetails=Array(12).fill(0).map((_,i)=>+(a.retails&&a.retails[i])||0);
+    const reRevAdj=Array(12).fill(0).map((_,i)=>+(a.rev_adj&&a.rev_adj[i])||0);
+    const reRevTotal=d.rev.map((r,i)=>r+reRevAdj[i]);
+    const reGmTotal=reRevTotal.map((r,i)=>r-d.mktg_cost[i]);
+    const reGpmTotal=reGmTotal.map((g,i)=>g-d.cc[i]);
     const leadsRow=adType==='CC contract'
       ? bCmp('Total Leads Processed',lpSum,'cv',0)
       : bCmp('Triggered Leads',d.trig_leads,'cv',0,tLeadsM)
@@ -2902,17 +3003,23 @@ function renderREModal(recIdx){
     return '<table class="pl-table" style="border:2px solid var(--blue);margin-bottom:18px"><thead>'+colHdrs()+'</thead><tbody>'
       +bhdr('◈ '+label,'#2a1a0a')
       +leadsRow
-      +bCmp('Revenue (Lacs)',d.rev,'cv-rev',1,tRevM)
+      +bCmp('Calculated Revenue (Lacs)',d.rev,'cv-rev',1)
+      +bCmp('Revenue Adjustment (Lacs)',reRevAdj,'cv-adj',1)
+      +bCmp('= Total Revenue (Calc+Adj)',reRevTotal,'cv-rev-total',1,tRevM)
       +bCmp('Total CC Seats (count)',Array(12).fill(0).map((_,i)=>+(a.cc_seats&&a.cc_seats[i])||0),'cv',0)
       +bCmp('CC Cost (Lacs)',d.cc,'cv-mktg',2,tCCM)
-      +bCmp('Abs GM',gm,'cv-gm',1,tGM)
-      +bPct('GM%',gm,d.rev,'cv-gm',tGM,tRevM)
-      +bCmp('Abs GPM',gpm,gpm.some(v=>v<0)?'cv-neg':'cv-gpm',1,tGPM)
-      +bPct('GPM%',gpm,d.rev,'cv-gpm',tGPM,tRevM)
+      +bCmp('Abs GM',reGmTotal,'cv-gm',1,tGM)
+      +bPct('GM%',reGmTotal,reRevTotal,'cv-gm',tGM,tRevM)
+      +bCmp('Abs GPM',reGpmTotal,reGpmTotal.some(v=>v<0)?'cv-neg':'cv-gpm',1,tGPM)
+      +bPct('GPM%',reGpmTotal,reRevTotal,'cv-gpm',tGPM,tRevM)
       +'</tbody></table>';
   }
   function brandTable(brand,br,bd,adType,brandLabel,col){
     const gm=bd.gm,gpm=bd.gpm;
+    const brRevAdj=Array(12).fill(0).map((_,i)=>+(br.rev_adj&&br.rev_adj[i])||0);
+    const brRevTotal=bd.rev.map((r,i)=>r+brRevAdj[i]);
+    const brGmTotal=brRevTotal.map((r,i)=>r-bd.mktg_cost[i]);
+    const brGpmTotal=brGmTotal.map((g,i)=>g-bd.cc[i]-bd.ai_cost[i]);
     let rev='';
     const brDMS=Array(12).fill(0).map((_,i)=>+(br.dms_retails&&br.dms_retails[i])||0),brVoC=Array(12).fill(0).map((_,i)=>+(br.voc_retails&&br.voc_retails[i])||0);
     const brGCr=Array(12).fill(0).map((_,i)=>+(br.google_cr_pct&&br.google_cr_pct[i])||0),brMCr=Array(12).fill(0).map((_,i)=>+(br.meta_cr_pct&&br.meta_cr_pct[i])||0);
@@ -2925,7 +3032,10 @@ function renderREModal(recIdx){
       +bPct('DMS Cr%',brDMS,bd.trig_leads,'cv-pct')
       +bPct('VoC Cr%',brVoC,bd.trig_leads,'cv-pct')
       +bInp('Overall Cr% (%)','cpl-input','overall_cr_pct',brOvCr,'0.01',brand)
-      +bCmp('= Revenue (Lacs)',bd.rev,'cv-rev',1)
+      +bCmp('= Calculated Revenue (Lacs)',bd.rev,'cv-rev',1)
+      +bInp('Revenue Adjustment (Lacs)','cv-adj','rev_adj',br.rev_adj||Array(12).fill(0),'0.01',brand)
+      +bTxt('Adj. Comment','rev_adj_comment',br.rev_adj_comment||Array(12).fill(''),brand)
+      +bCmp('= Total Revenue (Calc+Adj)',brRevTotal,'cv-rev-total',1)
       +sec('ROAS INPUTS (Ad Revenue)')
       +bInp('Google Expected Cr% (%)','cpl-input','google_cr_pct',brGCr,'0.01',brand)
       +bCmp('Google Rev from Ads (Lacs)',bd.google_rev,'cv-rev',2)
@@ -2934,13 +3044,16 @@ function renderREModal(recIdx){
     else if(adType==='Media Leads')rev=sec('REVENUE (CPL x Leads)')
       +bInp('CPL Charged (Rs/Lead)','cpl-input','cpl_rate',br.cpl_rate,'1',brand)
       +bInp('Total Leads','','total_leads',br.total_leads,'1',brand)
-      +bCmp('= Revenue (Lacs)',bd.rev,'cv-rev',1)
+      +bCmp('= Calculated Revenue (Lacs)',bd.rev,'cv-rev',1)
+      +bInp('Revenue Adjustment (Lacs)','cv-adj','rev_adj',br.rev_adj||Array(12).fill(0),'0.01',brand)
+      +bTxt('Adj. Comment','rev_adj_comment',br.rev_adj_comment||Array(12).fill(''),brand)
+      +bCmp('= Total Revenue (Calc+Adj)',brRevTotal,'cv-rev-total',1)
       +sec('ROAS INPUTS (Ad Revenue)')
       +bInp('Google Expected Cr% (%)','cpl-input','google_cr_pct',brGCr,'0.01',brand)
       +bCmp('Google Rev from Ads (Lacs)',bd.google_rev,'cv-rev',2)
       +bInp('Meta Expected Cr% (%)','cpl-input','meta_cr_pct',brMCr,'0.01',brand)
       +bCmp('Meta Rev from Ads (Lacs)',bd.meta_rev,'cv-rev',2);
-    else if(adType==='CC contract')rev=sec('REVENUE (Seat Cost x Seats)')+bInp('Seat Cost (Rs Abs)','cpl-input','seat_cost',br.seat_cost,'1',brand)+bInp('No. of Seats','','seats',br.seats,'1',brand)+bCmp('= Revenue (Lacs)',bd.rev,'cv-rev',1);
+    else if(adType==='CC contract')rev=sec('REVENUE (Seat Cost x Seats)')+bInp('Seat Cost (Rs Abs)','cpl-input','seat_cost',br.seat_cost,'1',brand)+bInp('No. of Seats','','seats',br.seats,'1',brand)+bCmp('= Calculated Revenue (Lacs)',bd.rev,'cv-rev',1)+bInp('Revenue Adjustment (Lacs)','cv-adj','rev_adj',br.rev_adj||Array(12).fill(0),'0.01',brand)+bTxt('Adj. Comment','rev_adj_comment',br.rev_adj_comment||Array(12).fill(''),brand)+bCmp('= Total Revenue (Calc+Adj)',brRevTotal,'cv-rev-total',1);
     const leadsRows=adType==='CC contract'
       ? sec('LEADS PROCESSED')
         +bInp('Leads Processed (count)','','leads_processed',br.leads_processed||Array(12).fill(0),'1',brand)
@@ -2970,10 +3083,10 @@ function renderREModal(recIdx){
       +bInp('Leads Processed by AI (count)','','ai_leads_processed',br.ai_leads_processed||Array(12).fill(0),'1',brand)
       +bCmp('= AI Bot Cost (Lacs)',bd.ai_cost,'cv-mktg',2)
       +sec('P&L')
-      +bCmp('GM = Rev - Mktg',gm,'cv-gm',1)
-      +bPct('GM%',gm,bd.rev,'cv-gm')
-      +bCmp('GPM = GM − CC − AI Cost',gpm,gpm.some(v=>v<0)?'cv-neg':'cv-gpm',1)
-      +bPct('GPM%',gpm,bd.rev,'cv-gpm')
+      +bCmp('GM = Total Rev − Mktg',brGmTotal,'cv-gm',1)
+      +bPct('GM%',brGmTotal,brRevTotal,'cv-gm')
+      +bCmp('GPM = GM − CC − AI Cost',brGpmTotal,brGpmTotal.some(v=>v<0)?'cv-neg':'cv-gpm',1)
+      +bPct('GPM%',brGpmTotal,brRevTotal,'cv-gpm')
       +'</tbody></table>';
   }
   function filterBar(){
