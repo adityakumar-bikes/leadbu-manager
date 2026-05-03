@@ -540,7 +540,7 @@ canvas{max-height:260px}
       <div class="brand-mark">🏍️</div>
       <div class="brand-text">
         <div class="t1">Bike AOP Tracker</div>
-        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.0.67</span> <span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
+        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.0.68</span> <span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
       </div>
     </div>
     <div class="hdr-right">
@@ -2346,6 +2346,18 @@ function renderModal(recIdx){
     return '<tr class="row-input"><td class="mc" style="font-style:italic;color:var(--text2)">'+label+'</td>'+cells+'<td class="fy-col nd">—</td><td class="fy-col tgt-col nd">—</td></tr>';
   }
 
+  // Ratio row: value = numArr[i]*scale / denArr[i]; FY = sum(num)*scale / sum(den)
+  function ratioRow(label,numArr,denArr,scale,cls,dec){
+    const cells=vis.map(i=>{
+      const v=denArr[i]>0?(numArr[i]*scale)/denArr[i]:0;
+      return '<td class="'+cls+'" style="border-left:1px solid var(--border2)">'+fmtC(v,dec)+'</td><td class="tgt-col nd">—</td>';
+    }).join('');
+    const fn=numArr.reduce((s,v)=>s+v,0),fd=denArr.reduce((s,v)=>s+v,0);
+    return '<tr class="row-computed"><td class="mc">'+label+'</td>'+cells
+      +'<td class="fy-col '+cls+'">'+fmtC(fd>0?fn*scale/fd:0,dec)+'</td>'
+      +'<td class="fy-col tgt-col nd">—</td></tr>';
+  }
+
   // Pre-compute target arrays
   const tRevM=t.rev.monthly, tMktgM=t.mktg.monthly, tCCM=t.cc.monthly;
   const tGM=tRevM.map((r,i)=>r-tMktgM[i]);
@@ -2441,7 +2453,8 @@ function renderModal(recIdx){
       +compRow('Google Mktg Cost (Rs Lacs)',d.google_mktg,'cv-mktg',1)
       +inputRow('Meta Trigger CPL (Rs/Lead)','cpl-input','meta_cpl',aMcp,'1','')
       +compRow('Meta Mktg Cost (Rs Lacs)',d.meta_mktg,'cv-mktg',1)
-      +compRow('= Total Mktg Cost (G + M)',d.mktg_cost,'cv-mktg',1,tMktgM);
+      +compRow('= Total Mktg Cost (G + M)',d.mktg_cost,'cv-mktg',1,tMktgM)
+      +ratioRow('Blended TCPL (Rs/Lead)',d.mktg_cost,d.paid_leads,100000,'cv-mktg',0);
 
   const aAiPLC=a.ai_per_lead_cost||Array(12).fill(0);
   const aAiLP=a.ai_leads_processed||Array(12).fill(0);
@@ -2670,6 +2683,11 @@ function renderBajajModal(recIdx){
     }).join('');
     return '<tr class="row-input"><td class="mc" style="font-style:italic;color:var(--text2)">'+label+'</td>'+cells+'<td class="fy-col nd">—</td><td class="fy-col tgt-col nd">—</td></tr>';
   }
+  function bRatio(label,nA,dA,scale,cls,dec){
+    const cells=vis.map(i=>{const v=(+dA[i]||0)>0?((+nA[i]||0)*scale)/(+dA[i]):0;return'<td class="'+cls+'" style="border-left:1px solid var(--border2)">'+fmtC(v,dec)+'</td><td class="tgt-col nd">—</td>';}).join('');
+    const fn=nA.reduce((s,v)=>s+(+v||0),0),fd=dA.reduce((s,v)=>s+(+v||0),0);
+    return'<tr class="row-computed"><td class="mc">'+label+'</td>'+cells+'<td class="fy-col '+cls+'">'+fmtC(fd>0?fn*scale/fd:0,dec)+'</td><td class="fy-col tgt-col nd">—</td></tr>';
+  }
   function totalTable(d,label,tRevM,tMktgM,tCCM,tGM,tGPM,tLeadsM,aRetails){
     const gm=d.gm,gpm=d.gpm;
     const saR=aRetails?Array(12).fill(0).map((_,i)=>+(aRetails&&aRetails[i])||0):null;
@@ -2719,6 +2737,7 @@ function renderBajajModal(recIdx){
       +bInp('Meta CPL (Rs)','cpl-input','meta_cpl',br.meta_cpl,'1',brand)
       +bCmp('Meta Mktg (Lacs)',bd.meta_mktg,'cv-mktg',1)
       +bCmp('= Total Mktg',bd.mktg_cost,'cv-mktg',1)
+      +bRatio('Blended TCPL (Rs/Lead)',bd.mktg_cost,bd.paid_leads,100000,'cv-mktg',0)
       +rev
       +sec('CC COST')
       +bInp('CC Seats','','cc_seats',br.cc_seats,'1',brand)
@@ -2812,6 +2831,11 @@ function renderTVSModal(recIdx){
     const fn=nA.reduce((s,v)=>s+v,0),fd=dA.reduce((s,v)=>s+v,0);
     return '<tr class="row-margin"><td class="mc">'+label+'</td>'+cells+'<td class="fy-col '+cls+' cv-pct">'+fmtP(fd?pct(fn,fd):0)+'</td><td class="fy-col tgt-col nd">—</td></tr>';
   }
+  function bRatioR(label,nA,dA,scale,cls,dec){
+    const cells=vis.map(i=>{const v=(+dA[i]||0)>0?((+nA[i]||0)*scale)/(+dA[i]):0;return'<td class="'+cls+'" style="border-left:1px solid var(--border2)">'+fmtC(v,dec)+'</td><td class="tgt-col nd">—</td>';}).join('');
+    const fn=nA.reduce((s,v)=>s+(+v||0),0),fd=dA.reduce((s,v)=>s+(+v||0),0);
+    return'<tr class="row-computed"><td class="mc">'+label+'</td>'+cells+'<td class="fy-col '+cls+'">'+fmtC(fd>0?fn*scale/fd:0,dec)+'</td><td class="fy-col tgt-col nd">—</td></tr>';
+  }
   function sec(lbl){return'<tr class="row-section"><td colspan="'+nc+'">'+lbl+'</td></tr>';}
   function bhdr(lbl,col){return'<tr><td colspan="'+nc+'" style="padding:6px 12px;font-size:12px;font-weight:700;color:#fff;letter-spacing:.5px;background:'+col+'">'+lbl+'</td></tr>';}
   function bTxtR(label,field,arr,brand){
@@ -2904,6 +2928,7 @@ function renderTVSModal(recIdx){
     html+=bInpR('Meta Trigger CPL (Rs/Lead)','cpl-input','meta_cpl',brMCpl,'1',brand,'');
     html+=bCmpR('Meta Mktg Cost (Rs Lacs)',mMktg,'cv-mktg',1);
     html+=bCmpR('= Total Mktg Cost (G + M)',mktgCost,'cv-mktg',1);
+    html+=bRatioR('Blended TCPL (Rs/Lead)',mktgCost,paidLd,100000,'cv-mktg',0);
     html+=sec('── REVENUE (CPS: CAC × Retails) ──');
     html+=bInpR('CAC — Rate Charged (Rs/Retail)','','cac',brCAC,'1',brand,'Revenue driver');
     html+=bInpR('DMS Retails','','dms_retails',brDMS,'1',brand,'DMS channel retails');
@@ -2991,6 +3016,11 @@ function renderREModal(recIdx){
     }).join('');
     return '<tr class="row-input"><td class="mc" style="font-style:italic;color:var(--text2)">'+label+'</td>'+cells+'<td class="fy-col nd">—</td><td class="fy-col tgt-col nd">—</td></tr>';
   }
+  function bRatio(label,nA,dA,scale,cls,dec){
+    const cells=vis.map(i=>{const v=(+dA[i]||0)>0?((+nA[i]||0)*scale)/(+dA[i]):0;return'<td class="'+cls+'" style="border-left:1px solid var(--border2)">'+fmtC(v,dec)+'</td><td class="tgt-col nd">—</td>';}).join('');
+    const fn=nA.reduce((s,v)=>s+(+v||0),0),fd=dA.reduce((s,v)=>s+(+v||0),0);
+    return'<tr class="row-computed"><td class="mc">'+label+'</td>'+cells+'<td class="fy-col '+cls+'">'+fmtC(fd>0?fn*scale/fd:0,dec)+'</td><td class="fy-col tgt-col nd">—</td></tr>';
+  }
   function totalTable(d,label,tRevM,tMktgM,tCCM,tGM,tGPM,tLeadsM){
     const gm=d.gm,gpm=d.gpm;
     // Sum leads_processed across all sub-brands for CC contract
@@ -3076,7 +3106,8 @@ function renderREModal(recIdx){
         +bCmp('Google Mktg (Lacs)',bd.google_mktg,'cv-mktg',1)
         +bInp('Meta CPL (Rs)','cpl-input','meta_cpl',br.meta_cpl,'1',brand)
         +bCmp('Meta Mktg (Lacs)',bd.meta_mktg,'cv-mktg',1)
-        +bCmp('= Total Mktg',bd.mktg_cost,'cv-mktg',1);
+        +bCmp('= Total Mktg',bd.mktg_cost,'cv-mktg',1)
+        +bRatio('Blended TCPL (Rs/Lead)',bd.mktg_cost,bd.paid_leads,100000,'cv-mktg',0);
     return '<table class="pl-table" style="margin-bottom:14px"><thead>'+colHdrs()+'</thead><tbody>'
       +bhdr('▸ '+brandLabel,col)
       +leadsRows
