@@ -417,6 +417,13 @@ tbody tr:hover td{background:var(--bg2)}
   font-weight:600;width:36px;transition:all .12s;
 }
 .detail-btn:hover{background:var(--accent-soft);color:var(--accent);border-color:var(--accent2)}
+/* AI Chat Assistant */
+#ai-chat-panel{position:fixed;right:-440px;top:0;bottom:0;width:440px;background:var(--bg2);border-left:1px solid var(--border2);z-index:200;display:flex;flex-direction:column;transition:right .24s cubic-bezier(.4,0,.2,1);box-shadow:-12px 0 48px rgba(0,0,0,.35)}
+#ai-chat-msgs{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px;scroll-behavior:smooth}
+#ai-chat-input{resize:none;overflow:hidden;min-height:38px;max-height:120px;line-height:1.5}
+#ai-chat-fab{position:fixed;bottom:28px;right:28px;z-index:199;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;border:none;border-radius:50px;padding:11px 20px;font-size:12px;font-weight:700;cursor:pointer;box-shadow:0 4px 24px rgba(99,102,241,.45);display:flex;align-items:center;gap:7px;transition:transform .15s,box-shadow .15s;letter-spacing:.02em}
+#ai-chat-fab:hover{box-shadow:0 6px 32px rgba(99,102,241,.6);transform:translateY(-1px)}
+body.light #ai-chat-panel{box-shadow:-6px 0 32px rgba(0,0,0,.12)}
 /* Inline last-edited chip */
 .le-chip{display:inline-flex;align-items:center;gap:3px;font-size:9px;color:var(--text3);background:var(--bg3);border:1px solid var(--border2);border-radius:10px;padding:1px 6px 1px 5px;margin-top:3px;white-space:nowrap;max-width:130px;overflow:hidden;cursor:default;vertical-align:middle;letter-spacing:.01em}
 .le-dot{width:5px;height:5px;border-radius:50%;flex-shrink:0;display:inline-block;margin-right:1px}
@@ -544,7 +551,7 @@ canvas{max-height:260px}
       <div class="brand-mark">🏍️</div>
       <div class="brand-text">
         <div class="t1">Bike AOP Tracker</div>
-        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.0.72</span> <span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
+        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.0.74</span> <span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
       </div>
     </div>
     <div class="hdr-right">
@@ -4425,7 +4432,7 @@ function renderOverview(){
     if(hasAct&&v.aRev>0&&aGMp<tGMp-5)issues.push('GM% gap '+(tGMp-aGMp).toFixed(1)+'pp');
     return{c,ach,tRevFY:v.tRev,aRevFY:v.aRev,tGMp,aGMp,issues};
   }).filter(({issues,tRevFY})=>issues.length>0&&tRevFY>0)
-    .sort((a,b)=>a.ach-b.ach).slice(0,8);
+    .sort((a,b)=>b.tRevFY-a.tRevFY).slice(0,8);
 
   // ── Unique values for filter dropdowns ──
   const uniqueClients=[...new Set(allRows.map(r=>r.t.client))].sort();
@@ -5668,6 +5675,175 @@ document.addEventListener('DOMContentLoaded',updateStickyOffsets);
 window.addEventListener('resize',updateStickyOffsets);
 setTimeout(updateStickyOffsets,300);
 
+// ═══════════════════════════════════════════════════════════════════════════
+// AI CHAT ASSISTANT
+// ═══════════════════════════════════════════════════════════════════════════
+let _chatOpen=false;
+let _chatHistory=[];
+let _chatThinking=false;
+
+function buildTrackerContext(){
+  const ALL_BRAND_LABELS={...BAJAJ_BRAND_LABELS,...TVS_BRAND_LABELS,...RE_BRAND_LABELS};
+  const lines=[];
+  lines.push('# BikeDekho AOP Tracker — FY27 Live Data');
+  lines.push('Units: Lacs = Indian Rupees Lakhs (1 Lac = 100,000 Rs). Leads are absolute counts.');
+  lines.push('Months (FY order): Apr, May, Jun [Q1], Jul, Aug, Sep [Q2], Oct, Nov, Dec [Q3], Jan, Feb, Mar [Q4]');
+  lines.push('Fields: GCPL=Google CPL(Rs/lead), MCPL=Meta CPL(Rs/lead), CAC=Cost per Acquisition(Rs/retail), GL=Google Leads, ML=Meta Leads, PaidLd=Paid Leads, TrigLd=Triggered Leads, DMS/VoC=retail channels, Rev=Revenue(L), Mktg=Marketing Cost(L), GM=Gross Margin(L), GPM=Gross Profit Margin(L=GM-CC), CC=Contact Centre cost(L)\n');
+
+  TARGETS.forEach((t,i)=>{
+    const a=ACTUALS[i]; if(!a)return;
+    const d=deriveActuals(a,t.ad_type);
+    const hasAnyData=d.rev.some(v=>v>0)||d.mktg_cost.some(v=>v>0)||(a.google_leads&&a.google_leads.some(v=>v>0));
+    lines.push(`\n### ${t.client} | ${t.ad_type} | BTL:${t.btl}${t.ba&&t.ba!=='-'?'|BA:'+t.ba:''} | Cat:${t.cat} | Fuel:${t.fuel}`);
+    if(hasAnyData){
+      lines.push('Month,GL,ML,PaidLd,TrigLd,GCPL,MCPL,CAC,Retails,CPL_Rate,TotalLeads,Rev(L),Mktg(L),CC(L),GM(L),GPM(L)');
+      MONTHS.forEach((m,mi)=>{
+        const gl=+(a.google_leads?.[mi]||0),ml=+(a.meta_leads?.[mi]||0);
+        const gcpl=+(a.google_cpl?.[mi]||0),mcpl=+(a.meta_cpl?.[mi]||0);
+        const cac=+(a.cac?.[mi]||0),ret=+(a.retails?.[mi]||0);
+        const cplr=+(a.cpl_rate?.[mi]||0),tl=+(a.total_leads?.[mi]||0);
+        const pl=+(d.paid_leads?.[mi]||0),trigl=+(d.trig_leads?.[mi]||0);
+        const rev=d.rev[mi],mktg=d.mktg_cost[mi],cc=d.cc[mi],gm=d.gm[mi],gpm=d.gpm[mi];
+        if(gl+ml+gcpl+mcpl+cac+ret+cplr+tl+rev+mktg===0)return;
+        lines.push(`${m},${gl},${ml},${pl},${trigl},${gcpl},${mcpl},${cac},${ret},${cplr},${tl},${rev.toFixed(2)},${mktg.toFixed(2)},${cc.toFixed(2)},${gm.toFixed(2)},${gpm.toFixed(2)}`);
+      });
+    } else {
+      lines.push('(no actuals entered yet)');
+    }
+    if(a.brands){
+      Object.keys(a.brands).forEach(brand=>{
+        const br=a.brands[brand]; if(!br)return;
+        const bd=deriveActuals(br,t.ad_type);
+        const brHas=bd.rev.some(v=>v>0)||(br.google_leads&&br.google_leads.some(v=>v>0))||(br.google_cpl&&br.google_cpl.some(v=>v>0));
+        if(!brHas)return;
+        lines.push(`  Brand: ${ALL_BRAND_LABELS[brand]||brand}`);
+        lines.push('  Month,GL,ML,PaidLd,GCPL,MCPL,CAC,DMS,VoC,Retails,CCSts,Rev(L),Mktg(L),GM(L),GPM(L)');
+        MONTHS.forEach((m,mi)=>{
+          const gl=+(br.google_leads?.[mi]||0),ml=+(br.meta_leads?.[mi]||0);
+          const gcpl=+(br.google_cpl?.[mi]||0),mcpl=+(br.meta_cpl?.[mi]||0);
+          const cac=+(br.cac?.[mi]||0),dms=+(br.dms_retails?.[mi]||0),voc=+(br.voc_retails?.[mi]||0);
+          const ret=dms+voc||+(br.retails?.[mi]||0),ccs=+(br.cc_seats?.[mi]||0);
+          const pl=+(bd.paid_leads?.[mi]||0);
+          const rev=bd.rev[mi],mktg=bd.mktg_cost[mi],gm=bd.gm[mi],gpm=bd.gpm[mi];
+          if(gl+ml+gcpl+mcpl+cac+ret+rev+mktg===0)return;
+          lines.push(`  ${m},${gl},${ml},${pl},${gcpl},${mcpl},${cac},${dms},${voc},${ret},${ccs},${rev.toFixed(2)},${mktg.toFixed(2)},${gm.toFixed(2)},${gpm.toFixed(2)}`);
+        });
+      });
+    }
+  });
+  return lines.join('\n');
+}
+
+function _chatMarkdown(text){
+  // Minimal markdown: bold, inline code, tables, line breaks
+  return text
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>')
+    .replace(/`([^`]+)`/g,'<code style="background:rgba(255,255,255,.1);padding:1px 4px;border-radius:3px;font-family:monospace;font-size:11px">$1</code>')
+    .replace(/^#{1,3} (.+)$/gm,'<div style="font-weight:700;color:var(--accent);margin:6px 0 3px">$1</div>')
+    .replace(/^\| .+/gm,row=>{
+      const cells=row.split('|').slice(1,-1).map(c=>`<td style="padding:3px 8px;border:1px solid rgba(255,255,255,.1)">${c.trim()}</td>`).join('');
+      return `<tr>${cells}</tr>`;
+    })
+    .replace(/(<tr>.*<\/tr>\n?)+/g,t=>`<table style="border-collapse:collapse;font-size:11px;margin:6px 0;width:100%">${t}</table>`)
+    .replace(/\n/g,'<br>');
+}
+
+function renderChat(){
+  const msgs=document.getElementById('ai-chat-msgs');
+  if(!msgs)return;
+  if(_chatHistory.length===0){
+    msgs.innerHTML=`<div style="text-align:center;padding:32px 16px;color:var(--text3)">
+      <div style="font-size:32px;margin-bottom:12px">✨</div>
+      <div style="font-size:13px;font-weight:700;color:var(--text2);margin-bottom:10px">AI Analytics Assistant</div>
+      <div style="font-size:11px;color:var(--text3);line-height:1.7;text-align:left;background:var(--bg3);border-radius:8px;padding:12px 14px">
+        Ask anything about the tracker. Try:<br>
+        <span style="color:var(--accent)">•</span> <em>"Meta CPL of TVS in April vs Bajaj"</em><br>
+        <span style="color:var(--accent)">•</span> <em>"Which OEM has best GM% this quarter?"</em><br>
+        <span style="color:var(--accent)">•</span> <em>"HMSI CPS revenue trend Q1 to Q3"</em><br>
+        <span style="color:var(--accent)">•</span> <em>"List all accounts where GPM is negative"</em>
+      </div>
+    </div>`;
+    return;
+  }
+  let html='';
+  _chatHistory.forEach(msg=>{
+    if(msg.role==='user'){
+      html+=`<div style="align-self:flex-end;max-width:85%;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;border-radius:14px 14px 3px 14px;padding:10px 14px;font-size:12px;line-height:1.5;word-break:break-word">${msg.content.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/\n/g,'<br>')}</div>`;
+    } else {
+      html+=`<div style="align-self:flex-start;max-width:96%;background:var(--bg3);border:1px solid var(--border2);border-radius:3px 14px 14px 14px;padding:11px 14px;font-size:12px;line-height:1.65;color:var(--text1);overflow-x:auto">${_chatMarkdown(msg.content)}</div>`;
+    }
+  });
+  if(_chatThinking){
+    html+=`<div style="align-self:flex-start;background:var(--bg3);border:1px solid var(--border2);border-radius:3px 14px 14px 14px;padding:10px 16px">
+      <span style="display:inline-flex;gap:5px;align-items:center">
+        ${[0,.15,.3].map(d=>`<span style="width:6px;height:6px;border-radius:50%;background:var(--accent);display:inline-block;animation:pulse 1.2s ease-in-out ${d}s infinite"></span>`).join('')}
+      </span>
+    </div>`;
+  }
+  msgs.innerHTML=html;
+  msgs.scrollTop=msgs.scrollHeight;
+}
+
+async function sendChatMessage(userMsg){
+  if(_chatThinking||!userMsg.trim())return;
+  let apiKey=localStorage.getItem('leadbu_ai_key')||'';
+  if(!apiKey){
+    const k=window.prompt('Enter your Anthropic API key.\nIt will be stored locally in your browser only:');
+    if(!k||!k.trim())return;
+    apiKey=k.trim();
+    localStorage.setItem('leadbu_ai_key',apiKey);
+  }
+  _chatThinking=true;
+  _chatHistory.push({role:'user',content:userMsg});
+  renderChat();
+  const systemPrompt=`You are an expert business analytics assistant embedded in BikeDekho's AOP Tracker — an internal digital marketing P&L tool.
+Clients are OEM bike brands (Bajaj, TVS, Royal Enfield, HMSI, Hero, etc.). Multi-brand clients (Bajaj, TVS, RE) have sub-brand breakdowns.
+Answer concisely with exact numbers. Use tables for comparisons. Format currency as "X.XX L" (Lacs). For percentages use 1 decimal place.
+If data is 0 or absent for a month, say "no data entered". Today = May 2026.
+
+LIVE TRACKER DATA:
+${buildTrackerContext()}`;
+  try{
+    const resp=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      body:JSON.stringify({model:'claude-3-5-haiku-20241022',max_tokens:1500,system:systemPrompt,messages:_chatHistory})
+    });
+    const data=await resp.json();
+    if(data.content&&data.content[0]){
+      _chatHistory.push({role:'assistant',content:data.content[0].text});
+    } else if(data.error){
+      _chatHistory.push({role:'assistant',content:`⚠ API error: ${data.error.message||JSON.stringify(data.error)}`});
+      if(data.error.type==='authentication_error') localStorage.removeItem('leadbu_ai_key');
+    }
+  }catch(e){
+    _chatHistory.push({role:'assistant',content:`⚠ Network error: ${e.message}`});
+  }
+  _chatThinking=false;
+  renderChat();
+}
+
+function toggleAIChat(){
+  _chatOpen=!_chatOpen;
+  const panel=document.getElementById('ai-chat-panel');
+  const btn=document.getElementById('ai-chat-fab');
+  if(panel)panel.style.right=_chatOpen?'0':'-440px';
+  if(btn)btn.style.transform=_chatOpen?'scale(0.9)':'scale(1)';
+  if(_chatOpen){renderChat();setTimeout(()=>{const inp=document.getElementById('ai-chat-input');if(inp)inp.focus();},280);}
+}
+function clearChat(){_chatHistory=[];renderChat();}
+function resetAIKey(){localStorage.removeItem('leadbu_ai_key');alert('API key cleared. You will be prompted on next message.');}
+async function submitAIChat(){
+  const inp=document.getElementById('ai-chat-input');
+  if(!inp)return;
+  const msg=inp.value.trim();
+  if(!msg||_chatThinking)return;
+  inp.value='';inp.style.height='auto';
+  await sendChatMessage(msg);
+}
+// ═══════════════════════════════════════════════════════════════════════════
+
 </script>
 
 <!-- ── Clear Actuals Confirmation Modal ───────────────────────────────────── -->
@@ -5705,6 +5881,53 @@ setTimeout(updateStickyOffsets,300);
       <button class="btn btn-red" onclick="confirmClearActuals()" style="background:#7f1d1d;border-color:#991b1b">
         Clear All Data
       </button>
+    </div>
+  </div>
+</div>
+
+<!-- ── AI Chat Assistant Panel ─────────────────────────────────────────────── -->
+<button id="ai-chat-fab" onclick="toggleAIChat()" title="Ask AI about your tracker data">
+  ✨ Ask AI
+</button>
+
+<div id="ai-chat-panel">
+  <!-- Header -->
+  <div style="padding:14px 18px;border-bottom:1px solid var(--border2);display:flex;justify-content:space-between;align-items:center;flex-shrink:0;background:var(--bg3)">
+    <div>
+      <div style="font-size:14px;font-weight:700;color:var(--text1);display:flex;align-items:center;gap:7px">
+        <span style="background:linear-gradient(135deg,#6366f1,#8b5cf6);-webkit-background-clip:text;-webkit-text-fill-color:transparent">✨</span>
+        AI Analytics Assistant
+      </div>
+      <div style="font-size:9.5px;color:var(--text3);margin-top:2px">Powered by Claude · Ask about any KPI, CPL, P&amp;L across all OEMs</div>
+    </div>
+    <div style="display:flex;gap:6px;align-items:center">
+      <button onclick="clearChat()" title="Clear conversation" style="font-size:10px;padding:3px 9px;background:var(--bg2);border:1px solid var(--border2);border-radius:5px;color:var(--text2);cursor:pointer">Clear</button>
+      <button onclick="resetAIKey()" title="Reset API key" style="font-size:10px;padding:3px 9px;background:var(--bg2);border:1px solid var(--border2);border-radius:5px;color:var(--text2);cursor:pointer">🔑</button>
+      <button onclick="toggleAIChat()" style="font-size:13px;padding:3px 9px;background:var(--bg2);border:1px solid var(--border2);border-radius:5px;color:var(--text2);cursor:pointer;font-weight:600">✕</button>
+    </div>
+  </div>
+
+  <!-- Messages -->
+  <div id="ai-chat-msgs"></div>
+
+  <!-- Suggested prompts (shown on first open via renderChat) -->
+
+  <!-- Input area -->
+  <div style="padding:12px 16px;border-top:1px solid var(--border2);flex-shrink:0;background:var(--bg3)">
+    <div style="display:flex;gap:8px;align-items:flex-end">
+      <textarea id="ai-chat-input" rows="1"
+        placeholder="Ask about Meta CPL, GM%, revenue across OEMs…"
+        style="flex:1;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;padding:9px 12px;color:var(--text1);font-size:12px;font-family:inherit;outline:none"
+        oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,120)+'px'"
+        onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();submitAIChat()}"></textarea>
+      <button onclick="submitAIChat()"
+        style="background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;border:none;border-radius:8px;padding:9px 16px;cursor:pointer;font-weight:700;font-size:12px;flex-shrink:0;align-self:flex-end">
+        ↑
+      </button>
+    </div>
+    <div style="font-size:9px;color:var(--text3);margin-top:5px;display:flex;justify-content:space-between">
+      <span>⏎ send &nbsp;·&nbsp; Shift+⏎ new line</span>
+      <span style="color:var(--text3)">claude-3-5-haiku</span>
     </div>
   </div>
 </div>
