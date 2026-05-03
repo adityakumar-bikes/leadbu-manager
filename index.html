@@ -540,7 +540,7 @@ canvas{max-height:260px}
       <div class="brand-mark">🏍️</div>
       <div class="brand-text">
         <div class="t1">Bike AOP Tracker</div>
-        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.0.68</span> <span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
+        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.0.69</span> <span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
       </div>
     </div>
     <div class="hdr-right">
@@ -2258,6 +2258,50 @@ function getVisibleMonths(){
   return [start,start+1,start+2];
 }
 
+// ── Copy Month Data ──────────────────────────────────────────────────────────
+function renderCopyBar(recIdx){
+  const opts=MONTHS.map((m,i)=>'<option value="'+i+'">'+m+'</option>').join('');
+  return '<div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap;padding:7px 12px;background:var(--bg2);border-radius:8px;border:1px dashed var(--border2)">'
+    +'<span style="font-size:10px;color:var(--text2);font-weight:700">📋 Copy Month:</span>'
+    +'<select id="cp-from-'+recIdx+'" style="font-size:11px;padding:2px 6px;background:var(--bg3);color:var(--text1);border:1px solid var(--border2);border-radius:4px">'+opts+'</select>'
+    +'<span style="font-size:12px;color:var(--text2)">→</span>'
+    +'<select id="cp-to-'+recIdx+'" style="font-size:11px;padding:2px 6px;background:var(--bg3);color:var(--text1);border:1px solid var(--border2);border-radius:4px">'+opts+'</select>'
+    +'<button onclick="copyMonthInModal('+recIdx+',+document.getElementById(\'cp-from-'+recIdx+'\').value,+document.getElementById(\'cp-to-'+recIdx+'\').value)" style="font-size:11px;padding:3px 12px;background:var(--blue2);color:#fff;border:none;border-radius:4px;cursor:pointer;font-weight:600">Copy →</button>'
+    +'<span style="font-size:9px;color:var(--text3);font-style:italic">Copies all input values for selected month into destination month</span>'
+    +'</div>';
+}
+
+function copyMonthInModal(recIdx, fromM, toM){
+  fromM=+fromM; toM=+toM;
+  if(fromM===toM){alert('Source and destination months must be different.');return;}
+  const a=ACTUALS[recIdx];
+  const tpl=newActualRec();
+  // Copy account-level array fields
+  Object.keys(tpl).forEach(k=>{
+    if(Array.isArray(tpl[k])&&tpl[k].length===12){
+      if(!a[k]||!Array.isArray(a[k]))a[k]=tpl[k].slice();
+      a[k][toM]=a[k][fromM];
+    }
+  });
+  // Copy all brand-level array fields
+  if(a.brands){
+    const bTpl=newBrandRec();
+    Object.keys(a.brands).forEach(brand=>{
+      const br=a.brands[brand];if(!br)return;
+      Object.keys(bTpl).forEach(k=>{
+        if(Array.isArray(bTpl[k])&&bTpl[k].length===12){
+          if(!br[k]||!Array.isArray(br[k]))br[k]=bTpl[k].slice();
+          br[k][toM]=br[k][fromM];
+        }
+      });
+    });
+  }
+  saveActuals();
+  updateKPIs(getFiltered());
+  renderModal(recIdx);
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 function renderModal(recIdx){
   const t=TARGETS[recIdx];
   if(t.client===BAJAJ_CLIENT){renderBajajModal(recIdx);return;}
@@ -2273,8 +2317,8 @@ function renderModal(recIdx){
     const active=qi===modalMonthFilter?'style="background:var(--blue2);color:#fff;border-color:var(--blue)"':'';
     return `<button class="pchip" ${active} onclick="setModalQFilter(${recIdx},${qi})">${lbl}</button>`;
   }).join('');
-  const filterBar=`<div style="display:flex;gap:6px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
-    <span style="font-size:10px;color:var(--text2);font-weight:700">Show months:</span>${qBtns}</div>`;
+  const filterBar=`<div style="display:flex;gap:6px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
+    <span style="font-size:10px;color:var(--text2);font-weight:700">Show months:</span>${qBtns}</div>`+renderCopyBar(recIdx);
 
   // Two-row header: month name spans 2 cols (ACT|TGT), sub-row for labels
   const colHdrs=
@@ -2755,7 +2799,7 @@ function renderBajajModal(recIdx){
       const active=qi===modalMonthFilter?'style="background:var(--blue2);color:#fff;border-color:var(--blue)"':'';;
       return `<button class="pchip" ${active} onclick="setModalQFilter(${recIdx},${qi})">${lbl}</button>`;
     }).join('');
-    return `<div style="display:flex;gap:6px;align-items:center;margin-bottom:12px;flex-wrap:wrap"><span style="font-size:10px;color:var(--text2);font-weight:700">Show months:</span>${qBtns}</div>`;
+    return `<div style="display:flex;gap:6px;align-items:center;margin-bottom:8px;flex-wrap:wrap"><span style="font-size:10px;color:var(--text2);font-weight:700">Show months:</span>${qBtns}</div>`+renderCopyBar(recIdx);
   }
   const tRevM=t.rev.monthly,tMktgM=t.mktg.monthly,tCCM=t.cc.monthly;
   const tGM=tRevM.map((r,i)=>r-tMktgM[i]),tGPM=tGM.map((g,i)=>g-tCCM[i]);
@@ -2852,7 +2896,7 @@ function renderTVSModal(recIdx){
     const active=qi===modalMonthFilter?'style="background:var(--blue2);color:#fff;border-color:var(--blue)"':'';
     return`<button class="pchip" ${active} onclick="setModalQFilter(${recIdx},${qi})">${lbl}</button>`;
   }).join('');
-  const filterBar=`<div style="display:flex;gap:6px;align-items:center;margin-bottom:12px;flex-wrap:wrap"><span style="font-size:10px;color:var(--text2);font-weight:700">Show months:</span>${qBtns}</div>`;
+  const filterBar=`<div style="display:flex;gap:6px;align-items:center;margin-bottom:8px;flex-wrap:wrap"><span style="font-size:10px;color:var(--text2);font-weight:700">Show months:</span>${qBtns}</div>`+renderCopyBar(recIdx);
 
   const tRevM=t.rev.monthly,tMktgM=t.mktg.monthly,tCCM=t.cc.monthly;
   const tGM=tRevM.map((r,i)=>r-tMktgM[i]),tGPM=tGM.map((g,i)=>g-tCCM[i]);
@@ -3132,7 +3176,7 @@ function renderREModal(recIdx){
       const active=qi===modalMonthFilter?'style="background:var(--blue2);color:#fff;border-color:var(--blue)"':'';
       return '<button class="pchip" '+active+' onclick="setModalQFilter('+recIdx+','+qi+')">'+lbl+'</button>';
     }).join('');
-    return '<div style="display:flex;gap:6px;align-items:center;margin-bottom:12px;flex-wrap:wrap"><span style="font-size:10px;color:var(--text2);font-weight:700">Show months:</span>'+qBtns+'</div>';
+    return '<div style="display:flex;gap:6px;align-items:center;margin-bottom:8px;flex-wrap:wrap"><span style="font-size:10px;color:var(--text2);font-weight:700">Show months:</span>'+qBtns+'</div>'+renderCopyBar(recIdx);
   }
   const tRevM=t.rev.monthly,tMktgM=t.mktg.monthly,tCCM=t.cc.monthly;
   const tGM=tRevM.map((r,i)=>r-tMktgM[i]),tGPM=tGM.map((g,i)=>g-tCCM[i]);
