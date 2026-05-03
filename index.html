@@ -417,6 +417,10 @@ tbody tr:hover td{background:var(--bg2)}
   font-weight:600;width:36px;transition:all .12s;
 }
 .detail-btn:hover{background:var(--accent-soft);color:var(--accent);border-color:var(--accent2)}
+/* Inline last-edited chip */
+.le-chip{display:inline-flex;align-items:center;gap:3px;font-size:9px;color:var(--text3);background:var(--bg3);border:1px solid var(--border2);border-radius:10px;padding:1px 6px 1px 5px;margin-top:3px;white-space:nowrap;max-width:130px;overflow:hidden;cursor:default;vertical-align:middle;letter-spacing:.01em}
+.le-dot{width:5px;height:5px;border-radius:50%;flex-shrink:0;display:inline-block;margin-right:1px}
+body.light .le-chip{background:#f1f5f9;border-color:#cbd5e1;color:#64748b}
 /* MODAL */
 .modal-overlay{display:none;position:fixed;inset:0;background:rgba(5,5,10,.72);backdrop-filter:blur(6px);z-index:100;overflow-y:auto;padding:24px}
 .modal-overlay.show{display:flex;align-items:flex-start;justify-content:center}
@@ -540,7 +544,7 @@ canvas{max-height:260px}
       <div class="brand-mark">🏍️</div>
       <div class="brand-text">
         <div class="t1">Bike AOP Tracker</div>
-        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.0.69</span> <span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
+        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.0.71</span> <span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
       </div>
     </div>
     <div class="hdr-right">
@@ -960,6 +964,8 @@ function writeAuditEntry(entry){
   if(_auditRef){
     _auditRef.push(entry).catch(e=>console.warn('[Audit] Firebase write failed:',e));
   }
+  // Keep inline chips current immediately (reads fresh localStorage we just wrote)
+  _rebuildLastEditMap();
 }
 
 function logChange(recIdx,field,monthIdx,oldVal,newVal,brand){
@@ -980,6 +986,42 @@ function logChange(recIdx,field,monthIdx,oldVal,newVal,brand){
     new: +newVal||0,
   });
 }
+
+// ── Inline Last-Edited Chips ─────────────────────────────────────────────────
+let _lastEditMap={};
+let _leAuditFetched=false;
+const _LE_PALETTE=['#60a5fa','#34d399','#f472b6','#fbbf24','#a78bfa','#fb923c','#38bdf8','#4ade80'];
+const _leUserColors={};let _leColorIdx=0;
+function _leColor(u){if(!_leUserColors[u])_leUserColors[u]=_LE_PALETTE[_leColorIdx++%_LE_PALETTE.length];return _leUserColors[u];}
+function _timeAgo(ts){
+  const diff=Date.now()-ts,m=Math.floor(diff/60000);
+  if(m<1)return'just now';if(m<60)return m+'m ago';
+  const h=Math.floor(m/60);if(h<24)return h+'h ago';
+  const dy=Math.floor(h/24);if(dy<7)return dy+'d ago';
+  return new Date(ts).toLocaleDateString('en-IN',{day:'numeric',month:'short'});
+}
+function _rebuildLastEditMap(extra){
+  let entries=[];try{entries=JSON.parse(localStorage.getItem('leadbu_audit')||'[]');}catch(e){}
+  if(extra){const seen=new Set(entries.map(e=>e.ts+'|'+e.client+'|'+e.field));extra.forEach(e=>{if(!seen.has(e.ts+'|'+e.client+'|'+e.field))entries.push(e);});}
+  entries.sort((a,b)=>b.ts-a.ts);
+  const tkMap={};
+  TARGETS.forEach((t,i)=>{const k=t.client+'§'+t.ad_type+'§'+(t.btl||'—');if(tkMap[k]===undefined)tkMap[k]=i;});
+  _lastEditMap={};
+  entries.forEach(e=>{
+    const k=(e.client||'')+'§'+(e.ad_type||'')+'§'+(e.btl||'—');
+    const ri=tkMap[k];
+    if(ri!==undefined&&_lastEditMap[ri]===undefined)_lastEditMap[ri]={user:e.user||'?',ts:e.ts};
+  });
+}
+function _loadAuditForChips(){
+  if(_leAuditFetched)return;_leAuditFetched=true;
+  if(!_auditRef)return;
+  _auditRef.orderByKey().limitToLast(500).once('value',snap=>{
+    _rebuildLastEditMap(Object.values(snap.val()||{}));
+    render();
+  }).catch(()=>{});
+}
+// ─────────────────────────────────────────────────────────────────────────────
 
 // ── Audit Panel ─────────────────────────────────────────────────────────────
 const AUDIT_FIELD_LABELS={
@@ -2187,8 +2229,12 @@ function buildRows(rows,field,idx,mode,showLY,metricsArr){
     const v=getPeriodVals(t,d,field,idx);
     const isZ=t.rev.fy===0&&t.mktg.fy===0;
     let cells='';metricsArr.forEach(m=>cells+=metricCells(v,mode,showLY,m.key,m.pct,m.intFmt));
+    const le=_lastEditMap[i];
+    const leChip=le
+      ?`<br><span class="le-chip" title="Last edited by ${le.user}"><span class="le-dot" style="background:${_leColor(le.user)}"></span>${le.user.split(' ')[0].substring(0,12)} · ${_timeAgo(le.ts)}</span>`
+      :'';
     return `<tr class="${isZ?'zero-row':''}">
-<td class="dc c0">${t.cat}</td><td class="dc c1">${t.fuel}</td><td class="dc c2">${oemBadge(t.client)}</td><td class="dc c3">${t.ad_type}<br><span style="font-size:9px;color:var(--text3)">${t.btl}${t.ba&&t.ba!=='-'?' <span style="color:#8b949e">/ '+t.ba+'</span>':''}</span></td>
+<td class="dc c0">${t.cat}</td><td class="dc c1">${t.fuel}</td><td class="dc c2">${oemBadge(t.client)}</td><td class="dc c3">${t.ad_type}<br><span style="font-size:9px;color:var(--text3)">${t.btl}${t.ba&&t.ba!=='-'?' <span style="color:#8b949e">/ '+t.ba+'</span>':''}</span>${leChip}</td>
 <td class="dc c4"><button class="detail-btn" title="Open P&L Detail" onclick="openModal(${i})">📋</button></td>
 ${cells}</tr>`;
   }).join('');
@@ -2196,6 +2242,7 @@ ${cells}</tr>`;
 
 function render(){
   SHOW_LY=document.getElementById('show-ly').checked;
+  _rebuildLastEditMap(); // keep inline chips fresh from localStorage
   const rows=getFiltered();
   updateKPIs(rows);
   if(VIEW==='charts'){renderCharts(rows);return;}
@@ -3995,6 +4042,7 @@ _fbRef.on('value', snapshot=>{
   _fbFirstLoad=false;
   initUserLabel();
   setPage(PAGE);
+  _loadAuditForChips(); // fetch audit once for cross-device inline chips
   try{_fbDb.ref('meta/lastSaved').once('value',s=>{if(s.val())updateLastSaved(s.val());});}catch(e){}
   registerPresence(); // announce this user as active
   // Hide loading overlay on first successful load
@@ -4553,9 +4601,17 @@ function renderOverview(){
           <span style="font-size:10.5px;color:var(--text3)">GM%</span>
           <span style="font-size:12px;font-weight:600;color:var(--m-gm)">${fmt(tGMp,1)}%${hasAct&&aR>0?' <span style="color:var(--pos-soft)">→ '+fmt(aGMp,1)+'%</span>':''}</span>
         </div>
-        <div style="display:flex;justify-content:space-between">
+        <div style="display:flex;justify-content:space-between;margin-top:-2px">
+          <span style="font-size:10px;color:var(--text3);font-style:italic">Abs GM</span>
+          <span style="font-size:11px;font-weight:600;color:${tGMv>=0?'var(--m-gm)':'var(--neg)'};font-family:'JetBrains Mono',monospace">${fmt(tGMv)}${hasAct&&aR>0?` <span style="font-size:10px;color:${aGMv>=0?'var(--pos-soft)':'var(--neg)'}">→ ${fmt(aGMv)}</span>`:''}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;border-top:1px solid var(--border);padding-top:7px">
           <span style="font-size:10.5px;color:var(--text3)">GPM%</span>
           <span style="font-size:12px;font-weight:600;color:var(--m-gpct)">${fmt(tGPp,1)}%${hasAct&&aR>0?' <span style="color:var(--warn)">→ '+fmt(aGPp,1)+'%</span>':''}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-top:-2px">
+          <span style="font-size:10px;color:var(--text3);font-style:italic">Abs GPM</span>
+          <span style="font-size:11px;font-weight:600;color:${tGP>=0?'var(--m-gpct)':'var(--neg)'};font-family:'JetBrains Mono',monospace">${fmt(tGP)}${hasAct&&aR>0?` <span style="font-size:10px;color:${aGP>=0?'var(--warn)':'var(--neg)'}">→ ${fmt(aGP)}</span>`:''}</span>
         </div>
       </div>
     </div>`;
