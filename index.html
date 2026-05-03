@@ -551,7 +551,7 @@ canvas{max-height:260px}
       <div class="brand-mark">🏍️</div>
       <div class="brand-text">
         <div class="t1">Bike AOP Tracker</div>
-        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.0.74</span> <span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
+        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.0.76</span> <span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
       </div>
     </div>
     <div class="hdr-right">
@@ -571,7 +571,7 @@ canvas{max-height:260px}
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
         Restore<input type="file" accept=".json" style="display:none" onchange="restoreFull(this)">
       </label>
-      <button class="btn btn-dim" onclick="exportCSV()" title="Export as CSV">
+      <button class="btn btn-dim" onclick="exportCSVDispatch()" title="Export current view as CSV">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
         CSV
       </button>
@@ -3298,7 +3298,8 @@ function renderLeads(rows){
   };
   const td=(v,col)=>'<td style="text-align:right;color:'+(col||'var(--text2)')+'">'+fL(v)+'</td>';
 
-  let html='<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:16px">'+pb+'</div>';
+  const _leExportBtn='<button onclick="exportLeadsCSV()" title="Export leads data for current period" style="margin-left:auto;padding:4px 12px;font-size:11px;border-radius:4px;border:1px solid var(--border2);cursor:pointer;background:var(--bg2);color:var(--text2);display:inline-flex;align-items:center;gap:5px;white-space:nowrap">⬇ Export CSV</button>';
+  let html='<div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center;margin-bottom:16px">'+pb+_leExportBtn+'</div>';
   html+='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">';
 
   // Column headers: Total | Mktg | Google | Meta | Organic | Non-MS
@@ -3454,7 +3455,8 @@ function renderMktg(rows){
   const thB='padding:6px 8px;text-align:center;font-size:10px;border-bottom:2px solid var(--border2);border-left:1px solid var(--border2)';
   const thS='padding:4px 6px;text-align:right;font-size:9px;color:var(--text3);border-bottom:1px solid var(--border2)';
 
-  let html='<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:16px">'+pb+'</div>';
+  const _mktgExportBtn='<button onclick="exportMktgCSV()" title="Export mktg data for current period" style="margin-left:auto;padding:4px 12px;font-size:11px;border-radius:4px;border:1px solid var(--border2);cursor:pointer;background:var(--bg2);color:var(--text2);display:inline-flex;align-items:center;gap:5px;white-space:nowrap">⬇ Export CSV</button>';
+  let html='<div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center;margin-bottom:16px">'+pb+_mktgExportBtn+'</div>';
   html+='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">';
   html+='<thead>'
     +'<tr>'
@@ -3877,28 +3879,222 @@ function renderCharts(rows){
 }
 
 // ═══════════════════════════
-// EXPORT
+// EXPORT HELPERS
+// ═══════════════════════════
+function _exportStamp(tag){
+  const n=new Date(),p=v=>String(v).padStart(2,'0');
+  return 'BikeAOP_DB_export_'+tag+'_'+n.getFullYear()+p(n.getMonth()+1)+p(n.getDate())+'_'+p(n.getHours())+p(n.getMinutes())+p(n.getSeconds())+'.csv';
+}
+function _dlCSV(filename,headers,dataRows){
+  const esc=v=>{const s=String(v==null?'':v);return /[,"\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;};
+  const lines=[headers.map(esc).join(','),...dataRows.map(r=>r.map(esc).join(','))];
+  const blob=new Blob([lines.join('\n')],{type:'text/csv'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=filename;a.click();
+}
+
+// Top-level dispatcher: routes to the right export based on current VIEW
+function exportCSVDispatch(){
+  if(VIEW==='leads'){exportLeadsCSV();return;}
+  if(VIEW==='mktg'){exportMktgCSV();return;}
+  exportCSV();
+}
+
+// ═══════════════════════════
+// MAIN TRACKER EXPORT (context-aware by VIEW+PERIOD)
 // ═══════════════════════════
 function exportCSV(){
   const rows=getFiltered();
-  const hdr=['Cat','Fuel','Client','AdType','BTL','BA'];
-  MONTHS.forEach(m=>{['TGT_Rev','TGT_Mktg','TGT_GM','TGT_CC','TGT_GPM','TGT_Leads','ACT_PaidLeads','ACT_OrgLeads','ACT_TrigLeads','ACT_CPL','ACT_MktgCost','ACT_Rev','ACT_CC','ACT_GM','ACT_GPM'].forEach(k=>hdr.push(m+'_'+k));});
-  hdr.push(...['FY_TGT_Rev','FY_TGT_Mktg','FY_TGT_GM','FY_TGT_CC','FY_TGT_GPM','FY_ACT_Rev','FY_ACT_Mktg','FY_ACT_GM','FY_ACT_CC','FY_ACT_GPM']);
-  const csvRows=[hdr.join(',')];
-  rows.forEach(({t,a,d})=>{
-    const base=[t.cat,t.fuel,t.client,t.ad_type,t.btl,t.ba];
-    const nums=[];
-    MONTHS.forEach((_,i)=>{
-      const tGM=t.rev.monthly[i]-t.mktg.monthly[i];
-      nums.push(t.rev.monthly[i].toFixed(1),t.mktg.monthly[i].toFixed(1),tGM.toFixed(1),t.cc.monthly[i].toFixed(1),(tGM-t.cc.monthly[i]).toFixed(1),t.leads.monthly[i].toFixed(3),
-        a.paid_leads[i].toFixed(3),a.organic_leads[i].toFixed(3),d.trig_leads[i].toFixed(3),a.mktg_cpl[i].toFixed(0),d.mktg_cost[i].toFixed(1),d.rev[i].toFixed(1),d.cc[i].toFixed(1),d.gm[i].toFixed(1),d.gpm[i].toFixed(1));
+
+  // FY / Charts / Team: wide 12-month format (all data)
+  if(VIEW==='fy'||VIEW==='charts'||VIEW==='team'){
+    const hdr=['Cat','Fuel','Client','AdType','BTL','BA'];
+    MONTHS.forEach(m=>{['TGT_Rev','TGT_Mktg','TGT_GM','TGT_CC','TGT_GPM','TGT_Leads','ACT_PaidLeads','ACT_OrgLeads','ACT_TrigLeads','ACT_CPL','ACT_MktgCost','ACT_Rev','ACT_CC','ACT_GM','ACT_GPM'].forEach(k=>hdr.push(m+'_'+k));});
+    hdr.push('FY_TGT_Rev','FY_TGT_Mktg','FY_TGT_GM','FY_TGT_CC','FY_TGT_GPM','FY_ACT_Rev','FY_ACT_Mktg','FY_ACT_GM','FY_ACT_CC','FY_ACT_GPM');
+    const dataRows=rows.map(({t,a,d})=>{
+      const base=[t.cat,t.fuel,t.client,t.ad_type,t.btl||'—',t.ba||'—'];
+      const nums=[];
+      MONTHS.forEach((_,i)=>{
+        const tGM=t.rev.monthly[i]-t.mktg.monthly[i];
+        nums.push(t.rev.monthly[i].toFixed(1),t.mktg.monthly[i].toFixed(1),tGM.toFixed(1),t.cc.monthly[i].toFixed(1),(tGM-t.cc.monthly[i]).toFixed(1),t.leads.monthly[i].toFixed(3),
+          a.paid_leads[i].toFixed(3),a.organic_leads[i].toFixed(3),d.trig_leads[i].toFixed(3),a.mktg_cpl[i].toFixed(0),d.mktg_cost[i].toFixed(1),d.rev[i].toFixed(1),d.cc[i].toFixed(1),d.gm[i].toFixed(1),d.gpm[i].toFixed(1));
+      });
+      nums.push(t.rev.fy.toFixed(1),t.mktg.fy.toFixed(1),(t.rev.fy-t.mktg.fy).toFixed(1),t.cc.fy.toFixed(1),((t.rev.fy-t.mktg.fy)-t.cc.fy).toFixed(1),
+        d.rev_fy.toFixed(1),d.mktg_fy.toFixed(1),d.gm_fy.toFixed(1),d.cc_fy.toFixed(1),d.gpm_fy.toFixed(1));
+      return [...base,...nums];
     });
-    nums.push(t.rev.fy.toFixed(1),t.mktg.fy.toFixed(1),(t.rev.fy-t.mktg.fy).toFixed(1),t.cc.fy.toFixed(1),((t.rev.fy-t.mktg.fy)-t.cc.fy).toFixed(1),
-      d.rev_fy.toFixed(1),d.mktg_fy.toFixed(1),d.gm_fy.toFixed(1),d.cc_fy.toFixed(1),d.gpm_fy.toFixed(1));
-    csvRows.push([...base,...nums].join(','));
+    _dlCSV(_exportStamp('tracker_FY'),hdr,dataRows);
+    return;
+  }
+
+  // QTR or MON: single-period aggregated export
+  let mIdxs,periodLabel,periodTag;
+  if(VIEW==='qtr'){
+    const q=PERIOD;
+    mIdxs=[q*3,q*3+1,q*3+2];
+    periodLabel='Q'+(q+1)+' '+['Apr-Jun','Jul-Sep','Oct-Dec','Jan-Mar'][q];
+    periodTag='tracker_Q'+(q+1);
+  } else {
+    mIdxs=[PERIOD];
+    periodLabel=MONTHS[PERIOD];
+    periodTag='tracker_'+MONTHS[PERIOD];
+  }
+  const sumM=arr=>mIdxs.reduce((s,i)=>s+(+(arr&&arr[i]||0)),0);
+  const pct=(t,a)=>t>0?(a/t*100).toFixed(1)+'%':'—';
+  const hdr=['Cat','Fuel','Client','AdType','BTL','BA','Period',
+    'Rev_TGT(L)','Rev_ACT(L)','Rev_ACH%',
+    'MktgCost_TGT(L)','MktgCost_ACT(L)',
+    'GM_TGT(L)','GM_ACT(L)','GM_ACH%',
+    'CC_TGT(L)','CC_ACT(L)',
+    'GPM_TGT(L)','GPM_ACT(L)','GPM_ACH%',
+    'Leads_TGT(L)','PaidLeads_ACT(L)','OrgLeads_ACT(L)','TrigLeads_ACT(L)','TCPL_ACT(Rs)'];
+  const dataRows=rows.map(({t,a,d})=>{
+    const rT=sumM(t.rev.monthly),rA=sumM(d.rev);
+    const mT=sumM(t.mktg.monthly),mA=sumM(d.mktg_cost);
+    const cT=sumM(t.cc.monthly),cA=sumM(d.cc);
+    const gmT=rT-mT,gmA=rA-mA,gpmT=gmT-cT,gpmA=gmA-cA;
+    const lT=sumM(t.leads.monthly);
+    const plA=sumM(d.paid_leads)/100000,olA=sumM(a.organic_leads||Array(12).fill(0))/100000,tlA=sumM(d.trig_leads)/100000;
+    const tcpl=plA>0?mA/plA:0;
+    return [t.cat,t.fuel,t.client,t.ad_type,t.btl||'—',t.ba||'—',periodLabel,
+      rT.toFixed(1),rA.toFixed(1),pct(rT,rA),mT.toFixed(1),mA.toFixed(1),
+      gmT.toFixed(1),gmA.toFixed(1),pct(gmT,gmA),cT.toFixed(1),cA.toFixed(1),
+      gpmT.toFixed(1),gpmA.toFixed(1),pct(gpmT,gpmA),lT.toFixed(3),plA.toFixed(3),olA.toFixed(3),tlA.toFixed(3),tcpl.toFixed(0)];
   });
-  const blob=new Blob([csvRows.join('\n')],{type:'text/csv'});
-  const link=document.createElement('a');link.href=URL.createObjectURL(blob);link.download='LeadBU_FY27.csv';link.click();
+  _dlCSV(_exportStamp(periodTag),hdr,dataRows);
+}
+
+// ═══════════════════════════
+// LEADS TAB EXPORT (respects LEADS_PERIOD)
+// ═══════════════════════════
+function exportLeadsCSV(){
+  const rows=getFiltered();
+  // Deduplicate same as renderLeads
+  const _lSeen={};const lRows=[];
+  rows.forEach(row=>{
+    const k=row.t.client+'§'+row.t.ad_type;
+    if(_lSeen[k]){
+      const ex=_lSeen[k];
+      const sum=(a,b)=>Array.isArray(a)?a.map((v,i)=>(+v||0)+(+b[i]||0)):(+a||0)+(+b||0);
+      ex.t={...ex.t,
+        leads:{fy:(ex.t.leads?ex.t.leads.fy:0)+(row.t.leads?row.t.leads.fy:0),monthly:sum(ex.t.leads?ex.t.leads.monthly:Array(12).fill(0),row.t.leads?row.t.leads.monthly:Array(12).fill(0))},
+        org_leads:{fy:(ex.t.org_leads?ex.t.org_leads.fy:0)+(row.t.org_leads?row.t.org_leads.fy:0),monthly:sum(ex.t.org_leads?ex.t.org_leads.monthly:Array(12).fill(0),row.t.org_leads?row.t.org_leads.monthly:Array(12).fill(0))},
+        mktg_leads:{fy:(ex.t.mktg_leads?ex.t.mktg_leads.fy:0)+(row.t.mktg_leads?row.t.mktg_leads.fy:0),monthly:sum(ex.t.mktg_leads?ex.t.mktg_leads.monthly:Array(12).fill(0),row.t.mktg_leads?row.t.mktg_leads.monthly:Array(12).fill(0))},
+      };
+    } else {_lSeen[k]=row;lRows.push(row);}
+  });
+  function gS(arr,pid){
+    if(!arr||!arr.length)return 0;
+    if(pid==='fy')return arr.reduce((s,v)=>s+(+v||0),0);
+    if(pid.startsWith('q')){const s=+pid[1]*3;return(+arr[s]||0)+(+arr[s+1]||0)+(+arr[s+2]||0);}
+    return +(arr[+pid.slice(1)])||0;
+  }
+  const pid=LEADS_PERIOD;
+  const _qNames=['Apr-Jun','Jul-Sep','Oct-Dec','Jan-Mar'];
+  const pLabel=pid==='fy'?'FY':pid.startsWith('q')?'Q'+(+pid[1]+1)+' '+_qNames[+pid[1]]:MONTHS[+pid.slice(1)];
+  const pTag='leads_'+(pid==='fy'?'FY':pid.startsWith('q')?'Q'+(+pid[1]+1):MONTHS[+pid.slice(1)]);
+  const hdr=['Client','AdType','BTL','Period',
+    'TotalLeads_TGT(L)','TotalLeads_ACT(L)','TotalLeads_ACH%',
+    'MktgLeads_TGT(L)','MktgLeads_ACT(L)','MktgLeads_ACH%',
+    'GoogleLeads_ACT(L)','Google_ACH%',
+    'MetaLeads_ACT(L)','Meta_ACH%',
+    'OrgLeads_TGT(L)','OrgLeads_ACT(L)','OrgLeads_ACH%',
+    'NonMS_ACT(L)','NonMS_ACH%'];
+  const pct=(t,a)=>t>0?Math.round(a/t*100)+'%':'—';
+  const dataRows=[];
+  lRows.forEach(({t,a,d})=>{
+    const tT=gS(t.leads.monthly,pid);
+    const mT=t.mktg_leads?gS(t.mktg_leads.monthly,pid):0;
+    const oT=t.org_leads?gS(t.org_leads.monthly,pid):0;
+    const tA=gS(d.trig_leads,pid)/100000;
+    const mA=gS(d.paid_leads,pid)/100000;
+    const gA=gS(d.google_leads,pid)/100000;
+    const meA=gS(d.meta_leads,pid)/100000;
+    const oA=gS(a.organic_leads||Array(12).fill(0),pid)/100000;
+    const nA=gS(a.non_ms_leads||Array(12).fill(0),pid)/100000;
+    if(tT===0&&tA===0) return;
+    dataRows.push([t.client,t.ad_type,t.btl||'—',pLabel,
+      tT.toFixed(2),tA.toFixed(2),pct(tT,tA),
+      mT.toFixed(2),mA.toFixed(2),pct(mT,mA),
+      gA.toFixed(2),pct(mT,gA),
+      meA.toFixed(2),pct(mT,meA),
+      oT.toFixed(2),oA.toFixed(2),pct(oT,oA),
+      nA.toFixed(2),pct(tT,nA)]);
+  });
+  _dlCSV(_exportStamp(pTag),hdr,dataRows);
+}
+
+// ═══════════════════════════
+// MKTG TAB EXPORT (respects MKTG_PERIOD)
+// ═══════════════════════════
+function exportMktgCSV(){
+  const rows=getFiltered();
+  // Deduplicate + skip CC contracts, same as renderMktg
+  const _mSeen={};const mRows=[];
+  rows.forEach(row=>{
+    if(row.t.ad_type==='CC contract') return;
+    const k=row.t.client+'§'+row.t.ad_type;
+    if(_mSeen[k]){
+      const ex=_mSeen[k];
+      const sum=(a,b)=>Array.isArray(a)?a.map((v,i)=>(+v||0)+(+b[i]||0)):(+a||0)+(+b||0);
+      ex.t={...ex.t,
+        mktg:{fy:ex.t.mktg.fy+row.t.mktg.fy,monthly:sum(ex.t.mktg.monthly,row.t.mktg.monthly)},
+        mktg_leads:{fy:(ex.t.mktg_leads?ex.t.mktg_leads.fy:0)+(row.t.mktg_leads?row.t.mktg_leads.fy:0),monthly:sum(ex.t.mktg_leads?ex.t.mktg_leads.monthly:Array(12).fill(0),row.t.mktg_leads?row.t.mktg_leads.monthly:Array(12).fill(0))},
+      };
+      ['mktg_cost','google_mktg','meta_mktg','paid_leads','google_leads','meta_leads','google_rev','meta_rev'].forEach(f=>{
+        ex.d[f]=(ex.d[f]||Array(12).fill(0)).map((v,i)=>(+v||0)+(+(row.d[f]||[])[i]||0));
+      });
+    } else {_mSeen[k]=row;mRows.push(row);}
+  });
+  function mS(arr,pid){
+    if(!arr||!arr.length)return 0;
+    if(pid==='fy')return arr.reduce((s,v)=>s+(+v||0),0);
+    if(pid.startsWith('q')){const s=+pid[1]*3;return(+arr[s]||0)+(+arr[s+1]||0)+(+arr[s+2]||0);}
+    return +(arr[+pid.slice(1)])||0;
+  }
+  const pid=MKTG_PERIOD;
+  const _qNames=['Apr-Jun','Jul-Sep','Oct-Dec','Jan-Mar'];
+  const pLabel=pid==='fy'?'FY':pid.startsWith('q')?'Q'+(+pid[1]+1)+' '+_qNames[+pid[1]]:MONTHS[+pid.slice(1)];
+  const pTag='mktg_'+(pid==='fy'?'FY':pid.startsWith('q')?'Q'+(+pid[1]+1):MONTHS[+pid.slice(1)]);
+  const hdr=['Client','AdType','BTL','Period',
+    'MktgLeads_TGT(L)','PaidLeads_ACT(L)','Contrib%',
+    'TCPL_TGT(Rs)','TCPL_ACT(Rs)',
+    'GoogleLeads_ACT(L)','GoogleCPL_ACT(Rs)',
+    'MetaLeads_ACT(L)','MetaCPL_ACT(Rs)',
+    'MktgSpend_TGT(L)','MktgSpend_ACT(L)',
+    'GoogleSpend_ACT(L)','MetaSpend_ACT(L)',
+    'Google_ROAS','Meta_ROAS'];
+  const pct=(t,a)=>t>0?(a/t*100).toFixed(1)+'%':'—';
+  // Grand total paid leads for contrib%
+  const grandPaid=mRows.reduce((s,{d})=>s+mS(d.paid_leads,pid)/100000,0);
+  const dataRows=[];
+  mRows.forEach(({t,a,d})=>{
+    const mLT=t.mktg_leads?mS(t.mktg_leads.monthly,pid):0;
+    const mSpT=mS(t.mktg.monthly,pid);
+    const tcplT=mLT>0?mSpT/mLT:0;
+    const paidL=mS(d.paid_leads,pid)/100000;
+    const googL=mS(d.google_leads,pid)/100000;
+    const metaL=mS(d.meta_leads,pid)/100000;
+    const mSpA=mS(d.mktg_cost,pid);
+    const gSpend=mS(d.google_mktg,pid);
+    const meSpend=mS(d.meta_mktg,pid);
+    const gRevA=mS(d.google_rev,pid);
+    const meRevA=mS(d.meta_rev,pid);
+    const tcplA=paidL>0?mSpA/paidL:0;
+    const gCpl=googL>0?gSpend/googL:0;
+    const meCpl=metaL>0?meSpend/metaL:0;
+    const gRoas=gSpend>0?gRevA/gSpend:0;
+    const meRoas=meSpend>0?meRevA/meSpend:0;
+    const contrib=grandPaid>0?(paidL/grandPaid*100).toFixed(1)+'%':'—';
+    if(mLT===0&&paidL===0) return;
+    dataRows.push([t.client,t.ad_type,t.btl||'—',pLabel,
+      mLT.toFixed(2),paidL.toFixed(2),contrib,
+      tcplT.toFixed(0),tcplA.toFixed(0),
+      googL.toFixed(2),gCpl.toFixed(0),
+      metaL.toFixed(2),meCpl.toFixed(0),
+      mSpT.toFixed(1),mSpA.toFixed(1),gSpend.toFixed(1),meSpend.toFixed(1),
+      gRoas.toFixed(2),meRoas.toFixed(2)]);
+  });
+  _dlCSV(_exportStamp(pTag),hdr,dataRows);
 }
 
 // ═══════════════════════════
@@ -3930,6 +4126,9 @@ try {
 _fbDb = firebase.database(_fbApp);
 _fbRef = _fbDb.ref('actuals/fy27_v2');
 let _auditRef = _fbDb.ref('actuals/fy27_audit');
+let _aiKeyRef = _fbDb.ref('config/ai_key');
+// Proactively warm the key cache so first message is instant
+setTimeout(()=>_loadAIKey().catch(()=>{}), 2000);
 
 // ── Presence: who's currently viewing the page ────────────────────────────────
 const _sessionId = Math.random().toString(36).slice(2); // unique per tab
@@ -5676,6 +5875,92 @@ window.addEventListener('resize',updateStickyOffsets);
 setTimeout(updateStickyOffsets,300);
 
 // ═══════════════════════════════════════════════════════════════════════════
+// AI KEY MANAGEMENT (shared via Firebase — admin sets once, all users get it)
+// ═══════════════════════════════════════════════════════════════════════════
+let _aiKeyCache=null;
+const _AK_SALT='bdAOP27KS';
+function _akEnc(s){let r='';for(let i=0;i<s.length;i++)r+=String.fromCharCode(s.charCodeAt(i)^_AK_SALT.charCodeAt(i%_AK_SALT.length));return btoa(r);}
+function _akDec(b){try{const r=atob(b);let s='';for(let i=0;i<r.length;i++)s+=String.fromCharCode(r.charCodeAt(i)^_AK_SALT.charCodeAt(i%_AK_SALT.length));return s;}catch(e){return null;}}
+
+async function _loadAIKey(){
+  if(_aiKeyCache) return _aiKeyCache;
+  // 1. localStorage (cached in this browser from a previous session)
+  const local=localStorage.getItem('leadbu_ai_key');
+  if(local){_aiKeyCache=local;return _aiKeyCache;}
+  // 2. Firebase shared config
+  if(_aiKeyRef){
+    try{
+      const snap=await _aiKeyRef.once('value');
+      const raw=snap.val();
+      if(raw){
+        const key=_akDec(raw)||raw; // decode obfuscated, fall back to raw if legacy plain-text
+        localStorage.setItem('leadbu_ai_key',key); // cache locally for speed
+        _aiKeyCache=key;
+        return _aiKeyCache;
+      }
+    }catch(e){}
+  }
+  return null;
+}
+
+async function saveAIKeyGlobal(key){
+  key=(key||'').trim();
+  if(!key) return false;
+  _aiKeyCache=key;
+  localStorage.setItem('leadbu_ai_key',key);
+  if(_aiKeyRef) await _aiKeyRef.set(_akEnc(key));
+  return true;
+}
+
+async function clearAIKeyGlobal(){
+  _aiKeyCache=null;
+  localStorage.removeItem('leadbu_ai_key');
+  if(_aiKeyRef) await _aiKeyRef.remove();
+}
+
+// ── Key Management UI ─────────────────────────────────────────────────────
+async function toggleAIKeyMgmt(){
+  const panel=document.getElementById('ai-key-mgmt');
+  if(!panel) return;
+  const isOpen=panel.style.display!=='none';
+  if(isOpen){panel.style.display='none';return;}
+  panel.style.display='block';
+  const status=document.getElementById('ai-key-status');
+  if(status){
+    status.textContent='Checking…';
+    const key=await _loadAIKey();
+    const masked=key?'sk-ant-…'+key.slice(-6):'not set';
+    status.innerHTML=key
+      ?'<span style="color:#34d399">✅ Key active</span> — <span style="color:var(--text3);font-family:monospace">'+masked+'</span> — shared with all users'
+      :'<span style="color:#f87171">⚠ No key configured</span> — enter one below to enable AI for everyone';
+  }
+}
+
+async function saveAIKeyFromUI(){
+  const inp=document.getElementById('ai-key-input');
+  const status=document.getElementById('ai-key-status');
+  const key=(inp&&inp.value||'').trim();
+  if(!key){if(status)status.innerHTML='<span style="color:#f87171">Please enter a key</span>';return;}
+  if(status)status.textContent='Saving…';
+  const ok=await saveAIKeyGlobal(key);
+  if(ok){
+    if(inp)inp.value='';
+    if(status)status.innerHTML='<span style="color:#34d399">✅ Saved! All users can now use AI without entering a key.</span>';
+    setTimeout(()=>{const p=document.getElementById('ai-key-mgmt');if(p)p.style.display='none';},2000);
+  }
+}
+
+async function clearAIKeyFromUI(){
+  const status=document.getElementById('ai-key-status');
+  if(!confirm('Remove the shared API key? All users will lose AI access until a new key is set.')) return;
+  if(status)status.textContent='Clearing…';
+  await clearAIKeyGlobal();
+  if(status)status.innerHTML='<span style="color:#f87171">Key removed.</span> Enter a new key to re-enable AI.';
+  const inp=document.getElementById('ai-key-input');
+  if(inp)inp.value='';
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // AI CHAT ASSISTANT
 // ═══════════════════════════════════════════════════════════════════════════
 let _chatOpen=false;
@@ -5787,12 +6072,11 @@ function renderChat(){
 
 async function sendChatMessage(userMsg){
   if(_chatThinking||!userMsg.trim())return;
-  let apiKey=localStorage.getItem('leadbu_ai_key')||'';
+  const apiKey=await _loadAIKey();
   if(!apiKey){
-    const k=window.prompt('Enter your Anthropic API key.\nIt will be stored locally in your browser only:');
-    if(!k||!k.trim())return;
-    apiKey=k.trim();
-    localStorage.setItem('leadbu_ai_key',apiKey);
+    _chatHistory.push({role:'assistant',content:'⚠️ No API key configured yet. Ask your admin to click 🔑 and set a shared key — it only needs to be done once for everyone.'});
+    renderChat();
+    return;
   }
   _chatThinking=true;
   _chatHistory.push({role:'user',content:userMsg});
@@ -5815,7 +6099,7 @@ ${buildTrackerContext()}`;
       _chatHistory.push({role:'assistant',content:data.content[0].text});
     } else if(data.error){
       _chatHistory.push({role:'assistant',content:`⚠ API error: ${data.error.message||JSON.stringify(data.error)}`});
-      if(data.error.type==='authentication_error') localStorage.removeItem('leadbu_ai_key');
+      if(data.error.type==='authentication_error'){_aiKeyCache=null;localStorage.removeItem('leadbu_ai_key');}
     }
   }catch(e){
     _chatHistory.push({role:'assistant',content:`⚠ Network error: ${e.message}`});
@@ -5833,7 +6117,7 @@ function toggleAIChat(){
   if(_chatOpen){renderChat();setTimeout(()=>{const inp=document.getElementById('ai-chat-input');if(inp)inp.focus();},280);}
 }
 function clearChat(){_chatHistory=[];renderChat();}
-function resetAIKey(){localStorage.removeItem('leadbu_ai_key');alert('API key cleared. You will be prompted on next message.');}
+function resetAIKey(){toggleAIKeyMgmt();} // legacy — now opens key mgmt panel
 async function submitAIChat(){
   const inp=document.getElementById('ai-chat-input');
   if(!inp)return;
@@ -5902,8 +6186,25 @@ async function submitAIChat(){
     </div>
     <div style="display:flex;gap:6px;align-items:center">
       <button onclick="clearChat()" title="Clear conversation" style="font-size:10px;padding:3px 9px;background:var(--bg2);border:1px solid var(--border2);border-radius:5px;color:var(--text2);cursor:pointer">Clear</button>
-      <button onclick="resetAIKey()" title="Reset API key" style="font-size:10px;padding:3px 9px;background:var(--bg2);border:1px solid var(--border2);border-radius:5px;color:var(--text2);cursor:pointer">🔑</button>
+      <button onclick="toggleAIKeyMgmt()" title="Manage shared API key (admin)" style="font-size:10px;padding:3px 9px;background:var(--bg2);border:1px solid var(--border2);border-radius:5px;color:var(--text2);cursor:pointer">🔑 Key</button>
       <button onclick="toggleAIChat()" style="font-size:13px;padding:3px 9px;background:var(--bg2);border:1px solid var(--border2);border-radius:5px;color:var(--text2);cursor:pointer;font-weight:600">✕</button>
+    </div>
+  </div>
+
+  <!-- Key Management Panel (admin only, hidden by default) -->
+  <div id="ai-key-mgmt" style="display:none;padding:13px 16px;background:var(--bg3);border-bottom:2px solid var(--border2);flex-shrink:0">
+    <div style="font-size:11px;font-weight:700;color:var(--text1);margin-bottom:7px;display:flex;align-items:center;gap:6px">🔑 Shared API Key<span style="font-weight:400;color:var(--text3);font-size:10px">— set once, works for everyone</span></div>
+    <div id="ai-key-status" style="font-size:10px;color:var(--text3);margin-bottom:9px;min-height:14px">Checking…</div>
+    <div style="display:flex;gap:6px;align-items:center">
+      <input type="password" id="ai-key-input" placeholder="sk-ant-api03-…"
+        style="flex:1;background:var(--bg2);border:1px solid var(--border2);border-radius:5px;padding:7px 10px;font-size:11px;color:var(--text1);font-family:monospace;outline:none"
+        onkeydown="if(event.key==='Enter')saveAIKeyFromUI()">
+      <button onclick="saveAIKeyFromUI()"
+        style="padding:7px 13px;font-size:11px;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;border:none;border-radius:5px;cursor:pointer;font-weight:700;white-space:nowrap">Save for All</button>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:7px">
+      <span style="font-size:9px;color:var(--text3)">Key is obfuscated and stored in shared DB — all users get it automatically</span>
+      <button onclick="clearAIKeyFromUI()" style="font-size:9px;padding:2px 8px;background:transparent;border:1px solid var(--border2);border-radius:4px;color:var(--text3);cursor:pointer">Remove Key</button>
     </div>
   </div>
 
