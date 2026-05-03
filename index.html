@@ -477,6 +477,9 @@ tbody tr:hover td{background:var(--bg2)}
 .pl-input.cpl-input{color:var(--orange);border-color:rgba(251,146,60,.30);background:rgba(251,146,60,.08)}
 .pl-input.cpl-input:hover{border-color:rgba(251,146,60,.50);background:rgba(251,146,60,.12)}
 .pl-input.cpl-input:focus{border-color:var(--orange);box-shadow:0 0 0 3px rgba(251,146,60,.15)}
+.pl-input[type=number]::-webkit-outer-spin-button,
+.pl-input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.pl-input[type=number]{-moz-appearance:textfield}
 /* computed values */
 .cv{color:var(--pos-soft)}
 .cv-rev{color:var(--accent)}
@@ -537,7 +540,7 @@ canvas{max-height:260px}
       <div class="brand-mark">🏍️</div>
       <div class="brand-text">
         <div class="t1">Bike AOP Tracker</div>
-        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.0.66</span> <span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
+        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.0.67</span> <span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
       </div>
     </div>
     <div class="hdr-right">
@@ -1955,7 +1958,7 @@ const fmt=(v,d=1)=>(+v||0).toFixed(d).replace(/\B(?=(\d{3})+(?!\d))/g,',');
 const fmtP=v=>(+v||0).toFixed(1)+'%';
 const pct=(a,b)=>b?a/b*100:0;
 const pc=v=>v>=60?'pct-hi':v>=40?'pct-mid':'pct-lo';
-const fmtC=(v,dec)=>dec===0?Math.round(v).toLocaleString('en-IN'):fmt(v,dec);
+const fmtC=(v,dec)=>dec===0?Math.round(v).toLocaleString('en-IN'):fmt(v,Math.max(dec,2));
 
 // Get period values from target and derived actual
 function getPeriodVals(t,d,field,idx){
@@ -2285,13 +2288,13 @@ function renderModal(recIdx){
     +'</tr>';
 
   // Helper: format number, int if dec=0
-  const fmtC=(v,dec)=>dec===0?Math.round(v).toLocaleString('en-IN'):fmt(v,dec);
+  const fmtC=(v,dec)=>dec===0?Math.round(v).toLocaleString('en-IN'):fmt(v,Math.max(dec,2));
 
   function inputRow(label,cls,field,arr,step,hint,tgtArr){
     const dec=step==='1'?0:step==='0.001'?3:2;
     const cells=vis.map(i=>{
       const v=+(arr[i]||0);
-      const inp='<td style="border-left:1px solid var(--border2)"><input class="pl-input '+cls+'" type="number" step="'+step+'" value="'+v.toFixed(dec)+'" data-field="'+field+'" data-month="'+i+'" data-rec="'+recIdx+'" onchange="onModalInputChange(this)"></td>';
+      const inp='<td style="border-left:1px solid var(--border2)"><input class="pl-input '+cls+'" type="number" step="'+step+'" value="'+v.toFixed(dec)+'" data-field="'+field+'" data-month="'+i+'" data-rec="'+recIdx+'" onfocus="if(+this.value===0)this.value=\'\'" onblur="if(this.value===\'\')this.value=\'0\'" onchange="onModalInputChange(this)"></td>';
       const tval=tgtArr!=null?tgtArr[i]:null;
       const tgt=tval!=null?'<td class="tgt-col">'+fmtC(tval,dec)+'</td>':'<td class="tgt-col nd">—</td>';
       return inp+tgt;
@@ -2643,7 +2646,7 @@ function renderBajajModal(recIdx){
   }
   function bInp(label,cls,field,arr,step,brand){
     const dec=step==='1'?0:2;
-    const cells=vis.map(i=>{const v=+(arr[i]||0);return'<td style="border-left:1px solid var(--border2)"><input class="pl-input '+cls+'" type="number" step="'+step+'" value="'+v.toFixed(dec)+'" data-field="'+field+'" data-month="'+i+'" data-rec="'+recIdx+'" data-brand="'+brand+'" onchange="onBrandInputChange(this)"></td><td class="tgt-col nd">—</td>';}).join('');
+    const cells=vis.map(i=>{const v=+(arr[i]||0);return'<td style="border-left:1px solid var(--border2)"><input class="pl-input '+cls+'" type="number" step="'+step+'" value="'+v.toFixed(dec)+'" data-field="'+field+'" data-month="'+i+'" data-rec="'+recIdx+'" data-brand="'+brand+'" onfocus="if(+this.value===0)this.value=\'\'" onblur="if(this.value===\'\')this.value=\'0\'" onchange="onBrandInputChange(this)"></td><td class="tgt-col nd">—</td>';}).join('');
     const fy=arr.reduce((s,v)=>s+(+v||0),0);
     return '<tr class="row-input"><td class="mc">'+label+'</td>'+cells+'<td class="fy-col">'+fmtC(fy,dec)+'</td><td class="fy-col tgt-col nd">—</td></tr>';
   }
@@ -2767,7 +2770,7 @@ function renderTVSModal(recIdx){
   recomputeBrandTotals(recIdx,TVS_BRANDS);
   const d=deriveActuals(a,t.ad_type);
   const vis=getVisibleMonths(),nc=vis.length*2+3,adType=t.ad_type;
-  const fmtC=(v,dec)=>dec===0?Math.round(v).toLocaleString('en-IN'):fmt(v,dec);
+  const fmtC=(v,dec)=>dec===0?Math.round(v).toLocaleString('en-IN'):fmt(v,Math.max(dec,2));
 
   // safe array from any Firebase object or JS array
   const sa=(obj)=>Array(12).fill(0).map((_,i)=>+(obj&&obj[i])||0);
@@ -2784,7 +2787,7 @@ function renderTVSModal(recIdx){
   function bInpR(label,cls,field,rawArr,step,brand,hint){
     const arr=sa(rawArr);
     const dec=step==='0.01'?2:0;
-    const cells=vis.map(i=>'<td style="border-left:1px solid var(--border2)"><input class="pl-input '+cls+'" type="number" step="'+step+'" value="'+arr[i].toFixed(dec)+'" data-field="'+field+'" data-month="'+i+'" data-rec="'+recIdx+'" data-brand="'+brand+'" onchange="onBrandInputChange(this)"></td><td class="tgt-col nd">—</td>').join('');
+    const cells=vis.map(i=>'<td style="border-left:1px solid var(--border2)"><input class="pl-input '+cls+'" type="number" step="'+step+'" value="'+arr[i].toFixed(dec)+'" data-field="'+field+'" data-month="'+i+'" data-rec="'+recIdx+'" data-brand="'+brand+'" onfocus="if(+this.value===0)this.value=\'\'" onblur="if(this.value===\'\')this.value=\'0\'" onchange="onBrandInputChange(this)"></td><td class="tgt-col nd">—</td>').join('');
     const fy=arr.reduce((s,v)=>s+v,0);
     return '<tr class="row-input"><td class="mc">'+label+(hint?'<br><span class="hint">'+hint+'</span>':'')+'</td>'+cells+'<td class="fy-col">'+fmtC(fy,dec)+'</td><td class="fy-col tgt-col nd">—</td></tr>';
   }
@@ -2964,7 +2967,7 @@ function renderREModal(recIdx){
   }
   function bInp(label,cls,field,arr,step,brand){
     const dec=step==='1'?0:2;
-    const cells=vis.map(i=>{const v=+(arr[i]||0);return'<td style="border-left:1px solid var(--border2)"><input class="pl-input '+cls+'" type="number" step="'+step+'" value="'+v.toFixed(dec)+'" data-field="'+field+'" data-month="'+i+'" data-rec="'+recIdx+'" data-brand="'+brand+'" onchange="onBrandInputChange(this)"></td><td class="tgt-col nd">—</td>';}).join('');
+    const cells=vis.map(i=>{const v=+(arr[i]||0);return'<td style="border-left:1px solid var(--border2)"><input class="pl-input '+cls+'" type="number" step="'+step+'" value="'+v.toFixed(dec)+'" data-field="'+field+'" data-month="'+i+'" data-rec="'+recIdx+'" data-brand="'+brand+'" onfocus="if(+this.value===0)this.value=\'\'" onblur="if(this.value===\'\')this.value=\'0\'" onchange="onBrandInputChange(this)"></td><td class="tgt-col nd">—</td>';}).join('');
     const fy=arr.reduce((s,v)=>s+(+v||0),0);
     return '<tr class="row-input"><td class="mc">'+label+'</td>'+cells+'<td class="fy-col">'+fmtC(fy,dec)+'</td><td class="fy-col tgt-col nd">—</td></tr>';
   }
