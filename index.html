@@ -544,7 +544,7 @@ canvas{max-height:260px}
       <div class="brand-mark">🏍️</div>
       <div class="brand-text">
         <div class="t1">Bike AOP Tracker</div>
-        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.0.71</span> <span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
+        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.0.72</span> <span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
       </div>
     </div>
     <div class="hdr-right">
@@ -4386,6 +4386,19 @@ function renderOverview(){
   const tRM=MONTHS.map((_,i)=>filteredRows.reduce((s,{t})=>s+(mArr(t,'rev')[i]||0),0));
   const aRM=MONTHS.map((_,i)=>filteredRows.reduce((s,{d})=>s+(d.rev[i]||0),0));
   const lyRM=MONTHS.map((_,i)=>filteredRows.reduce((s,{t})=>s+(sArr(t,'rev')[i]||0),0));
+  // Monthly mktg & CC for GM / GPM charts
+  const tMktgMon=MONTHS.map((_,i)=>filteredRows.reduce((s,{t})=>s+(mArr(t,'mktg')[i]||0),0));
+  const aMktgMon=MONTHS.map((_,i)=>filteredRows.reduce((s,{d})=>s+(d.mktg_cost[i]||0),0));
+  const tCCMon  =MONTHS.map((_,i)=>filteredRows.reduce((s,{t})=>s+(mArr(t,'cc')[i]||0),0));
+  const aCCMon  =MONTHS.map((_,i)=>filteredRows.reduce((s,{d})=>s+(d.cc[i]||0),0));
+  const tGMM =tRM.map((r,i)=>r-tMktgMon[i]);
+  const aGMM =aRM.map((r,i)=>r-aMktgMon[i]);
+  const tGMpM=tRM.map((r,i)=>r>0?tGMM[i]/r*100:0);
+  const aGMpM=aRM.map((r,i)=>r>0?aGMM[i]/r*100:0);
+  const tGPMM =tGMM.map((g,i)=>g-tCCMon[i]);
+  const aGPMM =aGMM.map((g,i)=>g-aCCMon[i]);
+  const tGPMpM=tRM.map((r,i)=>r>0?tGPMM[i]/r*100:0);
+  const aGPMpM=aRM.map((r,i)=>r>0?aGPMM[i]/r*100:0);
 
   // ── Mktg efficiency ──
   const roas=aMktgFY>0?aRevFY/aMktgFY:0;
@@ -4628,6 +4641,23 @@ function renderOverview(){
     </div>
   </section>`;
 
+  html+=`<section>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+      <div>
+        <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">Monthly GM — Abs (Lacs) &amp; GM%${!isFullYear?' <span style="color:var(--blue);font-style:normal;font-size:10px">('+periodLabel+')</span>':''}</div>
+        <div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:16px">
+          <canvas id="ov-gm-chart" style="max-height:200px"></canvas>
+        </div>
+      </div>
+      <div>
+        <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">Monthly GPM — Abs (Lacs) &amp; GPM%${!isFullYear?' <span style="color:var(--blue);font-style:normal;font-size:10px">('+periodLabel+')</span>':''}</div>
+        <div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:16px">
+          <canvas id="ov-gpm-chart" style="max-height:200px"></canvas>
+        </div>
+      </div>
+    </div>
+  </section>`;
+
   // Watchlist
   if(watchlist.length>0){
     html+=`<section>
@@ -4682,6 +4712,60 @@ function renderOverview(){
         {label:'LY',data:lyRM,type:'line',borderColor:'#fbbf2499',borderWidth:1.5,backgroundColor:'transparent',pointRadius:3,pointBackgroundColor:'#fbbf24',tension:.3},
       ]},
       options:{...CO(),scales:{x:{ticks:{color:isLt?'#58586e':'#8b949e',font:{size:9}},grid:{color:isLt?'#dcdce855':'#1e2d4533'}},y:{ticks:{color:isLt?'#58586e':'#8b949e',font:{size:9}},grid:{color:isLt?'#dcdce855':'#1e2d4533'}}}}
+    });
+  }
+
+  // ── GM chart ──
+  dc('ov-gm-chart');
+  const gmCanvas=document.getElementById('ov-gm-chart');
+  if(gmCanvas){
+    const isLt=document.body.classList.contains('light');
+    const tc=isLt?'#58586e':'#8b949e',gc=isLt?'#dcdce855':'#1e2d4533';
+    const gmTgtBg=MONTHS.map((_,i)=>chartHighlight.includes(i)?'#34d39966':'#34d39922');
+    const gmTgtBd=MONTHS.map((_,i)=>chartHighlight.includes(i)?'#34d39999':'#34d39944');
+    const gmActBg=MONTHS.map((_,i)=>chartHighlight.includes(i)?'#34d399cc':'#34d39944');
+    const gmActBd=MONTHS.map((_,i)=>chartHighlight.includes(i)?'#34d399':'#34d39966');
+    CI['ov-gm-chart']=new Chart(gmCanvas,{
+      type:'bar',
+      data:{labels:MONTHS,datasets:[
+        {label:'GM TGT (L)',data:tGMM,type:'bar',yAxisID:'y',backgroundColor:isFullYear?'#34d39933':gmTgtBg,borderColor:isFullYear?'#34d39966':gmTgtBd,borderWidth:1},
+        {label:'GM ACT (L)',data:aGMM,type:'bar',yAxisID:'y',backgroundColor:isFullYear?'#34d39966':gmActBg,borderColor:isFullYear?'#34d399':gmActBd,borderWidth:1},
+        {label:'GM% TGT',data:tGMpM,type:'line',yAxisID:'y1',borderColor:'#818cf877',borderWidth:1.5,backgroundColor:'transparent',pointRadius:2,tension:.35,borderDash:[4,3],pointBackgroundColor:'#818cf8'},
+        {label:'GM% ACT',data:aGMpM,type:'line',yAxisID:'y1',borderColor:'#34d399',borderWidth:2,backgroundColor:'transparent',pointRadius:3,tension:.35,pointBackgroundColor:'#34d399'},
+      ]},
+      options:{responsive:true,plugins:{legend:{labels:{color:tc,font:{size:10}}}},
+        scales:{
+          x:{ticks:{color:tc,font:{size:9}},grid:{color:gc}},
+          y:{position:'left',ticks:{color:tc,font:{size:9}},grid:{color:gc},title:{display:true,text:'Lacs',color:tc,font:{size:9}}},
+          y1:{position:'right',ticks:{color:tc,font:{size:9},callback:v=>v.toFixed(1)+'%'},grid:{drawOnChartArea:false},title:{display:true,text:'GM%',color:tc,font:{size:9}}}
+        }}
+    });
+  }
+
+  // ── GPM chart ──
+  dc('ov-gpm-chart');
+  const gpmCanvas=document.getElementById('ov-gpm-chart');
+  if(gpmCanvas){
+    const isLt=document.body.classList.contains('light');
+    const tc=isLt?'#58586e':'#8b949e',gc=isLt?'#dcdce855':'#1e2d4533';
+    const gpmTgtBg=MONTHS.map((_,i)=>chartHighlight.includes(i)?'#a78bfa66':'#a78bfa22');
+    const gpmTgtBd=MONTHS.map((_,i)=>chartHighlight.includes(i)?'#a78bfa99':'#a78bfa44');
+    const gpmActBg=MONTHS.map((_,i)=>chartHighlight.includes(i)?'#a78bfacc':'#a78bfa44');
+    const gpmActBd=MONTHS.map((_,i)=>chartHighlight.includes(i)?'#a78bfa':'#a78bfa66');
+    CI['ov-gpm-chart']=new Chart(gpmCanvas,{
+      type:'bar',
+      data:{labels:MONTHS,datasets:[
+        {label:'GPM TGT (L)',data:tGPMM,type:'bar',yAxisID:'y',backgroundColor:isFullYear?'#a78bfa33':gpmTgtBg,borderColor:isFullYear?'#a78bfa66':gpmTgtBd,borderWidth:1},
+        {label:'GPM ACT (L)',data:aGPMM,type:'bar',yAxisID:'y',backgroundColor:isFullYear?'#a78bfa66':gpmActBg,borderColor:isFullYear?'#a78bfa':gpmActBd,borderWidth:1},
+        {label:'GPM% TGT',data:tGPMpM,type:'line',yAxisID:'y1',borderColor:'#818cf877',borderWidth:1.5,backgroundColor:'transparent',pointRadius:2,tension:.35,borderDash:[4,3],pointBackgroundColor:'#818cf8'},
+        {label:'GPM% ACT',data:aGPMpM,type:'line',yAxisID:'y1',borderColor:'#a78bfa',borderWidth:2,backgroundColor:'transparent',pointRadius:3,tension:.35,pointBackgroundColor:'#a78bfa'},
+      ]},
+      options:{responsive:true,plugins:{legend:{labels:{color:tc,font:{size:10}}}},
+        scales:{
+          x:{ticks:{color:tc,font:{size:9}},grid:{color:gc}},
+          y:{position:'left',ticks:{color:tc,font:{size:9}},grid:{color:gc},title:{display:true,text:'Lacs',color:tc,font:{size:9}}},
+          y1:{position:'right',ticks:{color:tc,font:{size:9},callback:v=>v.toFixed(1)+'%'},grid:{drawOnChartArea:false},title:{display:true,text:'GPM%',color:tc,font:{size:9}}}
+        }}
     });
   }
 
