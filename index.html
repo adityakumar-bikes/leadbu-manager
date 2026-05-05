@@ -551,7 +551,7 @@ canvas{max-height:260px}
       <div class="brand-mark">🏍️</div>
       <div class="brand-text">
         <div class="t1">Bike AOP Tracker</div>
-        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.0.76</span> <span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
+        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.0.77</span> <span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
       </div>
     </div>
     <div class="hdr-right">
@@ -700,6 +700,7 @@ canvas{max-height:260px}
   <div class="vtab"        data-v="charts" onclick="setView('charts')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>Charts</div>
   <div class="vtab"        data-v="leads"  onclick="setView('leads')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>Leads</div>
   <div class="vtab"        data-v="mktg"   onclick="setView('mktg')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l18-5v12L3 13zM11.6 16.8a3 3 0 1 1-5.8-1.6"/></svg>Mktg</div>
+  <div class="vtab"        data-v="cc"     onclick="setView('cc')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>CC</div>
 </div>
 <div class="period-bar" id="period-bar"></div>
 
@@ -727,6 +728,7 @@ canvas{max-height:260px}
 <div id="leads-area" class="hidden" style="padding:0 16px"></div>
 <div id="team-area" class="hidden" style="padding:0 16px"></div>
 <div id="mktg-area" class="hidden" style="padding:0 16px"></div>
+<div id="cc-area"   class="hidden" style="padding:0 16px"></div>
 </div><!-- /#page-tracker -->
 
 <!-- ============= PAGE: CLIENTS ============= -->
@@ -926,25 +928,20 @@ function promptUserName(){
   if(name&&name.trim()){
     localStorage.setItem('leadbu_user',name.trim());
     document.getElementById('user-label').textContent=name.trim();
-    registerPresence(); // re-register with new name
+    registerPresence();
   }
 }
 function initUserLabel(){
   const n=localStorage.getItem('leadbu_user');
   if(n&&n.trim()) document.getElementById('user-label').textContent=n;
-  // No auto-prompt on load — name is asked only when someone tries to edit
 }
-
-// Returns true if name is set; otherwise prompts and returns false (blocks the edit)
 function requireName(){
   const n=localStorage.getItem('leadbu_user');
   if(n&&n.trim()) return true;
-  // Block edit — force name entry
   let entered='';
   while(!entered||!entered.trim()){
     entered=window.prompt('⚠ You must set your name before editing.\n\nThis is required so changes are tracked in the audit log.\n\nEnter your name:','');
     if(entered===null){
-      // User hit Cancel — show red button and abort the edit
       const btn=document.getElementById('user-btn');
       if(btn){btn.style.background='#7f1d1d';btn.style.color='#fca5a5';btn.title='⚠ Name required — click to set';}
       return false;
@@ -954,7 +951,7 @@ function requireName(){
   document.getElementById('user-label').textContent=entered.trim();
   const btn=document.getElementById('user-btn');
   if(btn){btn.style.background='';btn.style.color='';btn.title='Click to change your name';}
-  registerPresence(); // now named — announce presence
+  registerPresence();
   return true;
 }
 
@@ -1978,18 +1975,20 @@ function setView(v){
   const isL=v==='leads';
   const isT=v==='team';
   const isM=v==='mktg';
-  document.getElementById('table-area').classList.toggle('hidden',isC||isL||isT||isM);
+  const isCC=v==='cc';
+  document.getElementById('table-area').classList.toggle('hidden',isC||isL||isT||isM||isCC);
   document.getElementById('charts-area').classList.toggle('hidden',!isC);
   document.getElementById('leads-area').classList.toggle('hidden',!isL);
   document.getElementById('team-area').classList.toggle('hidden',!isT);
   document.getElementById('mktg-area').classList.toggle('hidden',!isM);
+  document.getElementById('cc-area').classList.toggle('hidden',!isCC);
   buildPeriodBar();
   render();
 }
 function setMode(m){DISP_MODE=m;['tgt','act','tva','all'].forEach(x=>document.getElementById('m-'+x).classList.toggle('active',x===m));render();}
 function buildPeriodBar(){
   const pb=document.getElementById('period-bar');
-  if(VIEW==='fy'||VIEW==='charts'||VIEW==='leads'||VIEW==='team'||VIEW==='mktg'){pb.classList.remove('show');return;}
+  if(VIEW==='fy'||VIEW==='charts'||VIEW==='leads'||VIEW==='team'||VIEW==='mktg'||VIEW==='cc'){pb.classList.remove('show');return;}
   pb.classList.add('show');
   const labels=VIEW==='mon'?MONTHS:QTRS.map(q=>q+' FY27');
   pb.innerHTML=`<span style="font-size:10px;color:var(--text2);margin-right:4px">${VIEW==='mon'?'Month:':'Quarter:'}</span>`;
@@ -2255,6 +2254,7 @@ function render(){
   if(VIEW==='charts'){renderCharts(rows);return;}
   if(VIEW==='leads'){renderLeads(rows);return;}
   if(VIEW==='mktg'){renderMktg(rows);return;}
+  if(VIEW==='cc'){renderCC(rows);return;}
   if(VIEW==='team'){renderTeam();return;}
   const thead=document.getElementById('thead');
   const tbody=document.getElementById('tbody');
@@ -3251,6 +3251,7 @@ function renderREModal(recIdx){
 // ═══════════════════════════
 let LEADS_PERIOD='fy';
 let MKTG_PERIOD='fy';
+let CC_PERIOD='fy';
 
 function renderLeads(rows){
   const el=document.getElementById('leads-area');
@@ -3896,6 +3897,7 @@ function _dlCSV(filename,headers,dataRows){
 function exportCSVDispatch(){
   if(VIEW==='leads'){exportLeadsCSV();return;}
   if(VIEW==='mktg'){exportMktgCSV();return;}
+  if(VIEW==='cc'){exportCCCSV();return;}
   exportCSV();
 }
 
@@ -4095,6 +4097,231 @@ function exportMktgCSV(){
       gRoas.toFixed(2),meRoas.toFixed(2)]);
   });
   _dlCSV(_exportStamp(pTag),hdr,dataRows);
+}
+
+// ═══════════════════════════
+// CC TRACKER
+// ═══════════════════════════
+function renderCC(rows){
+  const el=document.getElementById('cc-area');
+
+  // Deduplicate same client+ad_type
+  const _cSeen={};const _cDedup=[];
+  rows.forEach(row=>{
+    const k=row.t.client+'§'+row.t.ad_type;
+    if(_cSeen[k]){
+      const ex=_cSeen[k];
+      const sum=(a,b)=>Array.isArray(a)?a.map((v,i)=>(+v||0)+(+b[i]||0)):(+a||0)+(+b||0);
+      ex.t={...ex.t,
+        leads:{fy:(ex.t.leads?ex.t.leads.fy:0)+(row.t.leads?row.t.leads.fy:0),monthly:sum(ex.t.leads?ex.t.leads.monthly:Array(12).fill(0),row.t.leads?row.t.leads.monthly:Array(12).fill(0))},
+        cc:{fy:(ex.t.cc?ex.t.cc.fy:0)+(row.t.cc?row.t.cc.fy:0),monthly:sum(ex.t.cc?ex.t.cc.monthly:Array(12).fill(0),row.t.cc?row.t.cc.monthly:Array(12).fill(0)),qtrs:sum(ex.t.cc?ex.t.cc.qtrs:[0,0,0,0],row.t.cc?row.t.cc.qtrs:[0,0,0,0])},
+        rev:{fy:ex.t.rev.fy+row.t.rev.fy,monthly:sum(ex.t.rev.monthly,row.t.rev.monthly),qtrs:sum(ex.t.rev.qtrs||[0,0,0,0],row.t.rev.qtrs||[0,0,0,0])},
+      };
+      ['cc','trig_leads','rev'].forEach(f=>{
+        ex.d[f]=(ex.d[f]||Array(12).fill(0)).map((v,i)=>(+v||0)+(+(row.d[f]||[])[i]||0));
+      });
+      ['cc_fy','trig_fy','rev_fy'].forEach(f=>{ex.d[f]=(+ex.d[f]||0)+(+row.d[f]||0);});
+      ['cc_q','trig_q','rev_q'].forEach(f=>{
+        if(Array.isArray(ex.d[f]))ex.d[f]=ex.d[f].map((v,i)=>(+v||0)+(+(row.d[f]||[])[i]||0));
+      });
+      ex.a.cc_seats=(ex.a.cc_seats||Array(12).fill(0)).map((v,i)=>(+v||0)+(+(row.a.cc_seats||[])[i]||0));
+    } else { _cSeen[k]=row; _cDedup.push(row); }
+  });
+  rows=_cDedup;
+
+  // Only rows with CC activity (target or actual)
+  const ccRows=rows.filter(({t,a,d})=>(t.cc&&t.cc.fy>0)||(d.cc_fy>0)||(a.cc_seats&&a.cc_seats.some(v=>v>0)));
+
+  if(!ccRows.length){
+    el.innerHTML='<p style="color:var(--text3);padding:24px">No CC accounts found. Enter CC Seats and Per-Seat Cost in account settings to begin tracking.</p>';return;
+  }
+
+  // Period buttons
+  const periods=[
+    {id:'fy',label:'FY Total'},
+    {id:'q0',label:'Q1 Apr-Jun'},{id:'q1',label:'Q2 Jul-Sep'},
+    {id:'q2',label:'Q3 Oct-Dec'},{id:'q3',label:'Q4 Jan-Mar'},
+    ...MONTHS.map((m,i)=>({id:'m'+i,label:m}))
+  ];
+  function cSlice(arr,pid){
+    if(!arr||!arr.length)return 0;
+    if(pid==='fy')return arr.reduce((s,v)=>s+(+v||0),0);
+    if(pid.startsWith('q')){const s=+pid[1]*3;return (+arr[s]||0)+(+arr[s+1]||0)+(+arr[s+2]||0);}
+    return +(arr[+pid.slice(1)])||0;
+  }
+  function cSeatsAvg(arr,pid){
+    if(!arr||!arr.length)return 0;
+    if(pid==='fy'){const tot=arr.reduce((a,v)=>a+(+v||0),0);const nz=arr.filter(v=>v>0).length;return nz>0?tot/nz:0;}
+    if(pid.startsWith('q')){const s=+pid[1]*3;const vals=[(+arr[s]||0),(+arr[s+1]||0),(+arr[s+2]||0)];const nz=vals.filter(v=>v>0).length;return nz>0?vals.reduce((a,v)=>a+v,0)/nz:0;}
+    return +(arr[+pid.slice(1)])||0;
+  }
+  const pid=CC_PERIOD;
+  const pb=periods.map(p=>{
+    const act=p.id===CC_PERIOD;
+    return '<button onclick="CC_PERIOD=\''+p.id+'\';renderCC(getFiltered())" style="padding:4px 10px;font-size:11px;border-radius:4px;border:1px solid var(--border2);cursor:pointer;margin:2px;background:'+(act?'var(--blue)':'var(--bg2)')+';color:'+(act?'#fff':'var(--text2)')+'">'+p.label+'</button>';
+  }).join('');
+
+  // Formatters
+  const fL=v=>v===0?'—':v.toFixed(2)+'L';
+  const fLac=v=>v===0?'—':v.toFixed(2)+' L';
+  const fRs=v=>v===0?'—':'₹'+Math.round(v).toLocaleString('en-IN');
+  const fPct=v=>v===0?'—':v.toFixed(1)+'%';
+  const fSeats=v=>v===0?'—':v.toFixed(1);
+
+  // Color: for cost lower ACT vs TGT = better (green = under budget)
+  const costColor=(tgt,act)=>{if(tgt<=0||act<=0)return '#8b949e';const r=act/tgt;return r<=1?'#3fb950':r<=1.2?'#d29922':'#f85149';};
+  const achColor=r=>{if(r<0)return '#8b949e';return r>=1?'#3fb950':r>=0.8?'#d29922':r>=0.6?'#f0883e':'#f85149';};
+  const fAch=(tgt,act,inverse)=>{
+    if(tgt<=0)return '<td style="text-align:right;color:#8b949e">—</td>';
+    const r=act/tgt;
+    const col=inverse?costColor(tgt,act):achColor(r);
+    return '<td style="text-align:right;font-weight:600;color:'+col+'">'+Math.round(r*100)+'%</td>';
+  };
+
+  const _lt=document.body.classList.contains('light');
+  const _bg=(dark,light)=>_lt?light:dark;
+  const thB='padding:6px 8px;text-align:center;font-size:10px;border-bottom:2px solid var(--border2);border-left:1px solid var(--border2)';
+  const thS='padding:4px 6px;text-align:right;font-size:9px;color:var(--text3);border-bottom:1px solid var(--border2)';
+
+  const _ccExportBtn='<button onclick="exportCCCSV()" title="Export CC data for current period" style="margin-left:auto;padding:4px 12px;font-size:11px;border-radius:4px;border:1px solid var(--border2);cursor:pointer;background:var(--bg2);color:var(--text2);display:inline-flex;align-items:center;gap:5px;white-space:nowrap">⬇ Export CSV</button>';
+  let html='<div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center;margin-bottom:16px">'+pb+_ccExportBtn+'</div>';
+  html+='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">';
+  html+='<thead>'
+    +'<tr>'
+    +'<th rowspan="2" style="text-align:left;padding:6px 10px;position:sticky;left:0;z-index:2;background:var(--bg3);border-bottom:2px solid var(--border2);min-width:130px">Account</th>'
+    +'<th rowspan="2" style="text-align:left;padding:6px 6px;background:var(--bg3);border-bottom:2px solid var(--border2);font-size:10px;color:var(--text3);min-width:55px">Type</th>'
+    +'<th colspan="3" style="'+thB+';background:'+_bg('#0a2040','#dbeafe')+';color:#58a6ff">Leads Catered (L)</th>'
+    +'<th colspan="1" style="'+thB+';background:'+_bg('#1a1a30','#eef2ff')+';color:'+_bg('#a0a0ff','#6366f1')+'">Headcount</th>'
+    +'<th colspan="1" style="'+thB+';background:'+_bg('#2a1a00','#fff7ed')+';color:#f0883e">Per-Seat Cost</th>'
+    +'<th colspan="3" style="'+thB+';background:'+_bg('#2a0a0a','#fef2f2')+';color:#f85149">CC Cost (Rs Lacs)</th>'
+    +'<th colspan="2" style="'+thB+';background:'+_bg('#1a0a2a','#f3e8ff')+';color:'+_bg('#c084fc','#7c3aed')+'">CC % of Revenue</th>'
+    +'</tr><tr>'
+    +['TGT','ACT','ACH%','Avg Seats','Rs/Seat (blended)','TGT','ACT','ACH%','TGT %','ACT %'].map((h,i)=>{
+      const bgs=_lt
+        ?['#dbeafe','#dbeafe','#dbeafe','#eef2ff','#fff7ed','#fef2f2','#fef2f2','#fef2f2','#f3e8ff','#f3e8ff']
+        :['#0a2040','#0a2040','#0a2040','#1a1a30','#2a1a00','#2a0a0a','#2a0a0a','#2a0a0a','#1a0a2a','#1a0a2a'];
+      return '<th style="'+thS+';background:'+bgs[i]+';border-left:1px solid var(--border2);min-width:62px">'+h+'</th>';
+    }).join('')
+    +'</tr></thead><tbody>';
+
+  // Grand total accumulators
+  let [gLT,gLA,gCCT,gCCA,gRevT,gRevA,gSeats]=[0,0,0,0,0,0,0];
+
+  let lastClient='';
+  ccRows.forEach(({t,a,d},ri)=>{
+    const leadT=t.leads?cSlice(t.leads.monthly,pid):0;
+    const ccT=t.cc?cSlice(t.cc.monthly,pid):0;
+    const revT=cSlice(t.rev.monthly,pid);
+    const leadA=cSlice(d.trig_leads,pid)/100000;
+    const ccA=cSlice(d.cc,pid);
+    const revA=cSlice(d.rev,pid);
+    const seatsAvg=cSeatsAvg(a.cc_seats||Array(12).fill(0),pid);
+    const perSeat=seatsAvg>0?(ccA*100000/seatsAvg):0;
+    const ccPctT=revT>0?(ccT/revT*100):0;
+    const ccPctA=revA>0?(ccA/revA*100):0;
+
+    if(leadT===0&&leadA===0&&ccT===0&&ccA===0) return;
+
+    gLT+=leadT; gLA+=leadA; gCCT+=ccT; gCCA+=ccA; gRevT+=revT; gRevA+=revA; gSeats+=seatsAvg;
+
+    const isNewClient=t.client!==lastClient;
+    if(isNewClient) lastClient=t.client;
+    const bg=ri%2===0?'var(--bg1)':'var(--bg2)';
+    const borderTop=isNewClient?'border-top:2px solid var(--border2);':'';
+    const ccCostCol=costColor(ccT,ccA);
+    const ccRevCol=ccPctA>ccPctT&&ccPctT>0?'#f85149':ccPctA>0?'#3fb950':'#8b949e';
+
+    html+='<tr style="background:'+bg+';'+borderTop+'">'
+      +'<td style="padding:5px 10px;font-size:11px;color:var(--text1);font-weight:'+(isNewClient?'700':'400')+';position:sticky;left:0;background:'+bg+'">'+(isNewClient?oemBadge(t.client):'<span style="opacity:.45;padding-left:30px">'+t.client+'</span>')+'</td>'
+      +'<td style="padding:5px 6px;font-size:10px;color:var(--text3)">'+t.ad_type+'</td>'
+      +'<td style="text-align:right;color:var(--text2)">'+fL(leadT)+'</td>'
+      +'<td style="text-align:right;color:var(--blue);font-weight:600">'+fL(leadA)+'</td>'
+      +fAch(leadT,leadA,false)
+      +'<td style="text-align:right;color:'+_bg('#a0a0ff','#6366f1')+'">'+fSeats(seatsAvg)+'</td>'
+      +'<td style="text-align:right;color:#f0883e">'+fRs(perSeat)+'</td>'
+      +'<td style="text-align:right;color:var(--text2)">'+fLac(ccT)+'</td>'
+      +'<td style="text-align:right;color:'+ccCostCol+';font-weight:600">'+fLac(ccA)+'</td>'
+      +fAch(ccT,ccA,true)
+      +'<td style="text-align:right;color:var(--text3)">'+fPct(ccPctT)+'</td>'
+      +'<td style="text-align:right;color:'+ccRevCol+';font-weight:600">'+fPct(ccPctA)+'</td>'
+      +'</tr>';
+  });
+
+  // Grand total row
+  const gPerSeat=gSeats>0?(gCCA*100000/gSeats):0;
+  const gCCPctT=gRevT>0?(gCCT/gRevT*100):0;
+  const gCCPctA=gRevA>0?(gCCA/gRevA*100):0;
+  const gCostCol=costColor(gCCT,gCCA);
+  const gRevCol=gCCPctA>gCCPctT&&gCCPctT>0?'#f85149':gCCPctA>0?'#3fb950':'#8b949e';
+  html+='<tr style="background:var(--bg3);font-weight:700;border-top:2px solid var(--border2)">'
+    +'<td colspan="2" style="padding:6px 10px;position:sticky;left:0;background:var(--bg3)">📊 TOTAL</td>'
+    +'<td style="text-align:right">'+fL(gLT)+'</td>'
+    +'<td style="text-align:right;color:var(--blue)">'+fL(gLA)+'</td>'
+    +fAch(gLT,gLA,false)
+    +'<td style="text-align:right;color:'+_bg('#a0a0ff','#6366f1')+'">'+fSeats(gSeats)+'</td>'
+    +'<td style="text-align:right;color:#f0883e">'+fRs(gPerSeat)+'</td>'
+    +'<td style="text-align:right">'+fLac(gCCT)+'</td>'
+    +'<td style="text-align:right;color:'+gCostCol+'">'+fLac(gCCA)+'</td>'
+    +fAch(gCCT,gCCA,true)
+    +'<td style="text-align:right;color:var(--text3)">'+fPct(gCCPctT)+'</td>'
+    +'<td style="text-align:right;color:'+gRevCol+';font-weight:600">'+fPct(gCCPctA)+'</td>'
+    +'</tr>';
+
+  html+='</tbody></table></div>';
+  html+='<p style="font-size:10px;color:var(--text3);margin-top:8px">Leads in Lakhs · CC Cost in Rs Lacs · Avg Seats = avg over active months in period · Rs/Seat = blended actual cost · CC% Rev = CC Cost ÷ Revenue · Cost color: <span style="color:#3fb950">🟢 At/Under budget</span> · <span style="color:#d29922">🟡 ≤120%</span> · <span style="color:#f85149">🔴 &gt;120% over budget</span></p>';
+  el.innerHTML=html;
+}
+
+function exportCCCSV(){
+  const rows=getFiltered();
+  const pid=CC_PERIOD;
+  const pMap={'fy':'FY-Total','q0':'Q1-Apr-Jun','q1':'Q2-Jul-Sep','q2':'Q3-Oct-Dec','q3':'Q4-Jan-Mar'};
+  const pTag=pid in pMap?pMap[pid]:(MONTHS[+pid.slice(1)]||pid);
+  const pLabel=pid in pMap?pMap[pid]:(MONTHS[+pid.slice(1)]||pid);
+  function cSlice(arr,p){
+    if(!arr||!arr.length)return 0;
+    if(p==='fy')return arr.reduce((s,v)=>s+(+v||0),0);
+    if(p.startsWith('q')){const s=+p[1]*3;return (+arr[s]||0)+(+arr[s+1]||0)+(+arr[s+2]||0);}
+    return +(arr[+p.slice(1)])||0;
+  }
+  function cSeatsAvg(arr,p){
+    if(!arr||!arr.length)return 0;
+    if(p==='fy'){const tot=arr.reduce((a,v)=>a+(+v||0),0);const nz=arr.filter(v=>v>0).length;return nz>0?tot/nz:0;}
+    if(p.startsWith('q')){const s=+p[1]*3;const vals=[(+arr[s]||0),(+arr[s+1]||0),(+arr[s+2]||0)];const nz=vals.filter(v=>v>0).length;return nz>0?vals.reduce((a,v)=>a+v,0)/nz:0;}
+    return +(arr[+p.slice(1)])||0;
+  }
+  const _cSeen={};const _cDedup=[];
+  rows.forEach(row=>{
+    const k=row.t.client+'§'+row.t.ad_type;
+    if(!_cSeen[k]){_cSeen[k]=row;_cDedup.push(row);}
+  });
+  const ccRows=_cDedup.filter(({t,a,d})=>(t.cc&&t.cc.fy>0)||(d.cc_fy>0)||(a.cc_seats&&a.cc_seats.some(v=>v>0)));
+  const hdr=['Client','AdType','Period',
+    'LeadsCatered_TGT(L)','LeadsCatered_ACT(L)','Leads_ACH%',
+    'AvgSeats','PerSeatCost_Rs(blended)',
+    'CCCost_TGT(L)','CCCost_ACT(L)','CCCost_ACH%',
+    'CCpctRev_TGT','CCpctRev_ACT'];
+  const pct=(t,a)=>t>0?(a/t*100).toFixed(1)+'%':'—';
+  const dataRows=[];
+  ccRows.forEach(({t,a,d})=>{
+    const leadT=t.leads?cSlice(t.leads.monthly,pid):0;
+    const ccT=t.cc?cSlice(t.cc.monthly,pid):0;
+    const revT=cSlice(t.rev.monthly,pid);
+    const leadA=cSlice(d.trig_leads,pid)/100000;
+    const ccA=cSlice(d.cc,pid);
+    const revA=cSlice(d.rev,pid);
+    const seatsAvg=cSeatsAvg(a.cc_seats||Array(12).fill(0),pid);
+    const perSeat=seatsAvg>0?(ccA*100000/seatsAvg):0;
+    const ccPctT=revT>0?(ccT/revT*100).toFixed(1)+'%':'—';
+    const ccPctA=revA>0?(ccA/revA*100).toFixed(1)+'%':'—';
+    if(leadT===0&&leadA===0&&ccT===0&&ccA===0) return;
+    dataRows.push([t.client,t.ad_type,pLabel,
+      leadT.toFixed(2),leadA.toFixed(2),pct(leadT,leadA),
+      seatsAvg.toFixed(1),Math.round(perSeat),
+      ccT.toFixed(2),ccA.toFixed(2),pct(ccT,ccA),
+      ccPctT,ccPctA]);
+  });
+  _dlCSV(_exportStamp('CC_'+pTag),hdr,dataRows);
 }
 
 // ═══════════════════════════
