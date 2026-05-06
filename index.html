@@ -855,6 +855,7 @@ function newActualRec(){
     // DMS / VoC retails split (TVS & Ampere)
     dms_retails:Array(12).fill(0),
     voc_retails:Array(12).fill(0),
+    billed_retails:Array(12).fill(0),  // Actual units reconciled after month-end → Billed Revenue & Billed Cr%
     // AI Bot Cost
     ai_per_lead_cost:Array(12).fill(0),   // Rs per lead (Absolute)
     ai_leads_processed:Array(12).fill(0), // count of leads processed by AI
@@ -1044,7 +1045,7 @@ const AUDIT_FIELD_LABELS={
   cm_mktgQ1:'Mktg TGT Q1',cm_mktgQ2:'Mktg TGT Q2',cm_mktgQ3:'Mktg TGT Q3',cm_mktgQ4:'Mktg TGT Q4',
   cm_ccFY:'CC Cost FY',cm_leadsFY:'Leads FY',cm_NEW_CLIENT:'New Client Added',
   google_cr_pct:'Google Cr%',meta_cr_pct:'Meta Cr%',overall_cr_pct:'Overall Cr%',
-  dms_retails:'DMS Retails',voc_retails:'VoC Retails',
+  dms_retails:'DMS Retails',voc_retails:'VoC Retails',billed_retails:'Billed Retails',
   ai_per_lead_cost:'AI Per Lead Cost',ai_leads_processed:'AI Leads Processed',
   piaggio_retainer:'Piaggio Retainer Cost',
   CLEAR_ALL:'Clear All Actuals',
@@ -1832,12 +1833,18 @@ function deriveActuals(a, adType){
   const ai_cost=aiPLC.map((c,i)=>(+(c||0))*(+(aiLP[i]||0))/100000);
   // GPM = GM - CC - AI Cost
   const gpmArr=gmArr.map((g,i)=>g-cc[i]-ai_cost[i]);
+  // Billed Revenue (CPS only) — post month-end reconciliation retails × CAC / 100000
+  const _billedRet=(a.billed_retails||Array(12).fill(0)).map(v=>+(v)||0);
+  const billed_rev=adType==='CPS'
+    ? _billedRet.map((r,i)=>(+(a.cac[i]||0))*r/100000)
+    : Array(12).fill(0);
   return {
     paid_leads, google_leads, meta_leads, organic_leads:a.organic_leads,
     google_mktg, meta_mktg, mktg_cost:mc2,
     google_rev, meta_rev, google_cr_pct:gCrPct, meta_cr_pct:mCrPct,
     ai_cost, ai_cost_q:qSum(ai_cost), ai_cost_fy:ai_cost.reduce((s,v)=>s+v,0),
     trig_leads:tl, rev, rev_calc, cc, gm:gmArr, gpm:gpmArr,
+    billed_rev, billed_rev_q:qSum(billed_rev), billed_rev_fy:billed_rev.reduce((s,v)=>s+v,0),
     // quarterly
     trig_q:qSum(tl), mktg_q:qSum(mc2), rev_q:qSum(rev), cc_q:qSum(cc),
     gm_q:qSum(gmArr), gpm_q:qSum(gpmArr),
@@ -1929,8 +1936,9 @@ function getFiltered(){
         meta_leads:   sumA(ml1,ml2),
         organic_leads:sumA(eA.organic_leads||mA12(), rA.organic_leads||mA12()),
         total_leads:  sumA(tl1,tl2),
-        retails:      sumA(rt1,rt2),
-        cc_seats:     sumA(eA.cc_seats||mA12(),    rA.cc_seats||mA12()),
+        retails:       sumA(rt1,rt2),
+        billed_retails:sumA(eA.billed_retails||mA12(), rA.billed_retails||mA12()),
+        cc_seats:      sumA(eA.cc_seats||mA12(),    rA.cc_seats||mA12()),
         google_rev:   sumA(eA.google_rev||mA12(),  rA.google_rev||mA12()),
         meta_rev:     sumA(eA.meta_rev||mA12(),    rA.meta_rev||mA12()),
         // CPL: weighted avg by respective lead count
@@ -2141,6 +2149,7 @@ function newBrandRec(){
     // DMS / VoC retails split (TVS & Ampere)
     dms_retails:Array(12).fill(0),
     voc_retails:Array(12).fill(0),
+    billed_retails:Array(12).fill(0),
     // AI Bot Cost
     ai_per_lead_cost:Array(12).fill(0),   // Rs per lead (Absolute)
     ai_leads_processed:Array(12).fill(0), // count of leads processed by AI
@@ -2474,6 +2483,7 @@ function renderModal(recIdx){
   const isPiaggioRetainer=(t.client===PIAGGIO_CLIENT&&adType==='CPS');
   const aDMS=a.dms_retails||Array(12).fill(0);
   const aVoC=a.voc_retails||Array(12).fill(0);
+  const aBilledRet=a.billed_retails||Array(12).fill(0);
   const aOvCr=a.overall_cr_pct||Array(12).fill(0);
   const aGCr=a.google_cr_pct||Array(12).fill(0);
   const aMCr=a.meta_cr_pct||Array(12).fill(0);
@@ -2496,7 +2506,10 @@ function renderModal(recIdx){
       +compRow(isPiaggioRetainer?'= Calculated Revenue (CAC×Retails + Retainer)':'= Calculated Revenue (Rs Lacs)',d.rev_calc,'cv-rev',1)
       +inputRow('Revenue Adjustment (Lacs)','cv-adj','rev_adj',revAdj,'0.01','Enter positive (+) or negative (−) adjustment')
       +textRow('Adj. Comment','rev_adj_comment',a.rev_adj_comment)
-      +compRow('= Total Revenue (Calc + Adj)',revTotal,'cv-rev-total',1,tRevM)
+      +compRow('= Total Revenue / Notional (Calc + Adj)',revTotal,'cv-rev-total',1,tRevM)
+      +sectionRow('── BILLED REVENUE (Post Reconciliation) ──')
+      +inputRow('Billed Retails (units reconciled)','','billed_retails',aBilledRet,'1','Actual retails after month-end reconciliation — separate from notional revenue reported to management')
+      +compRow('= Billed Revenue (Billed Retails × CAC)',d.billed_rev,'cv-rev',1)
       +sectionRow('── ROAS INPUTS (Ad Revenue) ──')
       +inputRow('Google Expected Cr% (%)','cpl-input','google_cr_pct',aGCr,'0.01','Auto-computes Google Rev = Cr% × Google Leads × CAC')
       +compRow('Google Revenue from Ads (Rs Lacs)',d.google_rev,'cv-rev',2)
@@ -2568,11 +2581,14 @@ function renderModal(recIdx){
     +inputRow('Total Leads Processed by AI (count)','','ai_leads_processed',aAiLP,'1','Absolute count of leads handled by AI')
     +compRow('= AI Bot Cost (Rs Lacs)',d.ai_cost,'cv-mktg',2)
     +sectionRow('── P&L SUMMARY ──')
-    +(adType==='CPS'?compRow('Total Retails (count)',a.retails||Array(12).fill(0),'cv',0):'')
-    +(adType==='CPS'?pctRow('Overall Cr%',a.retails||Array(12).fill(0),d.trig_leads,'cv-pct'):'')
-    +compRow('Calculated Revenue (Rs Lacs)',d.rev_calc,'cv-rev',1)
+    +(adType==='CPS'?compRow('Notional Retails (count)',a.retails||Array(12).fill(0),'cv',0):'')
+    +(adType==='CPS'?pctRow('Notional Cr% (Retails ÷ Trig Leads)',a.retails||Array(12).fill(0),d.trig_leads,'cv-pct'):'')
+    +(adType==='CPS'?compRow('Billed Retails (reconciled count)',a.billed_retails||Array(12).fill(0),'cv',0):'')
+    +(adType==='CPS'?pctRow('Billed Cr% (Billed Retails ÷ Trig Leads)',a.billed_retails||Array(12).fill(0),d.trig_leads,'cv-pct'):'')
+    +compRow('Calculated Revenue / Notional (Rs Lacs)',d.rev_calc,'cv-rev',1)
     +compRow('Revenue Adjustment (Lacs)',revAdj,'cv-adj',1)
-    +compRow('= Total Revenue (Rs Lacs)',revTotal,'cv-rev-total',1)
+    +compRow('= Total Revenue / Notional (Rs Lacs)',revTotal,'cv-rev-total',1)
+    +(adType==='CPS'?compRow('Billed Revenue (Billed Retails × CAC)',d.billed_rev,'cv-rev',1):'')
     +compRow('Abs GM = Total Rev − Mktg',gmTotal,'cv-gm',1,tGM)
     +pctRow('GM %',gmTotal,revTotal,'cv-gm',tGM,tRevM)
     +compRow('Abs GPM = GM − CC − AI',gpmTotal,gpmTotal.some(v=>v<0)?'cv-neg':'cv-gpm',1,tGPM)
@@ -2675,7 +2691,7 @@ function onRevAdjCommentChange(input){
 function recomputeBrandTotals(recIdx,BRANDS){
   const a=ACTUALS[recIdx]; if(!a.brands)return;
   const get=(b,f,i)=>(+(a.brands[b]&&a.brands[b][f]&&a.brands[b][f][i])||0);
-  ['google_leads','meta_leads','organic_leads','non_ms_leads','retails','total_leads','seats','cc_seats','google_rev','meta_rev','dms_retails','voc_retails','ai_leads_processed','rev_adj'].forEach(f=>{
+  ['google_leads','meta_leads','organic_leads','non_ms_leads','retails','billed_retails','total_leads','seats','cc_seats','google_rev','meta_rev','dms_retails','voc_retails','ai_leads_processed','rev_adj'].forEach(f=>{
     a[f]=Array(12).fill(0).map((_,i)=>BRANDS.reduce((s,b)=>s+get(b,f,i),0));
   });
   const wtd=(f,wf)=>Array(12).fill(0).map((_,i)=>{const den=a[wf][i];return den>0?BRANDS.reduce((s,b)=>s+get(b,wf,i)*get(b,f,i),0)/den:0;});
