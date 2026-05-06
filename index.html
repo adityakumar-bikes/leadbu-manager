@@ -1709,18 +1709,31 @@ function clearActuals(){
   if(!requireName()) return;
   const user=getCurrentUser();
 
-  // Step 2: populate modal with user info and reset the confirmation input
+  // Step 2: only Aditya is authorised to clear data
+  if(!user.toLowerCase().includes('aditya')){
+    alert('⛔ Access denied.\n\nOnly Aditya is authorised to clear all actuals.\n\nIf you need data cleared, contact Aditya.');
+    return;
+  }
+
+  // Step 3: populate modal with user info and reset both confirmation inputs
   document.getElementById('clear-user-display').textContent=user;
   document.getElementById('clear-confirm-input').value='';
   document.getElementById('clear-confirm-input').style.borderColor='';
+  document.getElementById('clear-confirm-input2').value='';
+  document.getElementById('clear-confirm-input2').style.borderColor='';
   document.getElementById('clear-modal').classList.add('show');
 }
 
 function confirmClearActuals(){
   const input=document.getElementById('clear-confirm-input');
-  if(input.value.trim()!=='CLEAR'){
-    input.style.borderColor='var(--neg)';
-    input.focus();
+  const input2=document.getElementById('clear-confirm-input2');
+  const v1=input.value.trim(), v2=input2.value.trim();
+  if(v1!=='Clear'){input.style.borderColor='var(--neg)';input.focus();return;}
+  if(v2!=='Clear'){input2.style.borderColor='var(--neg)';input2.focus();return;}
+  // Extra guard: re-verify user is Aditya at the moment of confirm (not just on open)
+  if(!getCurrentUser().toLowerCase().includes('aditya')){
+    alert('⛔ Access denied. Only Aditya can clear all actuals.');
+    document.getElementById('clear-modal').classList.remove('show');
     return;
   }
 
@@ -6406,14 +6419,25 @@ async function submitAIChat(){
       <div style="font-size:12px;color:var(--text2)">
         Clearing as: <span id="clear-user-display" style="color:var(--accent);font-weight:600"></span>
       </div>
-      <div>
-        <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em">
-          Type <strong style="color:#f87171">CLEAR</strong> to confirm
-        </label>
-        <input id="clear-confirm-input" type="text" autocomplete="off" placeholder="CLEAR"
-          style="width:100%;box-sizing:border-box;background:var(--bg3);border:1px solid var(--border3);border-radius:7px;padding:9px 12px;color:var(--text1);font-family:var(--mono);font-size:14px;letter-spacing:.05em;outline:none;transition:border-color .15s"
-          oninput="this.style.borderColor=this.value==='CLEAR'?'var(--pos)':''"
-          onkeydown="if(event.key==='Enter')confirmClearActuals()">
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div>
+          <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em">
+            Type <strong style="color:#f87171">Clear</strong> to confirm (1st)
+          </label>
+          <input id="clear-confirm-input" type="text" autocomplete="off" placeholder="Clear"
+            style="width:100%;box-sizing:border-box;background:var(--bg3);border:1px solid var(--border3);border-radius:7px;padding:9px 12px;color:var(--text1);font-family:var(--mono);font-size:14px;letter-spacing:.05em;outline:none;transition:border-color .15s"
+            oninput="this.style.borderColor=this.value==='Clear'?'var(--pos)':this.value?'var(--neg)':''"
+            onkeydown="if(event.key==='Enter')document.getElementById('clear-confirm-input2').focus()">
+        </div>
+        <div>
+          <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em">
+            Type <strong style="color:#f87171">Clear</strong> again to confirm (2nd)
+          </label>
+          <input id="clear-confirm-input2" type="text" autocomplete="off" placeholder="Clear"
+            style="width:100%;box-sizing:border-box;background:var(--bg3);border:1px solid var(--border3);border-radius:7px;padding:9px 12px;color:var(--text1);font-family:var(--mono);font-size:14px;letter-spacing:.05em;outline:none;transition:border-color .15s"
+            oninput="this.style.borderColor=this.value==='Clear'?'var(--pos)':this.value?'var(--neg)':''"
+            onkeydown="if(event.key==='Enter')confirmClearActuals()">
+        </div>
       </div>
     </div>
     <div class="modal-footer">
