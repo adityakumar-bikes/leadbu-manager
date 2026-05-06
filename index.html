@@ -743,6 +743,7 @@ canvas{max-height:260px}
         <div class="modal-sub" id="modal-sub">Monthly actual inputs · Paid Leads + Organic = Triggered · CPL × Paid = Mktg Cost</div>
       </div>
       <div style="display:flex;gap:8px;align-items:center">
+        <span style="font-size:10px;color:var(--text3);opacity:.7;white-space:nowrap">Press <kbd style="font-family:monospace;font-size:10px;padding:1px 5px;border-radius:3px;border:1px solid var(--border2);background:var(--bg3);color:var(--text2)">Esc</kbd> to close without saving</span>
         <button class="btn btn-green" onclick="saveModal()">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
           Apply &amp; Close
@@ -4447,6 +4448,7 @@ _fbDb.ref('presence/fy27').on('value', snap=>renderActiveUsers(snap));
 // Wire up filters + modal close (non-data setup, safe to do immediately)
 ['f-cat','f-fuel','f-client','f-btl','f-ba','f-zeros'].forEach(id=>document.getElementById(id).addEventListener('change',render));
 document.getElementById('modal').addEventListener('click',e=>{if(e.target===document.getElementById('modal'))closeModal();});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&document.getElementById('modal').classList.contains('show')){e.preventDefault();closeModal();}});
 buildPeriodBar();
 
 // Real-time listener: fires immediately with current data, then on every remote change
