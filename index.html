@@ -551,7 +551,7 @@ canvas{max-height:260px}
       <div class="brand-mark">🏍️</div>
       <div class="brand-text">
         <div class="t1">Bike AOP Tracker</div>
-        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.0.78</span> <span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
+        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.0.79</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8"></span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
       </div>
     </div>
     <div class="hdr-right">
@@ -817,6 +817,7 @@ function oemBadge(client){
 }
 
 const ACT_KEY='leadbu_actuals_fy27_v2';
+const DEPLOY_TIME='2026-05-06T11:44:24Z'; // replaced with ISO timestamp at deploy time
 let ACTUALS=TARGETS.map(()=>newActualRec()); // populated by Firebase onValue
 
 function newActualRec(){
@@ -1633,7 +1634,19 @@ function updateLastSaved(isoStr){
   const pad=n=>String(n).padStart(2,'0');
   const dateStr=pad(d.getDate())+'/'+pad(d.getMonth()+1)+'/'+d.getFullYear();
   const timeStr=pad(d.getHours())+':'+pad(d.getMinutes());
-  el.textContent='· Updated '+dateStr+' '+timeStr;
+  el.textContent='· Data '+dateStr+' '+timeStr;
+}
+function showDeployTime(){
+  const el=document.getElementById('hdr-deployed');
+  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-05-06T11:44:24Z')return;
+  try{
+    const d=new Date(DEPLOY_TIME);
+    const pad=n=>String(n).padStart(2,'0');
+    const dateStr=pad(d.getDate())+'/'+pad(d.getMonth()+1)+'/'+d.getFullYear();
+    const timeStr=pad(d.getHours())+':'+pad(d.getMinutes());
+    el.textContent='· Deployed '+dateStr+' '+timeStr;
+    el.title='Version deployed to GitHub Pages on '+dateStr+' at '+timeStr;
+  }catch(e){}
 }
 function backupActuals(){
   const payload={
@@ -6140,6 +6153,7 @@ function updateStickyOffsets(){
   document.documentElement.style.setProperty('--vtabs-h',vh+'px');
 }
 document.addEventListener('DOMContentLoaded',updateStickyOffsets);
+document.addEventListener('DOMContentLoaded',showDeployTime);
 window.addEventListener('resize',updateStickyOffsets);
 setTimeout(updateStickyOffsets,300);
 
