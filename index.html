@@ -553,7 +553,7 @@ canvas{max-height:260px}
       <div class="brand-mark">🏍️</div>
       <div class="brand-text">
         <div class="t1">Bike AOP Tracker</div>
-        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.0.82</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8"></span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
+        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.0.83</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8"></span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
       </div>
     </div>
     <div class="hdr-right">
@@ -819,7 +819,7 @@ function oemBadge(client){
 }
 
 const ACT_KEY='leadbu_actuals_fy27_v2';
-const DEPLOY_TIME='2026-05-07T05:12:13Z'; // replaced with ISO timestamp at deploy time
+const DEPLOY_TIME='2026-05-07T05:16:26Z'; // replaced with ISO timestamp at deploy time
 let ACTUALS=TARGETS.map(()=>newActualRec()); // populated by Firebase onValue
 
 function newActualRec(){
@@ -1640,7 +1640,7 @@ function updateLastSaved(isoStr){
 }
 function showDeployTime(){
   const el=document.getElementById('hdr-deployed');
-  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-05-07T05:12:13Z')return;
+  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-05-07T05:16:26Z')return;
   try{
     const d=new Date(DEPLOY_TIME);
     const pad=n=>String(n).padStart(2,'0');
@@ -2420,7 +2420,7 @@ function renderModal(recIdx){
     +'<th colspan="2" class="fy-col" style="text-align:center;font-size:11px">FY Total</th>'
     +'</tr><tr>'
     +vis.map(()=>'<th style="font-size:9px;color:var(--blue);padding:2px 4px;border-left:1px solid var(--border2)">ACT</th><th style="font-size:9px;color:var(--text3);padding:2px 4px;min-width:52px">TGT</th>').join('')
-    +'<th style="font-size:9px;color:var(--blue);padding:2px 4px">ACT</th><th style="font-size:9px;color:var(--text3);padding:2px 4px">TGT</th>'
+    +'<th class="fy-col" style="font-size:9px;color:var(--blue);padding:2px 4px">ACT</th><th class="fy-col" style="font-size:9px;color:var(--text3);padding:2px 4px">TGT</th>'
     +'</tr>';
 
   // Helper: format number, int if dec=0
@@ -2798,7 +2798,7 @@ function renderBajajModal(recIdx){
       +'<th colspan="2" class="fy-col" style="text-align:center;font-size:11px">FY</th>'
       +'</tr><tr>'
       +vis.map(()=>'<th style="font-size:9px;color:var(--blue);padding:2px 4px;border-left:1px solid var(--border2)">ACT</th><th style="font-size:9px;color:var(--text3);padding:2px 4px;min-width:48px">TGT</th>').join('')
-      +'<th style="font-size:9px;color:var(--blue);padding:2px 4px">ACT</th><th style="font-size:9px;color:var(--text3);padding:2px 4px">TGT</th></tr>';
+      +'<th class="fy-col" style="font-size:9px;color:var(--blue);padding:2px 4px">ACT</th><th class="fy-col" style="font-size:9px;color:var(--text3);padding:2px 4px">TGT</th></tr>';
   }
   function bInp(label,cls,field,arr,step,brand){
     const dec=step==='1'?0:2;
@@ -2944,7 +2944,7 @@ function renderTVSModal(recIdx){
     +'<th colspan="2" class="fy-col" style="text-align:center;font-size:11px">FY Total</th>'
     +'</tr><tr>'
     +vis.map(()=>'<th style="font-size:9px;color:var(--blue);padding:2px 4px;border-left:1px solid var(--border2)">ACT</th><th style="font-size:9px;color:var(--text3);padding:2px 4px;min-width:52px">TGT</th>').join('')
-    +'<th style="font-size:9px;color:var(--blue);padding:2px 4px">ACT</th><th style="font-size:9px;color:var(--text3);padding:2px 4px">TGT</th></tr>';
+    +'<th class="fy-col" style="font-size:9px;color:var(--blue);padding:2px 4px">ACT</th><th class="fy-col" style="font-size:9px;color:var(--text3);padding:2px 4px">TGT</th></tr>';
 
   // Input row wired to onBrandInputChange
   function bInpR(label,cls,field,rawArr,step,brand,hint){
@@ -3138,7 +3138,7 @@ function renderREModal(recIdx){
       +'<th colspan="2" class="fy-col" style="text-align:center;font-size:11px">FY</th>'
       +'</tr><tr>'
       +vis.map(()=>'<th style="font-size:9px;color:var(--blue);padding:2px 4px;border-left:1px solid var(--border2)">ACT</th><th style="font-size:9px;color:var(--text3);padding:2px 4px;min-width:48px">TGT</th>').join('')
-      +'<th style="font-size:9px;color:var(--blue);padding:2px 4px">ACT</th><th style="font-size:9px;color:var(--text3);padding:2px 4px">TGT</th></tr>';
+      +'<th class="fy-col" style="font-size:9px;color:var(--blue);padding:2px 4px">ACT</th><th class="fy-col" style="font-size:9px;color:var(--text3);padding:2px 4px">TGT</th></tr>';
   }
   function bInp(label,cls,field,arr,step,brand){
     const dec=step==='1'?0:2;
