@@ -551,7 +551,7 @@ canvas{max-height:260px}
       <div class="brand-mark">🏍️</div>
       <div class="brand-text">
         <div class="t1">Bike AOP Tracker</div>
-        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.0.79</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8"></span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
+        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.0.80</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8"></span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
       </div>
     </div>
     <div class="hdr-right">
@@ -817,7 +817,7 @@ function oemBadge(client){
 }
 
 const ACT_KEY='leadbu_actuals_fy27_v2';
-const DEPLOY_TIME='2026-05-06T11:44:24Z'; // replaced with ISO timestamp at deploy time
+const DEPLOY_TIME='2026-05-07T02:00:08Z'; // replaced with ISO timestamp at deploy time
 let ACTUALS=TARGETS.map(()=>newActualRec()); // populated by Firebase onValue
 
 function newActualRec(){
@@ -1638,7 +1638,7 @@ function updateLastSaved(isoStr){
 }
 function showDeployTime(){
   const el=document.getElementById('hdr-deployed');
-  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-05-06T11:44:24Z')return;
+  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-05-07T02:00:08Z')return;
   try{
     const d=new Date(DEPLOY_TIME);
     const pad=n=>String(n).padStart(2,'0');
@@ -5424,6 +5424,112 @@ function loadClientData(){
 }
 function saveClientDataStore(d){try{localStorage.setItem(CLIENT_DATA_KEY,JSON.stringify(d))}catch(e){}}
 
+// ── Contract Document Storage (IndexedDB — handles large PDFs/Word files) ────
+const _CM_DOCS_DB='leadbu_contract_docs';
+let _pendingContractFile=null;   // file chosen in modal, not yet committed
+let _pendingContractRemove=false; // user clicked Remove in modal
+let _currentCMDocKey='';          // key of the record currently open in modal
+
+function _openCMDocsDB(){
+  return new Promise((resolve,reject)=>{
+    const req=indexedDB.open(_CM_DOCS_DB,1);
+    req.onupgradeneeded=e=>e.target.result.createObjectStore('docs',{keyPath:'key'});
+    req.onsuccess=e=>resolve(e.target.result);
+    req.onerror=()=>reject(req.error);
+  });
+}
+async function saveCMDoc(key,file){
+  return new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onload=async e=>{
+      try{
+        const db=await _openCMDocsDB();
+        const meta={fileName:file.name,fileType:file.type,fileSize:file.size,uploadedAt:new Date().toISOString()};
+        const tx=db.transaction('docs','readwrite');
+        tx.objectStore('docs').put({key,...meta,data:e.target.result});
+        tx.oncomplete=()=>{db.close();resolve(meta);};
+        tx.onerror=()=>reject(tx.error);
+      }catch(err){reject(err);}
+    };
+    reader.readAsDataURL(file);
+  });
+}
+async function loadCMDoc(key){
+  return new Promise(async resolve=>{
+    try{
+      const db=await _openCMDocsDB();
+      const tx=db.transaction('docs','readonly');
+      const req=tx.objectStore('docs').get(key);
+      req.onsuccess=()=>{db.close();resolve(req.result||null);};
+      req.onerror=()=>resolve(null);
+    }catch(e){resolve(null);}
+  });
+}
+async function deleteCMDoc(key){
+  try{
+    const db=await _openCMDocsDB();
+    const tx=db.transaction('docs','readwrite');
+    tx.objectStore('docs').delete(key);
+    await new Promise(res=>{tx.oncomplete=res;tx.onerror=res;});
+    db.close();
+  }catch(e){}
+}
+async function downloadCMDoc(key){
+  const doc=await loadCMDoc(key);
+  if(!doc){alert('Document not found.\n\nContract documents are stored in this browser only. If you uploaded on another device, please re-attach the file.');return;}
+  const a=document.createElement('a');a.href=doc.data;a.download=doc.fileName;a.click();
+}
+function _cmFmtSize(b){if(!b)return'';if(b<1024)return b+'B';if(b<1048576)return(b/1024).toFixed(1)+'KB';return(b/1048576).toFixed(1)+'MB';}
+function _cmFmtDate(iso){if(!iso)return'';try{const d=new Date(iso);const p=n=>String(n).padStart(2,'0');return p(d.getDate())+'/'+p(d.getMonth()+1)+'/'+d.getFullYear();}catch(e){return '';}}
+function _updateCMDocUI(meta,pendingFile){
+  const area=document.getElementById('cum-doc-area');if(!area)return;
+  const uploadSVG=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>`;
+  const dlSVG=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:11px;height:11px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`;
+  const fileSVG=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:26px;height:26px;flex-shrink:0"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>`;
+  const escKey=(_currentCMDocKey||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+  let html='';
+  if(pendingFile){
+    html+=`<div style="display:flex;align-items:center;gap:10px;background:var(--accent-soft);border:1px solid var(--accent)44;border-radius:8px;padding:9px 13px;margin-bottom:8px">
+      <span style="color:var(--accent)">${fileSVG}</span>
+      <div style="flex:1;min-width:0"><div style="font-size:12px;font-weight:600;color:var(--accent);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${pendingFile.name}</div>
+      <div style="font-size:10px;color:var(--text3);margin-top:2px">${_cmFmtSize(pendingFile.size)} · Ready to save</div></div>
+      <button type="button" class="btn btn-dim" style="padding:3px 8px;font-size:10px;color:var(--neg);flex-shrink:0" onclick="_cmClearPending()">✕ Cancel</button>
+    </div>`;
+  } else if(meta&&meta.fileName&&!_pendingContractRemove){
+    html+=`<div style="display:flex;align-items:center;gap:10px;background:rgba(52,211,153,.06);border:1px solid rgba(52,211,153,.25);border-radius:8px;padding:9px 13px;margin-bottom:8px">
+      <span style="color:var(--pos)">${fileSVG}</span>
+      <div style="flex:1;min-width:0"><div style="font-size:12px;font-weight:600;color:var(--text1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${meta.fileName}</div>
+      <div style="font-size:10px;color:var(--text3);margin-top:2px">${_cmFmtSize(meta.fileSize)} · Uploaded ${_cmFmtDate(meta.uploadedAt)}</div></div>
+      <button type="button" class="btn btn-dim" style="padding:3px 8px;font-size:10px;flex-shrink:0" onclick="downloadCMDoc('${escKey}')">${dlSVG} Download</button>
+      <button type="button" class="btn btn-dim" style="padding:3px 8px;font-size:10px;color:var(--neg);flex-shrink:0" onclick="_cmRemovePending()">✕ Remove</button>
+    </div>`;
+  }
+  const hasDoc=(pendingFile||(meta&&meta.fileName&&!_pendingContractRemove));
+  const lblTxt=hasDoc?'Replace document':'Attach PDF or Word';
+  html+=`<label style="display:inline-flex;align-items:center;gap:7px;cursor:pointer;padding:6px 13px;border-radius:7px;border:1px dashed var(--border2);font-size:11.5px;color:var(--text2);background:var(--bg2);transition:border-color .15s,color .15s" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'" onmouseout="this.style.borderColor='var(--border2)';this.style.color='var(--text2)'">
+    ${uploadSVG} ${lblTxt}
+    <input type="file" id="cum-contract-file" accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" style="display:none" onchange="_cmOnFileSelected(this)">
+  </label>
+  <span style="font-size:10px;color:var(--text3);margin-left:8px">PDF or Word · max 25 MB · stored in this browser</span>`;
+  area.innerHTML=html;
+}
+function _cmOnFileSelected(input){
+  if(!input.files||!input.files[0])return;
+  const file=input.files[0];
+  if(file.size>25*1024*1024){alert('File too large (max 25 MB). Please compress or use a smaller file.');input.value='';return;}
+  _pendingContractFile=file;_pendingContractRemove=false;
+  _updateCMDocUI(null,file);
+}
+function _cmClearPending(){
+  _pendingContractFile=null;_pendingContractRemove=false;
+  const meta=(loadClientData()[_currentCMDocKey]||{}).contractDoc||(loadNewClients().find(n=>'nc_'+n.id===_currentCMDocKey)||{}).contractDoc||null;
+  _updateCMDocUI(meta,null);
+}
+function _cmRemovePending(){
+  _pendingContractFile=null;_pendingContractRemove=true;
+  _updateCMDocUI(null,null);
+}
+
 // ── New clients (added via UI, not in static TARGETS) ──
 const NEW_CLIENTS_KEY='aop_new_clients_fy27';
 function loadNewClients(){try{return JSON.parse(localStorage.getItem(NEW_CLIENTS_KEY)||'[]')}catch(e){return[]}}
@@ -5479,6 +5585,9 @@ function openClientUpsertModal(mode, key){
   if(!requireName()) return;
   const user=getCurrentUser();
 
+  // Reset doc pending state whenever modal opens
+  _pendingContractFile=null;_pendingContractRemove=false;_currentCMDocKey='';
+
   document.getElementById('cum-mode').value=mode;
   document.getElementById('cum-nc-id').value='';
   document.getElementById('cum-client-key').value='';
@@ -5506,9 +5615,11 @@ function openClientUpsertModal(mode, key){
     document.getElementById('cum-primary-contact').value=src.primaryContact||'';
     document.getElementById('cum-spoc').value=src.spoc||'';
     document.getElementById('cum-notes').value=src.notes||'';
+    _updateCMDocUI(src.contractDoc||null,null);
   }
 
   if(mode==='edit-static'){
+    _currentCMDocKey=key;
     document.getElementById('cum-client-key').value=key;
     // key = "ClientName||AdType"
     const sepIdx=key.lastIndexOf('||');
@@ -5549,6 +5660,7 @@ function openClientUpsertModal(mode, key){
       +'</div>';
     _fillContact(cd);
   } else if(mode==='add'){
+    _currentCMDocKey='';
     ['cum-name-input','cum-btl','cum-hq-city','cum-hq-state','cum-primary-contact','cum-spoc','cum-notes','cum-cc-fy','cum-leads-fy'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
     [1,2,3,4].forEach(q=>{['cum-rev-q','cum-mktg-q'].forEach(p=>{const el=document.getElementById(p+q);if(el)el.value='';});});
     const catEl=document.getElementById('cum-cat');if(catEl)catEl.value='Bikes';
@@ -5558,7 +5670,9 @@ function openClientUpsertModal(mode, key){
     document.getElementById('cum-contract-fields').style.display='none';
     document.getElementById('cum-contract-start').value='';
     document.getElementById('cum-contract-end').value='';
+    _updateCMDocUI(null,null);
   } else if(mode==='edit-new'){
+    _currentCMDocKey='nc_'+key;
     document.getElementById('cum-nc-id').value=key;
     const nc=loadNewClients().find(n=>n.id===key)||{};
     const nameEl=document.getElementById('cum-name-input');if(nameEl)nameEl.value=nc.name||'';
@@ -5578,7 +5692,7 @@ function openClientUpsertModal(mode, key){
   document.getElementById('client-upsert-modal').classList.add('show');
 }
 
-function saveClientUpsert(){
+async function saveClientUpsert(){
   if(!requireName()) return;
   const user=getCurrentUser();
   const mode=document.getElementById('cum-mode').value;
@@ -5617,6 +5731,19 @@ function saveClientUpsert(){
       ['spoc',old.spoc||'',spoc],
       ['notes',old.notes||'',notes],
     ]);
+    // Handle contract document
+    if(_pendingContractRemove){
+      delete nw.contractDoc;
+      deleteCMDoc(key).catch(()=>{});
+      writeAuditEntry({ts:Date.now(),user,client:clientName,ad_type:adType,btl:'—',ba:'—',field:'cm_contractDoc',month:'CLIENT MASTER',old:old.contractDoc?.fileName||'',new:'(removed)'});
+    } else if(_pendingContractFile){
+      try{const meta=await saveCMDoc(key,_pendingContractFile);nw.contractDoc=meta;
+        writeAuditEntry({ts:Date.now(),user,client:clientName,ad_type:adType,btl:'—',ba:'—',field:'cm_contractDoc',month:'CLIENT MASTER',old:old.contractDoc?.fileName||'',new:meta.fileName});
+      }catch(e){console.error('Doc save failed:',e);}
+      _pendingContractFile=null;
+    } else if(old.contractDoc){
+      nw.contractDoc=old.contractDoc; // preserve existing
+    }
     data[key]=nw;
     saveClientDataStore(data);
     document.getElementById('client-upsert-modal').classList.remove('show');
@@ -5627,8 +5754,9 @@ function saveClientUpsert(){
     if(!name){alert('Client name is required.');return;}
     const revQ=[1,2,3,4].map(q=>parseFloat(document.getElementById('cum-rev-q'+q).value)||0);
     const mktgQ=[1,2,3,4].map(q=>parseFloat(document.getElementById('cum-mktg-q'+q).value)||0);
+    const ncId=Date.now().toString(36)+Math.random().toString(36).slice(2,6);
     const nc={
-      id:Date.now().toString(36)+Math.random().toString(36).slice(2,6),
+      id:ncId,
       name,cat:document.getElementById('cum-cat').value,fuel:document.getElementById('cum-fuel').value,
       adType:document.getElementById('cum-adtype').value,btl:document.getElementById('cum-btl').value.trim()||'—',
       revQ,mktgQ,ccFY:parseFloat(document.getElementById('cum-cc-fy').value)||0,
@@ -5636,8 +5764,13 @@ function saveClientUpsert(){
       hasContract:hasCon,contractStart,contractEnd,hqCity,hqState,primaryContact,spoc,notes,
       createdAt:new Date().toISOString(),createdBy:user
     };
+    // Save contract doc if attached
+    if(_pendingContractFile){
+      try{const meta=await saveCMDoc('nc_'+ncId,_pendingContractFile);nc.contractDoc=meta;}catch(e){console.error('Doc save failed:',e);}
+      _pendingContractFile=null;
+    }
     const list=loadNewClients(); list.push(nc); saveNewClients(list);
-    writeAuditEntry({ts:Date.now(),user,client:name,ad_type:nc.adType,btl:nc.btl,ba:'—',field:'cm_NEW_CLIENT',month:'CLIENT MASTER',old:'',new:'Added'});
+    writeAuditEntry({ts:Date.now(),user,client:name,ad_type:nc.adType,btl:nc.btl,ba:'—',field:'cm_NEW_CLIENT',month:'CLIENT MASTER',old:'',new:'Added'+(nc.contractDoc?' + contract doc':'')});
     document.getElementById('client-upsert-modal').classList.remove('show');
     renderClients();
     const badgeEl=document.getElementById('pn-client-count');
@@ -5674,6 +5807,17 @@ function saveClientUpsert(){
     });
     if((old.ccFY||0)!==ccFY) writeAuditEntry({ts:Date.now(),user,client:name,ad_type:nw.adType,btl:nw.btl,ba:'—',field:'cm_ccFY',month:'CLIENT MASTER',old:old.ccFY||0,new:ccFY});
     if((old.leadsFY||0)!==leadsFY) writeAuditEntry({ts:Date.now(),user,client:name,ad_type:nw.adType,btl:nw.btl,ba:'—',field:'cm_leadsFY',month:'CLIENT MASTER',old:old.leadsFY||0,new:leadsFY});
+    // Handle contract document
+    const ncDocKey='nc_'+ncId;
+    if(_pendingContractRemove){
+      delete nw.contractDoc;
+      deleteCMDoc(ncDocKey).catch(()=>{});
+    } else if(_pendingContractFile){
+      try{const meta=await saveCMDoc(ncDocKey,_pendingContractFile);nw.contractDoc=meta;}catch(e){console.error('Doc save failed:',e);}
+      _pendingContractFile=null;
+    } else if(old.contractDoc){
+      nw.contractDoc=old.contractDoc;
+    }
     list[idx]=nw;
     saveNewClients(list);
     document.getElementById('client-upsert-modal').classList.remove('show');
@@ -5846,6 +5990,10 @@ function renderClients(){
               <div id="cum-contract-fields" style="display:none;grid-template-columns:1fr 1fr;gap:12px">
                 <div><label style="${labelS}">Contract Start</label><input type="date" id="cum-contract-start" style="${inputS};color-scheme:dark"></div>
                 <div><label style="${labelS}">Contract End</label><input type="date" id="cum-contract-end" style="${inputS};color-scheme:dark"></div>
+                <div style="grid-column:1/-1">
+                  <label style="${labelS}">Contract Document <span style="font-weight:400;color:var(--text3)">(PDF or Word)</span></label>
+                  <div id="cum-doc-area"></div>
+                </div>
               </div>
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
                 <div><label style="${labelS}">HQ City</label><input type="text" id="cum-hq-city" placeholder="e.g. Pune" style="${inputS}"></div>
@@ -5998,10 +6146,12 @@ function renderClients(){
           ?cd.contractStart.slice(0,7)+' → '+cd.contractEnd.slice(0,7):'—';
         const escAt=adType.replace(/'/g,"\\'");
         const notesTxt=cd.notes?cd.notes.slice(0,40)+(cd.notes.length>40?'…':''):'—';
+        const escCdKey=cdKey.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+        const docBadge=cd.contractDoc?`<button onclick="downloadCMDoc('${escCdKey}')" style="display:inline-flex;align-items:center;gap:4px;margin-top:4px;background:none;border:1px solid var(--accent)44;border-radius:4px;padding:2px 7px;cursor:pointer;font-size:10px;color:var(--accent);font-family:inherit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:10px;height:10px"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>${(cd.contractDoc.fileName||'').slice(0,18)+((cd.contractDoc.fileName||'').length>18?'…':'')}</button>`:''        ;
         subRows.push(`<tr style="background:var(--bg)" onmouseenter="this.style.background='var(--bg2)'" onmouseleave="this.style.background='var(--bg)'">
           <td style="${tdH};border-left:2px solid ${BIZ_COLORS[adType]||'var(--border2)'}44"></td>
           <td style="${tdH}">${bizBadge(adType)}</td>
-          <td style="${tdH}">${contractBadge(cd)}</td>
+          <td style="${tdH}">${contractBadge(cd)}${docBadge}</td>
           <td style="${tdH};font-size:11px;color:var(--text3);white-space:nowrap">${period}</td>
           <td style="${tdH};font-size:12px;color:var(--text2)">${hq}</td>
           <td style="${tdH};font-size:12px;color:var(--text2)">${cd.primaryContact||'—'}</td>
@@ -6079,10 +6229,13 @@ function renderClients(){
     // Business sub-row
     const adType=nc.adType||'CPS';
     const bizC=BIZ_COLORS[adType]||'var(--border2)';
+    const ncDocKey='nc_'+ncId;
+    const escNcKey=ncDocKey.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    const ncDocBadge=nc.contractDoc?`<button onclick="downloadCMDoc('${escNcKey}')" style="display:inline-flex;align-items:center;gap:4px;margin-top:4px;background:none;border:1px solid var(--accent)44;border-radius:4px;padding:2px 7px;cursor:pointer;font-size:10px;color:var(--accent);font-family:inherit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:10px;height:10px"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>${(nc.contractDoc.fileName||'').slice(0,18)+((nc.contractDoc.fileName||'').length>18?'…':'')}</button>`:'';
     html+=`<tr style="background:var(--bg)" onmouseenter="this.style.background='var(--bg2)'" onmouseleave="this.style.background='var(--bg)'">
       <td style="${tdH};border-left:2px solid ${bizC}44"></td>
       <td style="${tdH}">${bizBadge(adType)}</td>
-      <td style="${tdH}">${contractBadge(nc)}</td>
+      <td style="${tdH}">${contractBadge(nc)}${ncDocBadge}</td>
       <td style="${tdH};font-size:11px;color:var(--text3);white-space:nowrap">${period}</td>
       <td style="${tdH};font-size:12px;color:var(--text2)">${hq}</td>
       <td style="${tdH};font-size:12px;color:var(--text2)">${nc.primaryContact||'—'}</td>
