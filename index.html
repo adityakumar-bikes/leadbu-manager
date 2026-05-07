@@ -551,7 +551,7 @@ canvas{max-height:260px}
       <div class="brand-mark">🏍️</div>
       <div class="brand-text">
         <div class="t1">Bike AOP Tracker</div>
-        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.0.86</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 07/05/2026 11:21</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
+        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.0.87</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 07/05/2026 12:37</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
       </div>
     </div>
     <div class="hdr-right">
@@ -817,7 +817,7 @@ function oemBadge(client){
 }
 
 const ACT_KEY='leadbu_actuals_fy27_v2';
-const DEPLOY_TIME='2026-05-07T11:21:15Z'; // replaced with ISO timestamp at deploy time
+const DEPLOY_TIME='2026-05-07T12:37:35Z'; // replaced with ISO timestamp at deploy time
 let ACTUALS=TARGETS.map(()=>newActualRec()); // populated by Firebase onValue
 
 function newActualRec(){
@@ -1638,7 +1638,7 @@ function updateLastSaved(isoStr){
 }
 function showDeployTime(){
   const el=document.getElementById('hdr-deployed');
-  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-05-07T11:21:15Z')return;
+  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-05-07T12:37:35Z')return;
   try{
     const d=new Date(DEPLOY_TIME);
     const pad=n=>String(n).padStart(2,'0');
@@ -4279,7 +4279,8 @@ function renderCC(rows){
     const ccA=cSlice(d.cc,pid);
     const revA=cSlice(d.rev,pid);
     const seatsAvg=cSeatsAvg(a.cc_seats||Array(12).fill(0),pid);
-    const perSeat=seatsAvg>0?(ccA*100000/seatsAvg):0;
+    const totalSeats=cSlice(a.cc_seats||Array(12).fill(0),pid);
+    const perSeat=totalSeats>0?(ccA*100000/totalSeats):0;
     const ccPctT=revT>0?(ccT/revT*100):0;
     const ccPctA=revA>0?(ccA/revA*100):0;
 
@@ -4374,7 +4375,8 @@ function exportCCCSV(){
     const ccA=cSlice(d.cc,pid);
     const revA=cSlice(d.rev,pid);
     const seatsAvg=cSeatsAvg(a.cc_seats||Array(12).fill(0),pid);
-    const perSeat=seatsAvg>0?(ccA*100000/seatsAvg):0;
+    const totalSeats=cSlice(a.cc_seats||Array(12).fill(0),pid);
+    const perSeat=totalSeats>0?(ccA*100000/totalSeats):0;
     const ccPctT=revT>0?(ccT/revT*100).toFixed(1)+'%':'—';
     const ccPctA=revA>0?(ccA/revA*100).toFixed(1)+'%':'—';
     if(leadT===0&&leadA===0&&ccT===0&&ccA===0) return;
