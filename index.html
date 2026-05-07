@@ -143,6 +143,7 @@ body.light .pchip[style*="color:#fff"]{color:#fff!important}  /* keep white text
 body.light .pchip[style*="blue2"]{background:#2563eb!important;border-color:#1d4ed8!important}
 /* FY column in light theme needs readable text */
 body.light .fy-col{color:var(--text1)!important}
+body.light .hide-fy .fy-col{display:none!important}
 /* tgt-col readable */
 body.light .tgt-col{color:var(--text2)}
 /* cv (pos-soft green) is near-invisible on light bg */
@@ -504,6 +505,7 @@ body.light .le-chip{background:#f1f5f9;border-color:#cbd5e1;color:#64748b}
 /* QTY / FY totals column */
 .fy-col{background:#1a1a25!important;color:var(--text1);font-weight:700;border-left:2px solid var(--accent3)!important}
 .fy-col input{background:rgba(99,102,241,.14);color:var(--accent)}
+.hide-fy .fy-col{display:none!important}
 /* modal footer */
 .modal-footer{padding:12px 20px;border-top:1px solid var(--border);display:flex;gap:10px;align-items:center;justify-content:flex-end;background:#0e0e16}
 .modal-footer .legend{font-size:10.5px;color:var(--text2);margin-right:auto;display:flex;gap:14px;align-items:center}
@@ -551,7 +553,7 @@ canvas{max-height:260px}
       <div class="brand-mark">🏍️</div>
       <div class="brand-text">
         <div class="t1">Bike AOP Tracker</div>
-        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.0.81</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8"></span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
+        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.0.82</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8"></span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
       </div>
     </div>
     <div class="hdr-right">
@@ -817,7 +819,7 @@ function oemBadge(client){
 }
 
 const ACT_KEY='leadbu_actuals_fy27_v2';
-const DEPLOY_TIME='2026-05-07T04:43:25Z'; // replaced with ISO timestamp at deploy time
+const DEPLOY_TIME='2026-05-07T05:12:13Z'; // replaced with ISO timestamp at deploy time
 let ACTUALS=TARGETS.map(()=>newActualRec()); // populated by Firebase onValue
 
 function newActualRec(){
@@ -1638,7 +1640,7 @@ function updateLastSaved(isoStr){
 }
 function showDeployTime(){
   const el=document.getElementById('hdr-deployed');
-  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-05-07T04:43:25Z')return;
+  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-05-07T05:12:13Z')return;
   try{
     const d=new Date(DEPLOY_TIME);
     const pad=n=>String(n).padStart(2,'0');
@@ -2596,7 +2598,7 @@ function renderModal(recIdx){
 
   const aAiPLC=a.ai_per_lead_cost||Array(12).fill(0);
   const aAiLP=a.ai_leads_processed||Array(12).fill(0);
-  const html=filterBar+'<div style="overflow-x:auto"><table class="pl-table"><thead>'+colHdrs+'</thead><tbody>'
+  const html=filterBar+`<div class="${modalMonthFilter===4?'':'hide-fy'}" style="overflow-x:auto"><table class="pl-table"><thead>`+colHdrs+'</thead><tbody>'
     +leadsSection
     +revSection
     +sectionRow('── CC COST ──')
@@ -2903,7 +2905,7 @@ function renderBajajModal(recIdx){
   const tGM=tRevM.map((r,i)=>r-tMktgM[i]),tGPM=tGM.map((g,i)=>g-tCCM[i]);
   const tLeadsM=t.leads.monthly.map(v=>Math.round(v*100000));
   const COLS={MC:'#1e3a5f',PB:'#3b1f5f',Triumph:'#1f3d2e',Chetak:'#3d2a1f',CV:'#3d1f2e'};
-  let html=filterBar()+'<div style="overflow-x:auto">';
+  let html=filterBar()+`<div class="${modalMonthFilter===4?'':'hide-fy'}" style="overflow-x:auto">`;
   html+=totalTable(d,'TOTAL — ALL BRANDS',tRevM,tMktgM,tCCM,tGM,tGPM,tLeadsM,adType==='CPS'?a.retails:null);
   BAJAJ_BRANDS.forEach(brand=>{
     const br=a.brands[brand],bd=deriveActuals(br,adType);
@@ -3025,7 +3027,7 @@ function renderTVSModal(recIdx){
 
   const COLS={Commuter:'#1a3a5c',Premium:'#2a1a5c',Scooter:'#1a4a3a',Moped:'#3a2a0a',EV:'#1a5c3a'};
 
-  let html=filterBar+'<div style="overflow-x:auto">'+summaryTable;
+  let html=filterBar+`<div class="${modalMonthFilter===4?'':'hide-fy'}" style="overflow-x:auto">`+summaryTable;
 
   TVS_BRANDS.forEach(brand=>{
     const br=a.brands[brand];
@@ -3290,7 +3292,7 @@ function renderREModal(recIdx){
   const tGM=tRevM.map((r,i)=>r-tMktgM[i]),tGPM=tGM.map((g,i)=>g-tCCM[i]);
   const tLeadsM=t.leads.monthly.map(v=>Math.round(v*100000));
   const COLS={ICE:'#4a1a0a',EV:'#1a3a1a'};
-  let html=filterBar()+'<div style="overflow-x:auto">';
+  let html=filterBar()+`<div class="${modalMonthFilter===4?'':'hide-fy'}" style="overflow-x:auto">`;
   html+=totalTable(d,'TOTAL — RE ICE + EV Flying Flea',tRevM,tMktgM,tCCM,tGM,tGPM,tLeadsM,adType==='CPS'?a.retails:null);
   RE_BRANDS.forEach(brand=>{
     const br=a.brands[brand],bd=deriveActuals(br,adType);
