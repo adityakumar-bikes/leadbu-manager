@@ -143,7 +143,6 @@ body.light .pchip[style*="color:#fff"]{color:#fff!important}  /* keep white text
 body.light .pchip[style*="blue2"]{background:#2563eb!important;border-color:#1d4ed8!important}
 /* FY column in light theme needs readable text */
 body.light .fy-col{color:var(--text1)!important}
-body.light .hide-fy .fy-col{display:none!important}
 /* tgt-col readable */
 body.light .tgt-col{color:var(--text2)}
 /* cv (pos-soft green) is near-invisible on light bg */
@@ -505,7 +504,6 @@ body.light .le-chip{background:#f1f5f9;border-color:#cbd5e1;color:#64748b}
 /* QTY / FY totals column */
 .fy-col{background:#1a1a25!important;color:var(--text1);font-weight:700;border-left:2px solid var(--accent3)!important}
 .fy-col input{background:rgba(99,102,241,.14);color:var(--accent)}
-.hide-fy .fy-col{display:none!important}
 /* modal footer */
 .modal-footer{padding:12px 20px;border-top:1px solid var(--border);display:flex;gap:10px;align-items:center;justify-content:flex-end;background:#0e0e16}
 .modal-footer .legend{font-size:10.5px;color:var(--text2);margin-right:auto;display:flex;gap:14px;align-items:center}
@@ -553,7 +551,7 @@ canvas{max-height:260px}
       <div class="brand-mark">🏍️</div>
       <div class="brand-text">
         <div class="t1">Bike AOP Tracker</div>
-        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.0.84</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 07/05/2026 10:52</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
+        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.0.85</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 07/05/2026 11:13</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
       </div>
     </div>
     <div class="hdr-right">
@@ -819,7 +817,7 @@ function oemBadge(client){
 }
 
 const ACT_KEY='leadbu_actuals_fy27_v2';
-const DEPLOY_TIME='2026-05-07T10:52:18Z'; // replaced with ISO timestamp at deploy time
+const DEPLOY_TIME='2026-05-07T11:13:36Z'; // replaced with ISO timestamp at deploy time
 let ACTUALS=TARGETS.map(()=>newActualRec()); // populated by Firebase onValue
 
 function newActualRec(){
@@ -1640,7 +1638,7 @@ function updateLastSaved(isoStr){
 }
 function showDeployTime(){
   const el=document.getElementById('hdr-deployed');
-  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-05-07T10:52:18Z')return;
+  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-05-07T11:13:36Z')return;
   try{
     const d=new Date(DEPLOY_TIME);
     const pad=n=>String(n).padStart(2,'0');
@@ -2413,11 +2411,14 @@ function renderModal(recIdx){
     <span style="font-size:10px;color:var(--text2);font-weight:700">Show months:</span>${qBtns}</div>`+renderCopyBar(recIdx);
 
   // Two-row header: month name spans 2 cols (ACT|TGT), sub-row for labels
+  const totLabel=modalMonthFilter===4?'FY Total':(QTRS[modalMonthFilter]+' Total');
+  const vSum=(arr)=>vis.reduce((s,i)=>s+(+(arr[i])||0),0); // sum only visible months
+
   const colHdrs=
     '<tr>'
     +'<th rowspan="2" style="min-width:170px;text-align:left;position:sticky;left:0;z-index:3;background:var(--bg3)">Metric</th>'
     +vis.map(i=>'<th colspan="2" style="text-align:center;border-left:1px solid var(--border2);background:var(--bg2);font-size:11px">'+MONTHS[i]+'</th>').join('')
-    +'<th colspan="2" class="fy-col" style="text-align:center;font-size:11px">FY Total</th>'
+    +'<th colspan="2" class="fy-col" style="text-align:center;font-size:11px">'+totLabel+'</th>'
     +'</tr><tr>'
     +vis.map(()=>'<th style="font-size:9px;color:var(--blue);padding:2px 4px;border-left:1px solid var(--border2)">ACT</th><th style="font-size:9px;color:var(--text3);padding:2px 4px;min-width:52px">TGT</th>').join('')
     +'<th class="fy-col" style="font-size:9px;color:var(--blue);padding:2px 4px">ACT</th><th class="fy-col" style="font-size:9px;color:var(--text3);padding:2px 4px">TGT</th>'
@@ -2435,8 +2436,8 @@ function renderModal(recIdx){
       const tgt=tval!=null?'<td class="tgt-col">'+fmtC(tval,dec)+'</td>':'<td class="tgt-col nd">—</td>';
       return inp+tgt;
     }).join('');
-    const fyAct=arr.reduce((s,v)=>s+(+v||0),0);
-    const fyTgt=tgtArr!=null?tgtArr.reduce((s,v)=>s+(+v||0),0):null;
+    const fyAct=vSum(arr);
+    const fyTgt=tgtArr!=null?vSum(tgtArr):null;
     return '<tr class="row-input"><td class="mc">'+label+(hint?'<br><span class="hint">'+hint+'</span>':'')+'</td>'
       +cells+'<td class="fy-col">'+fmtC(fyAct,dec)+'</td>'
       +'<td class="fy-col tgt-col">'+(fyTgt!=null?fmtC(fyTgt,dec):'—')+'</td></tr>';
@@ -2448,8 +2449,8 @@ function renderModal(recIdx){
       return '<td class="'+cls+'" style="border-left:1px solid var(--border2)">'+fmtC(arr[i],dec)+'</td>'
         +(tval!=null?'<td class="tgt-col '+cls+'">'+fmtC(tval,dec)+'</td>':'<td class="tgt-col nd">—</td>');
     }).join('');
-    const fyAct=arr.reduce((s,v)=>s+(+v||0),0);
-    const fyTgt=tgtArr!=null?tgtArr.reduce((s,v)=>s+(+v||0),0):null;
+    const fyAct=vSum(arr);
+    const fyTgt=tgtArr!=null?vSum(tgtArr):null;
     return '<tr class="row-computed"><td class="mc">'+label+'</td>'
       +cells+'<td class="fy-col '+cls+'">'+fmtC(fyAct,dec)+'</td>'
       +'<td class="fy-col tgt-col '+cls+'">'+(fyTgt!=null?fmtC(fyTgt,dec):'—')+'</td></tr>';
@@ -2462,8 +2463,8 @@ function renderModal(recIdx){
       return '<td class="'+cls+' cv-pct" style="border-left:1px solid var(--border2)">'+fmtP(v)+'</td>'
         +(tv!=null?'<td class="tgt-col cv-pct">'+fmtP(tv)+'</td>':'<td class="tgt-col nd">—</td>');
     }).join('');
-    const fn=numArr.reduce((s,v)=>s+v,0),fd=denArr.reduce((s,v)=>s+v,0);
-    const tfn=tgtNum?tgtNum.reduce((s,v)=>s+v,0):0,tfd=tgtDen?tgtDen.reduce((s,v)=>s+v,0):0;
+    const fn=vis.reduce((s,i)=>s+numArr[i],0),fd=vis.reduce((s,i)=>s+denArr[i],0);
+    const tfn=tgtNum?vis.reduce((s,i)=>s+tgtNum[i],0):0,tfd=tgtDen?vis.reduce((s,i)=>s+tgtDen[i],0):0;
     return '<tr class="row-margin"><td class="mc">'+label+'</td>'+cells
       +'<td class="fy-col '+cls+' cv-pct">'+fmtP(fd?pct(fn,fd):0)+'</td>'
       +'<td class="fy-col tgt-col cv-pct">'+(tfd?fmtP(pct(tfn,tfd)):'—')+'</td></tr>';
@@ -2482,13 +2483,13 @@ function renderModal(recIdx){
     return '<tr class="row-input"><td class="mc" style="font-style:italic;color:var(--text2)">'+label+'</td>'+cells+'<td class="fy-col nd">—</td><td class="fy-col tgt-col nd">—</td></tr>';
   }
 
-  // Ratio row: value = numArr[i]*scale / denArr[i]; FY = sum(num)*scale / sum(den)
+  // Ratio row: value = numArr[i]*scale / denArr[i]; total = sum(vis num)*scale / sum(vis den)
   function ratioRow(label,numArr,denArr,scale,cls,dec){
     const cells=vis.map(i=>{
       const v=denArr[i]>0?(numArr[i]*scale)/denArr[i]:0;
       return '<td class="'+cls+'" style="border-left:1px solid var(--border2)">'+fmtC(v,dec)+'</td><td class="tgt-col nd">—</td>';
     }).join('');
-    const fn=numArr.reduce((s,v)=>s+v,0),fd=denArr.reduce((s,v)=>s+v,0);
+    const fn=vis.reduce((s,i)=>s+numArr[i],0),fd=vis.reduce((s,i)=>s+denArr[i],0);
     return '<tr class="row-computed"><td class="mc">'+label+'</td>'+cells
       +'<td class="fy-col '+cls+'">'+fmtC(fd>0?fn*scale/fd:0,dec)+'</td>'
       +'<td class="fy-col tgt-col nd">—</td></tr>';
@@ -2598,7 +2599,7 @@ function renderModal(recIdx){
 
   const aAiPLC=a.ai_per_lead_cost||Array(12).fill(0);
   const aAiLP=a.ai_leads_processed||Array(12).fill(0);
-  const html=filterBar+`<div class="${modalMonthFilter===4?'':'hide-fy'}" style="overflow-x:auto"><table class="pl-table"><thead>`+colHdrs+'</thead><tbody>'
+  const html=filterBar+'<div style="overflow-x:auto"><table class="pl-table"><thead>'+colHdrs+'</thead><tbody>'
     +leadsSection
     +revSection
     +sectionRow('── CC COST ──')
@@ -2790,12 +2791,14 @@ function renderBajajModal(recIdx){
   recomputeBajajTotals(recIdx);
   const d=deriveActuals(a,t.ad_type);
   const vis=getVisibleMonths(),nc=vis.length*2+3,adType=t.ad_type;
+  const totLabel=modalMonthFilter===4?'FY Total':(QTRS[modalMonthFilter]+' Total');
+  const vSum=(arr)=>vis.reduce((s,i)=>s+(+(arr[i])||0),0);
 
   function colHdrs(){
     return '<tr>'
       +'<th rowspan="2" style="min-width:160px;text-align:left;position:sticky;left:0;z-index:3;background:var(--bg3)">Metric</th>'
       +vis.map(i=>'<th colspan="2" style="text-align:center;border-left:1px solid var(--border2);background:var(--bg2);font-size:11px">'+MONTHS[i]+'</th>').join('')
-      +'<th colspan="2" class="fy-col" style="text-align:center;font-size:11px">FY</th>'
+      +'<th colspan="2" class="fy-col" style="text-align:center;font-size:11px">'+totLabel+'</th>'
       +'</tr><tr>'
       +vis.map(()=>'<th style="font-size:9px;color:var(--blue);padding:2px 4px;border-left:1px solid var(--border2)">ACT</th><th style="font-size:9px;color:var(--text3);padding:2px 4px;min-width:48px">TGT</th>').join('')
       +'<th class="fy-col" style="font-size:9px;color:var(--blue);padding:2px 4px">ACT</th><th class="fy-col" style="font-size:9px;color:var(--text3);padding:2px 4px">TGT</th></tr>';
@@ -2803,17 +2806,17 @@ function renderBajajModal(recIdx){
   function bInp(label,cls,field,arr,step,brand){
     const dec=step==='1'?0:2;
     const cells=vis.map(i=>{const v=+(arr[i]||0);return'<td style="border-left:1px solid var(--border2)"><input class="pl-input '+cls+'" type="number" step="'+step+'" value="'+v.toFixed(dec)+'" data-field="'+field+'" data-month="'+i+'" data-rec="'+recIdx+'" data-brand="'+brand+'" onfocus="if(+this.value===0)this.value=\'\'" onblur="if(this.value===\'\')this.value=\'0\'" onchange="onBrandInputChange(this)"></td><td class="tgt-col nd">—</td>';}).join('');
-    const fy=arr.reduce((s,v)=>s+(+v||0),0);
+    const fy=vSum(arr);
     return '<tr class="row-input"><td class="mc">'+label+'</td>'+cells+'<td class="fy-col">'+fmtC(fy,dec)+'</td><td class="fy-col tgt-col nd">—</td></tr>';
   }
   function bCmp(label,arr,cls,dec,tA){
     const cells=vis.map(i=>{const tv=tA?tA[i]:null;return'<td class="'+cls+'" style="border-left:1px solid var(--border2)">'+fmtC(arr[i],dec)+'</td>'+(tv!=null?'<td class="tgt-col '+cls+'">'+fmtC(tv,dec)+'</td>':'<td class="tgt-col nd">—</td>');}).join('');
-    const fy=arr.reduce((s,v)=>s+(+v||0),0),fyT=tA?tA.reduce((s,v)=>s+(+v||0),0):null;
+    const fy=vSum(arr),fyT=tA?vSum(tA):null;
     return '<tr class="row-computed"><td class="mc">'+label+'</td>'+cells+'<td class="fy-col '+cls+'">'+fmtC(fy,dec)+'</td><td class="fy-col tgt-col '+cls+'">'+(fyT!=null?fmtC(fyT,dec):'—')+'</td></tr>';
   }
   function bPct(label,nA,dA,cls,tN,tD){
     const cells=vis.map(i=>{const v=dA[i]?pct(nA[i],dA[i]):0;const tv=(tN&&tD&&tD[i])?pct(tN[i],tD[i]):null;return'<td class="'+cls+' cv-pct" style="border-left:1px solid var(--border2)">'+fmtP(v)+'</td>'+(tv!=null?'<td class="tgt-col cv-pct">'+fmtP(tv)+'</td>':'<td class="tgt-col nd">—</td>');}).join('');
-    const fn=nA.reduce((s,v)=>s+v,0),fd=dA.reduce((s,v)=>s+v,0),tfn=tN?tN.reduce((s,v)=>s+v,0):0,tfd=tD?tD.reduce((s,v)=>s+v,0):0;
+    const fn=vis.reduce((s,i)=>s+nA[i],0),fd=vis.reduce((s,i)=>s+dA[i],0),tfn=tN?vis.reduce((s,i)=>s+tN[i],0):0,tfd=tD?vis.reduce((s,i)=>s+tD[i],0):0;
     return '<tr class="row-margin"><td class="mc">'+label+'</td>'+cells+'<td class="fy-col '+cls+' cv-pct">'+fmtP(fd?pct(fn,fd):0)+'</td><td class="fy-col tgt-col cv-pct">'+(tfd?fmtP(pct(tfn,tfd)):'—')+'</td></tr>';
   }
   function sec(lbl){return'<tr class="row-section"><td colspan="'+nc+'">'+lbl+'</td></tr>';}
@@ -2828,7 +2831,7 @@ function renderBajajModal(recIdx){
   }
   function bRatio(label,nA,dA,scale,cls,dec){
     const cells=vis.map(i=>{const v=(+dA[i]||0)>0?((+nA[i]||0)*scale)/(+dA[i]):0;return'<td class="'+cls+'" style="border-left:1px solid var(--border2)">'+fmtC(v,dec)+'</td><td class="tgt-col nd">—</td>';}).join('');
-    const fn=nA.reduce((s,v)=>s+(+v||0),0),fd=dA.reduce((s,v)=>s+(+v||0),0);
+    const fn=vis.reduce((s,i)=>s+(+nA[i]||0),0),fd=vis.reduce((s,i)=>s+(+dA[i]||0),0);
     return'<tr class="row-computed"><td class="mc">'+label+'</td>'+cells+'<td class="fy-col '+cls+'">'+fmtC(fd>0?fn*scale/fd:0,dec)+'</td><td class="fy-col tgt-col nd">—</td></tr>';
   }
   function totalTable(d,label,tRevM,tMktgM,tCCM,tGM,tGPM,tLeadsM,aRetails){
@@ -2905,7 +2908,7 @@ function renderBajajModal(recIdx){
   const tGM=tRevM.map((r,i)=>r-tMktgM[i]),tGPM=tGM.map((g,i)=>g-tCCM[i]);
   const tLeadsM=t.leads.monthly.map(v=>Math.round(v*100000));
   const COLS={MC:'#1e3a5f',PB:'#3b1f5f',Triumph:'#1f3d2e',Chetak:'#3d2a1f',CV:'#3d1f2e'};
-  let html=filterBar()+`<div class="${modalMonthFilter===4?'':'hide-fy'}" style="overflow-x:auto">`;
+  let html=filterBar()+'<div style="overflow-x:auto">';
   html+=totalTable(d,'TOTAL — ALL BRANDS',tRevM,tMktgM,tCCM,tGM,tGPM,tLeadsM,adType==='CPS'?a.retails:null);
   BAJAJ_BRANDS.forEach(brand=>{
     const br=a.brands[brand],bd=deriveActuals(br,adType);
@@ -2933,6 +2936,8 @@ function renderTVSModal(recIdx){
   recomputeBrandTotals(recIdx,TVS_BRANDS);
   const d=deriveActuals(a,t.ad_type);
   const vis=getVisibleMonths(),nc=vis.length*2+3,adType=t.ad_type;
+  const totLabel=modalMonthFilter===4?'FY Total':(QTRS[modalMonthFilter]+' Total');
+  const vSum=(arr)=>vis.reduce((s,i)=>s+(+(arr[i])||0),0);
   const fmtC=(v,dec)=>dec===0?Math.round(v).toLocaleString('en-IN'):fmt(v,Math.max(dec,2));
 
   // safe array from any Firebase object or JS array
@@ -2941,7 +2946,7 @@ function renderTVSModal(recIdx){
   const colHdrs='<tr>'
     +'<th rowspan="2" style="min-width:170px;text-align:left;position:sticky;left:0;z-index:3;background:var(--bg3)">Metric</th>'
     +vis.map(i=>'<th colspan="2" style="text-align:center;border-left:1px solid var(--border2);background:var(--bg2);font-size:11px">'+MONTHS[i]+'</th>').join('')
-    +'<th colspan="2" class="fy-col" style="text-align:center;font-size:11px">FY Total</th>'
+    +'<th colspan="2" class="fy-col" style="text-align:center;font-size:11px">'+totLabel+'</th>'
     +'</tr><tr>'
     +vis.map(()=>'<th style="font-size:9px;color:var(--blue);padding:2px 4px;border-left:1px solid var(--border2)">ACT</th><th style="font-size:9px;color:var(--text3);padding:2px 4px;min-width:52px">TGT</th>').join('')
     +'<th class="fy-col" style="font-size:9px;color:var(--blue);padding:2px 4px">ACT</th><th class="fy-col" style="font-size:9px;color:var(--text3);padding:2px 4px">TGT</th></tr>';
@@ -2951,33 +2956,33 @@ function renderTVSModal(recIdx){
     const arr=sa(rawArr);
     const dec=step==='0.01'?2:0;
     const cells=vis.map(i=>'<td style="border-left:1px solid var(--border2)"><input class="pl-input '+cls+'" type="number" step="'+step+'" value="'+arr[i].toFixed(dec)+'" data-field="'+field+'" data-month="'+i+'" data-rec="'+recIdx+'" data-brand="'+brand+'" onfocus="if(+this.value===0)this.value=\'\'" onblur="if(this.value===\'\')this.value=\'0\'" onchange="onBrandInputChange(this)"></td><td class="tgt-col nd">—</td>').join('');
-    const fy=arr.reduce((s,v)=>s+v,0);
+    const fy=vSum(arr);
     return '<tr class="row-input"><td class="mc">'+label+(hint?'<br><span class="hint">'+hint+'</span>':'')+'</td>'+cells+'<td class="fy-col">'+fmtC(fy,dec)+'</td><td class="fy-col tgt-col nd">—</td></tr>';
   }
   // Computed row — always safe
   function bCmpR(label,rawArr,cls,dec){
     const arr=sa(rawArr);
     const cells=vis.map(i=>'<td class="'+cls+'" style="border-left:1px solid var(--border2)">'+fmtC(arr[i],dec)+'</td><td class="tgt-col nd">—</td>').join('');
-    const fy=arr.reduce((s,v)=>s+v,0);
+    const fy=vSum(arr);
     return '<tr class="row-computed"><td class="mc">'+label+'</td>'+cells+'<td class="fy-col '+cls+'">'+fmtC(fy,dec)+'</td><td class="fy-col tgt-col nd">—</td></tr>';
   }
   // Computed row with targets (for summary)
   function bCmpT(label,rawArr,cls,dec,tgtArr){
     const arr=sa(rawArr);
     const cells=vis.map(i=>{const tv=tgtArr?tgtArr[i]:null;return'<td class="'+cls+'" style="border-left:1px solid var(--border2)">'+fmtC(arr[i],dec)+'</td>'+(tv!=null?'<td class="tgt-col '+cls+'">'+fmtC(tv,dec)+'</td>':'<td class="tgt-col nd">—</td>');}).join('');
-    const fy=arr.reduce((s,v)=>s+v,0),fyT=tgtArr?tgtArr.reduce((s,v)=>s+v,0):null;
+    const fy=vSum(arr),fyT=tgtArr?vSum(tgtArr):null;
     return '<tr class="row-computed"><td class="mc">'+label+'</td>'+cells+'<td class="fy-col '+cls+'">'+fmtC(fy,dec)+'</td><td class="fy-col tgt-col '+cls+'">'+(fyT!=null?fmtC(fyT,dec):'—')+'</td></tr>';
   }
   // Percent row
   function bPctR(label,rawN,rawD,cls){
     const nA=sa(rawN),dA=sa(rawD);
     const cells=vis.map(i=>'<td class="'+cls+' cv-pct" style="border-left:1px solid var(--border2)">'+fmtP(dA[i]?pct(nA[i],dA[i]):0)+'</td><td class="tgt-col nd">—</td>').join('');
-    const fn=nA.reduce((s,v)=>s+v,0),fd=dA.reduce((s,v)=>s+v,0);
+    const fn=vis.reduce((s,i)=>s+nA[i],0),fd=vis.reduce((s,i)=>s+dA[i],0);
     return '<tr class="row-margin"><td class="mc">'+label+'</td>'+cells+'<td class="fy-col '+cls+' cv-pct">'+fmtP(fd?pct(fn,fd):0)+'</td><td class="fy-col tgt-col nd">—</td></tr>';
   }
   function bRatioR(label,nA,dA,scale,cls,dec){
     const cells=vis.map(i=>{const v=(+dA[i]||0)>0?((+nA[i]||0)*scale)/(+dA[i]):0;return'<td class="'+cls+'" style="border-left:1px solid var(--border2)">'+fmtC(v,dec)+'</td><td class="tgt-col nd">—</td>';}).join('');
-    const fn=nA.reduce((s,v)=>s+(+v||0),0),fd=dA.reduce((s,v)=>s+(+v||0),0);
+    const fn=vis.reduce((s,i)=>s+(+nA[i]||0),0),fd=vis.reduce((s,i)=>s+(+dA[i]||0),0);
     return'<tr class="row-computed"><td class="mc">'+label+'</td>'+cells+'<td class="fy-col '+cls+'">'+fmtC(fd>0?fn*scale/fd:0,dec)+'</td><td class="fy-col tgt-col nd">—</td></tr>';
   }
   function sec(lbl){return'<tr class="row-section"><td colspan="'+nc+'">'+lbl+'</td></tr>';}
@@ -3027,7 +3032,7 @@ function renderTVSModal(recIdx){
 
   const COLS={Commuter:'#1a3a5c',Premium:'#2a1a5c',Scooter:'#1a4a3a',Moped:'#3a2a0a',EV:'#1a5c3a'};
 
-  let html=filterBar+`<div class="${modalMonthFilter===4?'':'hide-fy'}" style="overflow-x:auto">`+summaryTable;
+  let html=filterBar+'<div style="overflow-x:auto">'+summaryTable;
 
   TVS_BRANDS.forEach(brand=>{
     const br=a.brands[brand];
@@ -3130,12 +3135,14 @@ function renderREModal(recIdx){
   recomputeBrandTotals(recIdx,RE_BRANDS);
   const d=deriveActuals(a,t.ad_type);
   const vis=getVisibleMonths(),nc=vis.length*2+3,adType=t.ad_type;
+  const totLabel=modalMonthFilter===4?'FY Total':(QTRS[modalMonthFilter]+' Total');
+  const vSum=(arr)=>vis.reduce((s,i)=>s+(+(arr[i])||0),0);
 
   function colHdrs(){
     return '<tr>'
       +'<th rowspan="2" style="min-width:160px;text-align:left;position:sticky;left:0;z-index:3;background:var(--bg3)">Metric</th>'
       +vis.map(i=>'<th colspan="2" style="text-align:center;border-left:1px solid var(--border2);background:var(--bg2);font-size:11px">'+MONTHS[i]+'</th>').join('')
-      +'<th colspan="2" class="fy-col" style="text-align:center;font-size:11px">FY</th>'
+      +'<th colspan="2" class="fy-col" style="text-align:center;font-size:11px">'+totLabel+'</th>'
       +'</tr><tr>'
       +vis.map(()=>'<th style="font-size:9px;color:var(--blue);padding:2px 4px;border-left:1px solid var(--border2)">ACT</th><th style="font-size:9px;color:var(--text3);padding:2px 4px;min-width:48px">TGT</th>').join('')
       +'<th class="fy-col" style="font-size:9px;color:var(--blue);padding:2px 4px">ACT</th><th class="fy-col" style="font-size:9px;color:var(--text3);padding:2px 4px">TGT</th></tr>';
@@ -3143,17 +3150,17 @@ function renderREModal(recIdx){
   function bInp(label,cls,field,arr,step,brand){
     const dec=step==='1'?0:2;
     const cells=vis.map(i=>{const v=+(arr[i]||0);return'<td style="border-left:1px solid var(--border2)"><input class="pl-input '+cls+'" type="number" step="'+step+'" value="'+v.toFixed(dec)+'" data-field="'+field+'" data-month="'+i+'" data-rec="'+recIdx+'" data-brand="'+brand+'" onfocus="if(+this.value===0)this.value=\'\'" onblur="if(this.value===\'\')this.value=\'0\'" onchange="onBrandInputChange(this)"></td><td class="tgt-col nd">—</td>';}).join('');
-    const fy=arr.reduce((s,v)=>s+(+v||0),0);
+    const fy=vSum(arr);
     return '<tr class="row-input"><td class="mc">'+label+'</td>'+cells+'<td class="fy-col">'+fmtC(fy,dec)+'</td><td class="fy-col tgt-col nd">—</td></tr>';
   }
   function bCmp(label,arr,cls,dec,tA){
     const cells=vis.map(i=>{const tv=tA?tA[i]:null;return'<td class="'+cls+'" style="border-left:1px solid var(--border2)">'+fmtC(arr[i],dec)+'</td>'+(tv!=null?'<td class="tgt-col '+cls+'">'+fmtC(tv,dec)+'</td>':'<td class="tgt-col nd">—</td>');}).join('');
-    const fy=arr.reduce((s,v)=>s+(+v||0),0),fyT=tA?tA.reduce((s,v)=>s+(+v||0),0):null;
+    const fy=vSum(arr),fyT=tA?vSum(tA):null;
     return '<tr class="row-computed"><td class="mc">'+label+'</td>'+cells+'<td class="fy-col '+cls+'">'+fmtC(fy,dec)+'</td><td class="fy-col tgt-col '+cls+'">'+(fyT!=null?fmtC(fyT,dec):'—')+'</td></tr>';
   }
   function bPct(label,nA,dA,cls,tN,tD){
     const cells=vis.map(i=>{const v=dA[i]?pct(nA[i],dA[i]):0;const tv=(tN&&tD&&tD[i])?pct(tN[i],tD[i]):null;return'<td class="'+cls+' cv-pct" style="border-left:1px solid var(--border2)">'+fmtP(v)+'</td>'+(tv!=null?'<td class="tgt-col cv-pct">'+fmtP(tv)+'</td>':'<td class="tgt-col nd">—</td>');}).join('');
-    const fn=nA.reduce((s,v)=>s+v,0),fd=dA.reduce((s,v)=>s+v,0),tfn=tN?tN.reduce((s,v)=>s+v,0):0,tfd=tD?tD.reduce((s,v)=>s+v,0):0;
+    const fn=vis.reduce((s,i)=>s+nA[i],0),fd=vis.reduce((s,i)=>s+dA[i],0),tfn=tN?vis.reduce((s,i)=>s+tN[i],0):0,tfd=tD?vis.reduce((s,i)=>s+tD[i],0):0;
     return '<tr class="row-margin"><td class="mc">'+label+'</td>'+cells+'<td class="fy-col '+cls+' cv-pct">'+fmtP(fd?pct(fn,fd):0)+'</td><td class="fy-col tgt-col cv-pct">'+(tfd?fmtP(pct(tfn,tfd)):'—')+'</td></tr>';
   }
   function sec(lbl){return'<tr class="row-section"><td colspan="'+nc+'">'+lbl+'</td></tr>';}
@@ -3168,7 +3175,7 @@ function renderREModal(recIdx){
   }
   function bRatio(label,nA,dA,scale,cls,dec){
     const cells=vis.map(i=>{const v=(+dA[i]||0)>0?((+nA[i]||0)*scale)/(+dA[i]):0;return'<td class="'+cls+'" style="border-left:1px solid var(--border2)">'+fmtC(v,dec)+'</td><td class="tgt-col nd">—</td>';}).join('');
-    const fn=nA.reduce((s,v)=>s+(+v||0),0),fd=dA.reduce((s,v)=>s+(+v||0),0);
+    const fn=vis.reduce((s,i)=>s+(+nA[i]||0),0),fd=vis.reduce((s,i)=>s+(+dA[i]||0),0);
     return'<tr class="row-computed"><td class="mc">'+label+'</td>'+cells+'<td class="fy-col '+cls+'">'+fmtC(fd>0?fn*scale/fd:0,dec)+'</td><td class="fy-col tgt-col nd">—</td></tr>';
   }
   function totalTable(d,label,tRevM,tMktgM,tCCM,tGM,tGPM,tLeadsM){
@@ -3292,7 +3299,7 @@ function renderREModal(recIdx){
   const tGM=tRevM.map((r,i)=>r-tMktgM[i]),tGPM=tGM.map((g,i)=>g-tCCM[i]);
   const tLeadsM=t.leads.monthly.map(v=>Math.round(v*100000));
   const COLS={ICE:'#4a1a0a',EV:'#1a3a1a'};
-  let html=filterBar()+`<div class="${modalMonthFilter===4?'':'hide-fy'}" style="overflow-x:auto">`;
+  let html=filterBar()+'<div style="overflow-x:auto">';
   html+=totalTable(d,'TOTAL — RE ICE + EV Flying Flea',tRevM,tMktgM,tCCM,tGM,tGPM,tLeadsM,adType==='CPS'?a.retails:null);
   RE_BRANDS.forEach(brand=>{
     const br=a.brands[brand],bd=deriveActuals(br,adType);
