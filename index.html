@@ -551,7 +551,7 @@ canvas{max-height:260px}
       <div class="brand-mark">🏍️</div>
       <div class="brand-text">
         <div class="t1">Bike AOP Tracker</div>
-        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.0.87</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 07/05/2026 12:37</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
+        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.0.88</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 07/05/2026 12:50</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
       </div>
     </div>
     <div class="hdr-right">
@@ -701,6 +701,7 @@ canvas{max-height:260px}
   <div class="vtab"        data-v="leads"  onclick="setView('leads')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>Leads</div>
   <div class="vtab"        data-v="mktg"   onclick="setView('mktg')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l18-5v12L3 13zM11.6 16.8a3 3 0 1 1-5.8-1.6"/></svg>Mktg</div>
   <div class="vtab"        data-v="cc"     onclick="setView('cc')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>CC</div>
+  <div class="vtab"        data-v="revrec" onclick="setView('revrec')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>Rev Recon</div>
 </div>
 <div class="period-bar" id="period-bar"></div>
 
@@ -728,7 +729,8 @@ canvas{max-height:260px}
 <div id="leads-area" class="hidden" style="padding:0 16px"></div>
 <div id="team-area" class="hidden" style="padding:0 16px"></div>
 <div id="mktg-area" class="hidden" style="padding:0 16px"></div>
-<div id="cc-area"   class="hidden" style="padding:0 16px"></div>
+<div id="cc-area"      class="hidden" style="padding:0 16px"></div>
+<div id="revrec-area" class="hidden" style="padding:0 16px"></div>
 </div><!-- /#page-tracker -->
 
 <!-- ============= PAGE: CLIENTS ============= -->
@@ -817,7 +819,7 @@ function oemBadge(client){
 }
 
 const ACT_KEY='leadbu_actuals_fy27_v2';
-const DEPLOY_TIME='2026-05-07T12:37:35Z'; // replaced with ISO timestamp at deploy time
+const DEPLOY_TIME='2026-05-07T12:50:51Z'; // replaced with ISO timestamp at deploy time
 let ACTUALS=TARGETS.map(()=>newActualRec()); // populated by Firebase onValue
 
 function newActualRec(){
@@ -1638,7 +1640,7 @@ function updateLastSaved(isoStr){
 }
 function showDeployTime(){
   const el=document.getElementById('hdr-deployed');
-  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-05-07T12:37:35Z')return;
+  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-05-07T12:50:51Z')return;
   try{
     const d=new Date(DEPLOY_TIME);
     const pad=n=>String(n).padStart(2,'0');
@@ -2011,19 +2013,21 @@ function setView(v){
   const isT=v==='team';
   const isM=v==='mktg';
   const isCC=v==='cc';
-  document.getElementById('table-area').classList.toggle('hidden',isC||isL||isT||isM||isCC);
+  const isRR=v==='revrec';
+  document.getElementById('table-area').classList.toggle('hidden',isC||isL||isT||isM||isCC||isRR);
   document.getElementById('charts-area').classList.toggle('hidden',!isC);
   document.getElementById('leads-area').classList.toggle('hidden',!isL);
   document.getElementById('team-area').classList.toggle('hidden',!isT);
   document.getElementById('mktg-area').classList.toggle('hidden',!isM);
   document.getElementById('cc-area').classList.toggle('hidden',!isCC);
+  document.getElementById('revrec-area').classList.toggle('hidden',!isRR);
   buildPeriodBar();
   render();
 }
 function setMode(m){DISP_MODE=m;['tgt','act','tva','all'].forEach(x=>document.getElementById('m-'+x).classList.toggle('active',x===m));render();}
 function buildPeriodBar(){
   const pb=document.getElementById('period-bar');
-  if(VIEW==='fy'||VIEW==='charts'||VIEW==='leads'||VIEW==='team'||VIEW==='mktg'||VIEW==='cc'){pb.classList.remove('show');return;}
+  if(VIEW==='fy'||VIEW==='charts'||VIEW==='leads'||VIEW==='team'||VIEW==='mktg'||VIEW==='cc'||VIEW==='revrec'){pb.classList.remove('show');return;}
   pb.classList.add('show');
   const labels=VIEW==='mon'?MONTHS:QTRS.map(q=>q+' FY27');
   pb.innerHTML=`<span style="font-size:10px;color:var(--text2);margin-right:4px">${VIEW==='mon'?'Month:':'Quarter:'}</span>`;
@@ -2291,6 +2295,7 @@ function render(){
   if(VIEW==='leads'){renderLeads(rows);return;}
   if(VIEW==='mktg'){renderMktg(rows);return;}
   if(VIEW==='cc'){renderCC(rows);return;}
+  if(VIEW==='revrec'){renderRevRecon(rows);return;}
   if(VIEW==='team'){renderTeam();return;}
   const thead=document.getElementById('thead');
   const tbody=document.getElementById('tbody');
@@ -3961,6 +3966,7 @@ function exportCSVDispatch(){
   if(VIEW==='leads'){exportLeadsCSV();return;}
   if(VIEW==='mktg'){exportMktgCSV();return;}
   if(VIEW==='cc'){exportCCCSV();return;}
+  if(VIEW==='revrec'){exportRevReconCSV();return;}
   exportCSV();
 }
 
@@ -4160,6 +4166,248 @@ function exportMktgCSV(){
       gRoas.toFixed(2),meRoas.toFixed(2)]);
   });
   _dlCSV(_exportStamp(pTag),hdr,dataRows);
+}
+
+// ═══════════════════════════
+// REVENUE RECONCILIATION TAB
+// ═══════════════════════════
+let REVREC_PERIOD='fy';
+
+function renderRevRecon(rows){
+  const el=document.getElementById('revrec-area');
+  if(!el)return;
+
+  // Only rows with any revenue signal
+  const revRows=rows.filter(({t,a,d})=>(t.rev&&t.rev.fy>0)||(d.rev_fy>0)||(d.billed_rev_fy>0));
+  if(!revRows.length){
+    el.innerHTML='<p style="color:var(--text3);padding:24px">No revenue data found.</p>';return;
+  }
+
+  const pid=REVREC_PERIOD;
+  const fmt2=v=>v===0?'—':v.toFixed(2);
+  const fmtDiff=(v)=>{
+    if(Math.abs(v)<0.005)return '<span style="color:var(--text3)">—</span>';
+    const col=v>=0?'#3fb950':'#f85149';
+    return '<span style="color:'+col+';font-weight:600">'+(v>0?'+':'')+v.toFixed(2)+'</span>';
+  };
+
+  // Slicing helper (same logic as CC tab)
+  function cSlice(arr,pid){
+    if(!arr||!arr.length)return 0;
+    if(pid==='fy')return arr.reduce((s,v)=>s+(+v||0),0);
+    if(pid.startsWith('q')){const s=+pid[1]*3;return(+arr[s]||0)+(+arr[s+1]||0)+(+arr[s+2]||0);}
+    return +(arr[+pid.slice(1)])||0;
+  }
+
+  // Period labels for columns
+  function colLabels(pid){
+    if(pid==='fy')return MONTHS;
+    if(pid.startsWith('q')){const s=+pid[1]*3;return MONTHS.slice(s,s+3);}
+    return [MONTHS[+pid.slice(1)]];
+  }
+  function colIndices(pid){
+    if(pid==='fy')return Array.from({length:12},(_,i)=>i);
+    if(pid.startsWith('q')){const s=+pid[1]*3;return[s,s+1,s+2];}
+    return[+pid.slice(1)];
+  }
+  const cols=colIndices(pid);
+  const lbls=colLabels(pid);
+
+  // Period buttons
+  const periods=[
+    {id:'fy',label:'Full Year'},
+    {id:'q0',label:'Q1 Apr-Jun'},{id:'q1',label:'Q2 Jul-Sep'},
+    {id:'q2',label:'Q3 Oct-Dec'},{id:'q3',label:'Q4 Jan-Mar'},
+    ...MONTHS.map((m,i)=>({id:'m'+i,label:m}))
+  ];
+  const pb=periods.map(p=>{
+    const act=p.id===pid;
+    return `<button onclick="REVREC_PERIOD='${p.id}';renderRevRecon(getFiltered())" style="padding:4px 10px;font-size:11px;border-radius:4px;border:1px solid var(--border2);cursor:pointer;margin:2px;background:${act?'var(--blue)':'var(--bg2)'};color:${act?'#fff':'var(--text2)'}">${p.label}</button>`;
+  }).join('');
+
+  const _lt=document.body.classList.contains('light');
+  const thH='padding:5px 8px;font-size:10px;font-weight:600;text-align:right;border-bottom:2px solid var(--border2);border-left:1px solid var(--border2);white-space:nowrap';
+  const td='padding:5px 8px;font-size:11.5px;text-align:right;border-bottom:1px solid var(--border2);border-left:1px solid var(--border2)';
+  const tdL='padding:5px 10px;font-size:11px;border-bottom:1px solid var(--border2);position:sticky;left:0;z-index:1;background:var(--bg)';
+  const tdType='padding:5px 6px;font-size:10px;border-bottom:1px solid var(--border2);border-left:1px solid var(--border2)';
+
+  // Totals accumulators (12-month arrays)
+  const gTgt=Array(12).fill(0),gAccrued=Array(12).fill(0),gBilled=Array(12).fill(0);
+
+  // Build header
+  const showFY=cols.length>1; // show FY total column when multiple months visible
+  let html=`<div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center;margin-bottom:16px">${pb}
+    <button onclick="exportRevReconCSV()" style="margin-left:auto;padding:4px 12px;font-size:11px;border-radius:4px;border:1px solid var(--border2);cursor:pointer;background:var(--bg2);color:var(--text2);display:inline-flex;align-items:center;gap:5px">⬇ Export CSV</button>
+  </div>`;
+
+  html+='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">';
+  html+='<thead><tr>';
+  html+='<th style="text-align:left;padding:6px 10px;position:sticky;left:0;z-index:3;background:var(--bg3);border-bottom:2px solid var(--border2);min-width:150px">Account</th>';
+  html+='<th style="text-align:left;padding:6px 6px;background:var(--bg3);border-bottom:2px solid var(--border2);font-size:10px;color:var(--text3);min-width:55px;border-left:1px solid var(--border2)">Type</th>';
+  html+='<th style="'+thH+';background:var(--bg3);color:var(--text2);min-width:100px;border-left:1px solid var(--border2)">Metric</th>';
+  lbls.forEach(m=>{html+=`<th style="${thH};background:var(--bg2);color:var(--text1);min-width:72px">${m}</th>`;});
+  if(showFY)html+=`<th style="${thH};background:${_lt?'rgba(99,102,241,.07)':'#1a1a25'};color:${_lt?'var(--text1)':'var(--accent3)'};border-left:2px solid var(--accent3)">FY Total</th>`;
+  html+='</tr></thead><tbody>';
+
+  // Color helpers
+  const diffColor=v=>Math.abs(v)<0.005?'var(--text3)':v>=0?'#3fb950':'#f85149';
+
+  const METRICS=[
+    {key:'tgt',   label:'Target Revenue (Lacs)',  color:'var(--text2)',  italic:false},
+    {key:'acc',   label:'Accrued Revenue (Lacs)',  color:'#58a6ff',      italic:false},
+    {key:'bill',  label:'Billed Revenue (Lacs)',   color:'#3fb950',      italic:false},
+    {key:'diff',  label:'Accrued vs Billed (Lacs)',color:'var(--text3)', italic:true},
+    {key:'tdiff', label:'Target vs Billed (Lacs)', color:'var(--text3)', italic:true},
+  ];
+
+  let lastClient='';
+  revRows.forEach(({t,a,d},ri)=>{
+    const tgtM  =t.rev&&t.rev.monthly?t.rev.monthly:Array(12).fill(0);
+    const accM  =d.rev||Array(12).fill(0);
+    const billM =d.billed_rev||Array(12).fill(0);
+    const isCPS =t.ad_type==='CPS';
+
+    // Accumulate totals
+    cols.forEach(i=>{gTgt[i]+=(+tgtM[i]||0);gAccrued[i]+=(+accM[i]||0);gBilled[i]+=(+billM[i]||0);});
+
+    const isNewClient=t.client!==lastClient;
+    lastClient=t.client;
+
+    // Client group header
+    if(isNewClient){
+      const span=2+1+cols.length+(showFY?1:0);
+      html+=`<tr><td colspan="${span}" style="padding:4px 10px;background:${_lt?'rgba(99,102,241,.05)':'rgba(99,102,241,.08)'};font-size:11px;font-weight:700;color:var(--accent);border-top:2px solid var(--accent)44;letter-spacing:.3px">${t.client}</td></tr>`;
+    }
+
+    METRICS.forEach(({key,label,color,italic},mi)=>{
+      const isFirst=mi===0;
+      const rowBg=mi===3||mi===4?(_lt?'rgba(0,0,0,.02)':'rgba(255,255,255,.01)'):'';
+      html+=`<tr style="background:${rowBg}" onmouseenter="this.style.background='var(--bg2)'" onmouseleave="this.style.background='${rowBg}'">`;
+      // Account + type only on first metric row
+      if(isFirst){
+        html+=`<td rowspan="5" style="${tdL};color:var(--text1);font-weight:500">${t.client}<br><span style="font-size:10px;color:var(--text3)">${t.btl||'—'}</span></td>`;
+        html+=`<td rowspan="5" style="${tdType}"><span style="display:inline-block;padding:1px 6px;border-radius:4px;font-size:9.5px;font-weight:600;background:var(--accent)22;color:var(--accent)">${t.ad_type}</span></td>`;
+      }
+      html+=`<td style="padding:5px 8px;font-size:10.5px;border-bottom:1px solid var(--border2);border-left:1px solid var(--border2);color:${color};${italic?'font-style:italic':''};white-space:nowrap">${label}</td>`;
+      cols.forEach(i=>{
+        let v;
+        if(key==='tgt')    v=+tgtM[i]||0;
+        else if(key==='acc')  v=+accM[i]||0;
+        else if(key==='bill') v=isCPS?(+billM[i]||0):null;
+        else if(key==='diff') v=isCPS?((+accM[i]||0)-(+billM[i]||0)):null;
+        else if(key==='tdiff')v=isCPS?((+billM[i]||0)-(+tgtM[i]||0)):null;
+        if(v===null){html+=`<td style="${td};color:var(--text3)">—</td>`;return;}
+        if(key==='diff'||key==='tdiff'){
+          html+=`<td style="${td};color:${diffColor(key==='diff'?-v:v)};font-weight:600">${Math.abs(v)<0.005?'—':(v>0?'+':'')+v.toFixed(2)}</td>`;
+        }else{
+          html+=`<td style="${td};color:${color}">${v===0?'—':v.toFixed(2)}</td>`;
+        }
+      });
+      if(showFY){
+        const fySt='border-left:2px solid var(--accent3);background:'+(_lt?'rgba(99,102,241,.05)':'#15152080');
+        if(key==='tgt'){
+          const v=cols.reduce((s,i)=>s+(+tgtM[i]||0),0);
+          html+=`<td style="${td};${fySt};font-weight:700;color:var(--text2)">${v===0?'—':v.toFixed(2)}</td>`;
+        }else if(key==='acc'){
+          const v=cols.reduce((s,i)=>s+(+accM[i]||0),0);
+          html+=`<td style="${td};${fySt};font-weight:700;color:#58a6ff">${v===0?'—':v.toFixed(2)}</td>`;
+        }else if(key==='bill'){
+          const v=isCPS?cols.reduce((s,i)=>s+(+billM[i]||0),0):null;
+          html+=v===null?`<td style="${td};${fySt};color:var(--text3)">—</td>`:`<td style="${td};${fySt};font-weight:700;color:#3fb950">${v===0?'—':v.toFixed(2)}</td>`;
+        }else if(key==='diff'){
+          const v=isCPS?cols.reduce((s,i)=>s+(+accM[i]||0)-(+billM[i]||0),0):null;
+          html+=v===null?`<td style="${td};${fySt};color:var(--text3)">—</td>`:`<td style="${td};${fySt};font-weight:700;color:${diffColor(-v)}">${Math.abs(v)<0.005?'—':(v>0?'+':'')+v.toFixed(2)}</td>`;
+        }else{
+          const v=isCPS?cols.reduce((s,i)=>s+(+billM[i]||0)-(+tgtM[i]||0),0):null;
+          html+=v===null?`<td style="${td};${fySt};color:var(--text3)">—</td>`:`<td style="${td};${fySt};font-weight:700;color:${diffColor(v)}">${Math.abs(v)<0.005?'—':(v>0?'+':'')+v.toFixed(2)}</td>`;
+        }
+      }
+      html+='</tr>';
+    });
+  });
+
+  // Grand Total rows
+  const totSpan=3;
+  const gtBg=_lt?'rgba(99,102,241,.06)':'rgba(99,102,241,.1)';
+  html+=`<tr><td colspan="${2+1+cols.length+(showFY?1:0)}" style="padding:2px 10px;background:var(--bg2);border-top:2px solid var(--accent)44;font-size:10px;color:var(--accent);font-weight:700;letter-spacing:.3px">◈ GRAND TOTAL</td></tr>`;
+  [
+    {key:'tgt', label:'Target Revenue (Lacs)',   color:'var(--text2)'},
+    {key:'acc', label:'Accrued Revenue (Lacs)',   color:'#58a6ff'},
+    {key:'bill',label:'Billed Revenue (Lacs)',    color:'#3fb950'},
+    {key:'diff',label:'Accrued vs Billed (Lacs)', color:'var(--text3)',italic:true},
+    {key:'tdiff',label:'Target vs Billed (Lacs)', color:'var(--text3)',italic:true},
+  ].forEach(({key,label,color,italic})=>{
+    html+=`<tr style="background:${gtBg}" onmouseenter="this.style.background='var(--bg2)'" onmouseleave="this.style.background='${gtBg}'">`;
+    html+=`<td colspan="2" style="padding:5px 10px;font-size:10.5px;font-weight:700;border-bottom:1px solid var(--border2);color:var(--accent);border-top:1px solid var(--accent)22;position:sticky;left:0;background:${gtBg}">Total</td>`;
+    html+=`<td style="padding:5px 8px;font-size:10.5px;border-bottom:1px solid var(--border2);border-left:1px solid var(--border2);color:${color};${italic?'font-style:italic':''}">${label}</td>`;
+    cols.forEach(i=>{
+      let v;
+      if(key==='tgt')     v=+gTgt[i]||0;
+      else if(key==='acc') v=+gAccrued[i]||0;
+      else if(key==='bill')v=+gBilled[i]||0;
+      else if(key==='diff')v=(+gAccrued[i]||0)-(+gBilled[i]||0);
+      else                 v=(+gBilled[i]||0)-(+gTgt[i]||0);
+      if(key==='diff'||key==='tdiff'){
+        html+=`<td style="${td};color:${diffColor(key==='diff'?-v:v)};font-weight:600;background:${gtBg}">${Math.abs(v)<0.005?'—':(v>0?'+':'')+v.toFixed(2)}</td>`;
+      }else{
+        html+=`<td style="${td};color:${color};font-weight:700;background:${gtBg}">${v===0?'—':v.toFixed(2)}</td>`;
+      }
+    });
+    if(showFY){
+      const fySt='border-left:2px solid var(--accent3);background:'+(_lt?'rgba(99,102,241,.09)':'#1a1a2a');
+      const gv=(arr)=>cols.reduce((s,i)=>s+(+arr[i]||0),0);
+      let v;
+      if(key==='tgt')     v=gv(gTgt);
+      else if(key==='acc') v=gv(gAccrued);
+      else if(key==='bill')v=gv(gBilled);
+      else if(key==='diff')v=gv(gAccrued)-gv(gBilled);
+      else                 v=gv(gBilled)-gv(gTgt);
+      if(key==='diff'||key==='tdiff'){
+        html+=`<td style="${td};${fySt};color:${diffColor(key==='diff'?-v:v)};font-weight:700">${Math.abs(v)<0.005?'—':(v>0?'+':'')+v.toFixed(2)}</td>`;
+      }else{
+        html+=`<td style="${td};${fySt};font-weight:700;color:${color}">${v===0?'—':v.toFixed(2)}</td>`;
+      }
+    }
+    html+='</tr>';
+  });
+
+  html+='</tbody></table></div>';
+
+  // Legend
+  html+=`<div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:12px;padding:10px 14px;background:var(--bg2);border-radius:8px;border:1px solid var(--border2);font-size:10.5px;color:var(--text3)">
+    <span><span style="color:var(--text2);font-weight:600">Target</span> — AOP target revenue for the period</span>
+    <span><span style="color:#58a6ff;font-weight:600">Accrued</span> — Notional revenue reported to management (Retails × CAC + Adj)</span>
+    <span><span style="color:#3fb950;font-weight:600">Billed</span> — Post-reconciliation revenue (Billed Retails × CAC) · CPS only</span>
+    <span><span style="color:#f85149;font-weight:600">Diff (Accrued vs Billed)</span> — Positive = over-accrued · Negative = under-accrued</span>
+  </div>`;
+  el.innerHTML=html;
+}
+
+function exportRevReconCSV(){
+  const rows=getFiltered();
+  const revRows=rows.filter(({t,d})=>(t.rev&&t.rev.fy>0)||(d.rev_fy>0)||(d.billed_rev_fy>0));
+  const hdr=['Account','BTL','Type','Metric',...MONTHS,'FY Total'];
+  const dataRows=[];
+  function cSlice(arr,pid){if(!arr||!arr.length)return 0;if(pid==='fy')return arr.reduce((s,v)=>s+(+v||0),0);if(pid.startsWith('q')){const s=+pid[1]*3;return(+arr[s]||0)+(+arr[s+1]||0)+(+arr[s+2]||0);}return+(arr[+pid.slice(1)])||0;}
+  revRows.forEach(({t,a,d})=>{
+    const tgtM=t.rev&&t.rev.monthly?t.rev.monthly:Array(12).fill(0);
+    const accM=d.rev||Array(12).fill(0);
+    const billM=d.billed_rev||Array(12).fill(0);
+    const isCPS=t.ad_type==='CPS';
+    const m12=(arr)=>Array(12).fill(0).map((_,i)=>((+arr[i]||0)).toFixed(2));
+    const fy=(arr)=>arr.reduce((s,v)=>s+(+v||0),0).toFixed(2);
+    const diff12=(a,b)=>Array(12).fill(0).map((_,i)=>((+a[i]||0)-(+b[i]||0)).toFixed(2));
+    const fy2=(a,b)=>(a.reduce((s,v)=>s+(+v||0),0)-b.reduce((s,v)=>s+(+v||0),0)).toFixed(2);
+    dataRows.push([t.client,t.btl||'—',t.ad_type,'Target Revenue (Lacs)',...m12(tgtM),fy(tgtM)]);
+    dataRows.push([t.client,t.btl||'—',t.ad_type,'Accrued Revenue (Lacs)',...m12(accM),fy(accM)]);
+    dataRows.push([t.client,t.btl||'—',t.ad_type,'Billed Revenue (Lacs)',...(isCPS?m12(billM):Array(12).fill('—')),(isCPS?fy(billM):'—')]);
+    dataRows.push([t.client,t.btl||'—',t.ad_type,'Accrued vs Billed (Lacs)',...(isCPS?diff12(accM,billM):Array(12).fill('—')),(isCPS?fy2(accM,billM):'—')]);
+    dataRows.push([t.client,t.btl||'—',t.ad_type,'Target vs Billed (Lacs)',...(isCPS?diff12(billM,tgtM):Array(12).fill('—')),(isCPS?fy2(billM,tgtM):'—')]);
+    dataRows.push(Array(hdr.length).fill(''));
+  });
+  const now=new Date(),p=n=>String(n).padStart(2,'0');
+  const stamp=p(now.getDate())+p(now.getMonth()+1)+now.getFullYear()+'_'+p(now.getHours())+p(now.getMinutes());
+  _dlCSV('BikeAOP_RevRecon_'+stamp,hdr,dataRows);
 }
 
 // ═══════════════════════════
