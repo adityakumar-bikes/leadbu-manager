@@ -551,7 +551,7 @@ canvas{max-height:260px}
       <div class="brand-mark">🏍️</div>
       <div class="brand-text">
         <div class="t1">Bike AOP Tracker</div>
-        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.0.89</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 07/05/2026 12:55</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
+        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.0.90</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 07/05/2026 13:00</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
       </div>
     </div>
     <div class="hdr-right">
@@ -819,7 +819,7 @@ function oemBadge(client){
 }
 
 const ACT_KEY='leadbu_actuals_fy27_v2';
-const DEPLOY_TIME='2026-05-07T12:55:24Z'; // replaced with ISO timestamp at deploy time
+const DEPLOY_TIME='2026-05-07T13:00:31Z'; // replaced with ISO timestamp at deploy time
 let ACTUALS=TARGETS.map(()=>newActualRec()); // populated by Firebase onValue
 
 function newActualRec(){
@@ -1640,7 +1640,7 @@ function updateLastSaved(isoStr){
 }
 function showDeployTime(){
   const el=document.getElementById('hdr-deployed');
-  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-05-07T12:55:24Z')return;
+  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-05-07T13:00:31Z')return;
   try{
     const d=new Date(DEPLOY_TIME);
     const pad=n=>String(n).padStart(2,'0');
@@ -4256,7 +4256,6 @@ function renderRevRecon(rows){
     {key:'tgt',   label:'Target Revenue (Lacs)',  color:'var(--text2)',  italic:false},
     {key:'acc',   label:'Accrued Revenue (Lacs)',  color:'#58a6ff',      italic:false},
     {key:'bill',  label:'Billed Revenue (Lacs)',   color:'#3fb950',      italic:false},
-    {key:'diff',  label:'Accrued vs Billed (Lacs)',color:'var(--text3)', italic:true},
   ];
 
   let lastClient='';
@@ -4280,12 +4279,12 @@ function renderRevRecon(rows){
 
     METRICS.forEach(({key,label,color,italic},mi)=>{
       const isFirst=mi===0;
-      const rowBg=mi===3||mi===4?(_lt?'rgba(0,0,0,.02)':'rgba(255,255,255,.01)'):'';
+      const rowBg='';
       html+=`<tr style="background:${rowBg}" onmouseenter="this.style.background='var(--bg2)'" onmouseleave="this.style.background='${rowBg}'">`;
       // Account + type only on first metric row
       if(isFirst){
-        html+=`<td rowspan="5" style="${tdL};color:var(--text1);font-weight:500">${t.client}<br><span style="font-size:10px;color:var(--text3)">${t.btl||'—'}</span></td>`;
-        html+=`<td rowspan="5" style="${tdType}"><span style="display:inline-block;padding:1px 6px;border-radius:4px;font-size:9.5px;font-weight:600;background:var(--accent)22;color:var(--accent)">${t.ad_type}</span></td>`;
+        html+=`<td rowspan="3" style="${tdL};color:var(--text1);font-weight:500">${t.client}<br><span style="font-size:10px;color:var(--text3)">${t.btl||'—'}</span></td>`;
+        html+=`<td rowspan="3" style="${tdType}"><span style="display:inline-block;padding:1px 6px;border-radius:4px;font-size:9.5px;font-weight:600;background:var(--accent)22;color:var(--accent)">${t.ad_type}</span></td>`;
       }
       html+=`<td style="padding:5px 8px;font-size:10.5px;border-bottom:1px solid var(--border2);border-left:1px solid var(--border2);color:${color};${italic?'font-style:italic':''};white-space:nowrap">${label}</td>`;
       cols.forEach(i=>{
@@ -4333,7 +4332,6 @@ function renderRevRecon(rows){
     {key:'tgt', label:'Target Revenue (Lacs)',   color:'var(--text2)'},
     {key:'acc', label:'Accrued Revenue (Lacs)',   color:'#58a6ff'},
     {key:'bill',label:'Billed Revenue (Lacs)',    color:'#3fb950'},
-    {key:'diff',label:'Accrued vs Billed (Lacs)', color:'var(--text3)',italic:true},
   ].forEach(({key,label,color,italic})=>{
     html+=`<tr style="background:${gtBg}" onmouseenter="this.style.background='var(--bg2)'" onmouseleave="this.style.background='${gtBg}'">`;
     html+=`<td colspan="2" style="padding:5px 10px;font-size:10.5px;font-weight:700;border-bottom:1px solid var(--border2);color:var(--accent);border-top:1px solid var(--accent)22;position:sticky;left:0;background:${gtBg}">Total</td>`;
@@ -4376,7 +4374,6 @@ function renderRevRecon(rows){
     <span><span style="color:var(--text2);font-weight:600">Target</span> — AOP target revenue for the period</span>
     <span><span style="color:#58a6ff;font-weight:600">Accrued</span> — Notional revenue reported to management (Retails × CAC + Adj)</span>
     <span><span style="color:#3fb950;font-weight:600">Billed</span> — Post-reconciliation revenue (Billed Retails × CAC) · CPS only</span>
-    <span><span style="color:#f85149;font-weight:600">Diff (Accrued vs Billed)</span> — Positive = over-accrued · Negative = under-accrued</span>
   </div>`;
   el.innerHTML=html;
 }
@@ -4399,7 +4396,6 @@ function exportRevReconCSV(){
     dataRows.push([t.client,t.btl||'—',t.ad_type,'Target Revenue (Lacs)',...m12(tgtM),fy(tgtM)]);
     dataRows.push([t.client,t.btl||'—',t.ad_type,'Accrued Revenue (Lacs)',...m12(accM),fy(accM)]);
     dataRows.push([t.client,t.btl||'—',t.ad_type,'Billed Revenue (Lacs)',...(isCPS?m12(billM):Array(12).fill('—')),(isCPS?fy(billM):'—')]);
-    dataRows.push([t.client,t.btl||'—',t.ad_type,'Accrued vs Billed (Lacs)',...(isCPS?diff12(accM,billM):Array(12).fill('—')),(isCPS?fy2(accM,billM):'—')]);
     dataRows.push(Array(hdr.length).fill(''));
   });
   const now=new Date(),p=n=>String(n).padStart(2,'0');
