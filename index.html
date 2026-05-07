@@ -551,7 +551,7 @@ canvas{max-height:260px}
       <div class="brand-mark">🏍️</div>
       <div class="brand-text">
         <div class="t1">Bike AOP Tracker</div>
-        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.0.85</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 07/05/2026 11:13</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
+        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.0.86</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 07/05/2026 11:21</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
       </div>
     </div>
     <div class="hdr-right">
@@ -817,7 +817,7 @@ function oemBadge(client){
 }
 
 const ACT_KEY='leadbu_actuals_fy27_v2';
-const DEPLOY_TIME='2026-05-07T11:13:36Z'; // replaced with ISO timestamp at deploy time
+const DEPLOY_TIME='2026-05-07T11:21:15Z'; // replaced with ISO timestamp at deploy time
 let ACTUALS=TARGETS.map(()=>newActualRec()); // populated by Firebase onValue
 
 function newActualRec(){
@@ -1638,7 +1638,7 @@ function updateLastSaved(isoStr){
 }
 function showDeployTime(){
   const el=document.getElementById('hdr-deployed');
-  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-05-07T11:13:36Z')return;
+  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-05-07T11:21:15Z')return;
   try{
     const d=new Date(DEPLOY_TIME);
     const pad=n=>String(n).padStart(2,'0');
@@ -2538,7 +2538,7 @@ function renderModal(recIdx){
       +textRow('Adj. Comment','rev_adj_comment',a.rev_adj_comment)
       +compRow('= Total Revenue / Notional (Calc + Adj)',revTotal,'cv-rev-total',1,tRevM)
       +sectionRow('── BILLED REVENUE (Post Reconciliation) ──')
-      +inputRow('Billed Retails (units reconciled)','','billed_retails',aBilledRet,'1','Actual retails after month-end reconciliation — separate from notional revenue reported to management')
+      +inputRow('Billed Retails (units reconciled)','','billed_retails',aBilledRet,'1')
       +compRow('= Billed Revenue (Billed Retails × CAC)',d.billed_rev,'cv-rev',1)
       +sectionRow('── ROAS INPUTS (Ad Revenue) ──')
       +inputRow('Google Expected Cr% (%)','cpl-input','google_cr_pct',aGCr,'0.01','Auto-computes Google Rev = Cr% × Google Leads × CAC')
@@ -3094,7 +3094,7 @@ function renderTVSModal(recIdx){
     const brBilledRev=brBilledRet.map((r,i)=>brCAC[i]*r/100000);
     html+=bCmpR('= Total Revenue / Notional (Calc+Adj)',brRevTotal,'cv-rev-total',1);
     html+=sec('── BILLED REVENUE ──');
-    html+=bInpR('Billed Retails (reconciled)','','billed_retails',brBilledRet,'1',brand,'Actual units after month-end reconciliation');
+    html+=bInpR('Billed Retails (reconciled)','','billed_retails',brBilledRet,'1',brand);
     html+=bCmpR('= Billed Revenue (Billed Retails × CAC)',brBilledRev,'cv-rev',1);
     html+=sec('── ROAS INPUTS (Ad Revenue) ──');
     html+=bInpR('Google Expected Cr% (%)','cpl-input','google_cr_pct',brGCr,'0.01',brand,'');
