@@ -551,7 +551,7 @@ canvas{max-height:260px}
       <div class="brand-mark">🏍️</div>
       <div class="brand-text">
         <div class="t1">Bike AOP Tracker</div>
-        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.0.88</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 07/05/2026 12:50</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
+        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.0.89</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 07/05/2026 12:55</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
       </div>
     </div>
     <div class="hdr-right">
@@ -819,7 +819,7 @@ function oemBadge(client){
 }
 
 const ACT_KEY='leadbu_actuals_fy27_v2';
-const DEPLOY_TIME='2026-05-07T12:50:51Z'; // replaced with ISO timestamp at deploy time
+const DEPLOY_TIME='2026-05-07T12:55:24Z'; // replaced with ISO timestamp at deploy time
 let ACTUALS=TARGETS.map(()=>newActualRec()); // populated by Firebase onValue
 
 function newActualRec(){
@@ -1640,7 +1640,7 @@ function updateLastSaved(isoStr){
 }
 function showDeployTime(){
   const el=document.getElementById('hdr-deployed');
-  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-05-07T12:50:51Z')return;
+  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-05-07T12:55:24Z')return;
   try{
     const d=new Date(DEPLOY_TIME);
     const pad=n=>String(n).padStart(2,'0');
@@ -4257,7 +4257,6 @@ function renderRevRecon(rows){
     {key:'acc',   label:'Accrued Revenue (Lacs)',  color:'#58a6ff',      italic:false},
     {key:'bill',  label:'Billed Revenue (Lacs)',   color:'#3fb950',      italic:false},
     {key:'diff',  label:'Accrued vs Billed (Lacs)',color:'var(--text3)', italic:true},
-    {key:'tdiff', label:'Target vs Billed (Lacs)', color:'var(--text3)', italic:true},
   ];
 
   let lastClient='';
@@ -4335,7 +4334,6 @@ function renderRevRecon(rows){
     {key:'acc', label:'Accrued Revenue (Lacs)',   color:'#58a6ff'},
     {key:'bill',label:'Billed Revenue (Lacs)',    color:'#3fb950'},
     {key:'diff',label:'Accrued vs Billed (Lacs)', color:'var(--text3)',italic:true},
-    {key:'tdiff',label:'Target vs Billed (Lacs)', color:'var(--text3)',italic:true},
   ].forEach(({key,label,color,italic})=>{
     html+=`<tr style="background:${gtBg}" onmouseenter="this.style.background='var(--bg2)'" onmouseleave="this.style.background='${gtBg}'">`;
     html+=`<td colspan="2" style="padding:5px 10px;font-size:10.5px;font-weight:700;border-bottom:1px solid var(--border2);color:var(--accent);border-top:1px solid var(--accent)22;position:sticky;left:0;background:${gtBg}">Total</td>`;
@@ -4402,7 +4400,6 @@ function exportRevReconCSV(){
     dataRows.push([t.client,t.btl||'—',t.ad_type,'Accrued Revenue (Lacs)',...m12(accM),fy(accM)]);
     dataRows.push([t.client,t.btl||'—',t.ad_type,'Billed Revenue (Lacs)',...(isCPS?m12(billM):Array(12).fill('—')),(isCPS?fy(billM):'—')]);
     dataRows.push([t.client,t.btl||'—',t.ad_type,'Accrued vs Billed (Lacs)',...(isCPS?diff12(accM,billM):Array(12).fill('—')),(isCPS?fy2(accM,billM):'—')]);
-    dataRows.push([t.client,t.btl||'—',t.ad_type,'Target vs Billed (Lacs)',...(isCPS?diff12(billM,tgtM):Array(12).fill('—')),(isCPS?fy2(billM,tgtM):'—')]);
     dataRows.push(Array(hdr.length).fill(''));
   });
   const now=new Date(),p=n=>String(n).padStart(2,'0');
