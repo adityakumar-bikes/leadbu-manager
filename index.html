@@ -551,7 +551,7 @@ canvas{max-height:260px}
       <div class="brand-mark">🏍️</div>
       <div class="brand-text">
         <div class="t1">Bike AOP Tracker</div>
-        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.1.4</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 08/05/2026 14:53</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
+        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.1.5</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 08/05/2026 15:25</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
       </div>
     </div>
     <div class="hdr-right">
@@ -821,7 +821,7 @@ function oemBadge(client){
 }
 
 const ACT_KEY='leadbu_actuals_fy27_v2';
-const DEPLOY_TIME='2026-05-08T14:53:23Z'; // replaced with ISO timestamp at deploy time
+const DEPLOY_TIME='2026-05-08T15:25:09Z'; // replaced with ISO timestamp at deploy time
 let ACTUALS=TARGETS.map(()=>newActualRec()); // populated by Firebase onValue
 
 function newActualRec(){
@@ -1647,7 +1647,7 @@ function updateLastSaved(isoStr){
 }
 function showDeployTime(){
   const el=document.getElementById('hdr-deployed');
-  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-05-08T14:53:23Z')return;
+  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-05-08T15:25:09Z')return;
   try{
     const d=new Date(DEPLOY_TIME);
     const pad=n=>String(n).padStart(2,'0');
@@ -4019,11 +4019,11 @@ function exportCSV(){
       const nums=[];
       MONTHS.forEach((_,i)=>{
         const tGM=t.rev.monthly[i]-t.mktg.monthly[i];
-        nums.push(t.rev.monthly[i].toFixed(1),t.mktg.monthly[i].toFixed(1),tGM.toFixed(1),t.cc.monthly[i].toFixed(1),(tGM-t.cc.monthly[i]).toFixed(1),t.leads.monthly[i].toFixed(3),
-          a.paid_leads[i].toFixed(3),a.organic_leads[i].toFixed(3),d.trig_leads[i].toFixed(3),a.mktg_cpl[i].toFixed(0),d.mktg_cost[i].toFixed(1),d.rev[i].toFixed(1),d.cc[i].toFixed(1),d.gm[i].toFixed(1),d.gpm[i].toFixed(1));
+        nums.push(t.rev.monthly[i],t.mktg.monthly[i],tGM,t.cc.monthly[i],(tGM-t.cc.monthly[i]),t.leads.monthly[i],
+          a.paid_leads[i],a.organic_leads[i],d.trig_leads[i],a.mktg_cpl[i],d.mktg_cost[i],d.rev[i],d.cc[i],d.gm[i],d.gpm[i]);
       });
-      nums.push(t.rev.fy.toFixed(1),t.mktg.fy.toFixed(1),(t.rev.fy-t.mktg.fy).toFixed(1),t.cc.fy.toFixed(1),((t.rev.fy-t.mktg.fy)-t.cc.fy).toFixed(1),
-        d.rev_fy.toFixed(1),d.mktg_fy.toFixed(1),d.gm_fy.toFixed(1),d.cc_fy.toFixed(1),d.gpm_fy.toFixed(1));
+      nums.push(t.rev.fy,t.mktg.fy,(t.rev.fy-t.mktg.fy),t.cc.fy,((t.rev.fy-t.mktg.fy)-t.cc.fy),
+        d.rev_fy,d.mktg_fy,d.gm_fy,d.cc_fy,d.gpm_fy);
       return [...base,...nums];
     });
     _dlCSV(_exportStamp('tracker_FY'),hdr,dataRows);
@@ -4043,7 +4043,7 @@ function exportCSV(){
     periodTag='tracker_'+MONTHS[PERIOD];
   }
   const sumM=arr=>mIdxs.reduce((s,i)=>s+(+(arr&&arr[i]||0)),0);
-  const pct=(t,a)=>t>0?(a/t*100).toFixed(1)+'%':'—';
+  const pct=(t,a)=>t>0?(a/t*100).toFixed(2)+'%':'—';
   const hdr=['Cat','Fuel','Client','AdType','BTL','BA','Period',
     'Rev_TGT(L)','Rev_ACT(L)','Rev_ACH%',
     'MktgCost_TGT(L)','MktgCost_ACT(L)',
@@ -4060,9 +4060,9 @@ function exportCSV(){
     const plA=sumM(d.paid_leads)/100000,olA=sumM(a.organic_leads||Array(12).fill(0))/100000,tlA=sumM(d.trig_leads)/100000;
     const tcpl=plA>0?mA/plA:0;
     return [t.cat,t.fuel,t.client,t.ad_type,t.btl||'—',t.ba||'—',periodLabel,
-      rT.toFixed(1),rA.toFixed(1),pct(rT,rA),mT.toFixed(1),mA.toFixed(1),
-      gmT.toFixed(1),gmA.toFixed(1),pct(gmT,gmA),cT.toFixed(1),cA.toFixed(1),
-      gpmT.toFixed(1),gpmA.toFixed(1),pct(gpmT,gpmA),lT.toFixed(3),plA.toFixed(3),olA.toFixed(3),tlA.toFixed(3),tcpl.toFixed(0)];
+      rT,rA,pct(rT,rA),mT,mA,
+      gmT,gmA,pct(gmT,gmA),cT,cA,
+      gpmT,gpmA,pct(gpmT,gpmA),lT,plA,olA,tlA,tcpl];
   });
   _dlCSV(_exportStamp(periodTag),hdr,dataRows);
 }
@@ -4103,7 +4103,7 @@ function exportLeadsCSV(){
     'MetaLeads_ACT(L)','Meta_ACH%',
     'OrgLeads_TGT(L)','OrgLeads_ACT(L)','OrgLeads_ACH%',
     'NonMS_ACT(L)','NonMS_ACH%'];
-  const pct=(t,a)=>t>0?Math.round(a/t*100)+'%':'—';
+  const pct=(t,a)=>t>0?(a/t*100).toFixed(2)+'%':'—';
   const dataRows=[];
   lRows.forEach(({t,a,d})=>{
     const tT=gS(t.leads.monthly,pid);
@@ -4117,12 +4117,12 @@ function exportLeadsCSV(){
     const nA=gS(a.non_ms_leads||Array(12).fill(0),pid)/100000;
     if(tT===0&&tA===0) return;
     dataRows.push([t.client,t.ad_type,t.btl||'—',pLabel,
-      tT.toFixed(2),tA.toFixed(2),pct(tT,tA),
-      mT.toFixed(2),mA.toFixed(2),pct(mT,mA),
-      gA.toFixed(2),pct(mT,gA),
-      meA.toFixed(2),pct(mT,meA),
-      oT.toFixed(2),oA.toFixed(2),pct(oT,oA),
-      nA.toFixed(2),pct(tT,nA)]);
+      tT,tA,pct(tT,tA),
+      mT,mA,pct(mT,mA),
+      gA,pct(mT,gA),
+      meA,pct(mT,meA),
+      oT,oA,pct(oT,oA),
+      nA,pct(tT,nA)]);
   });
   _dlCSV(_exportStamp(pTag),hdr,dataRows);
 }
@@ -4167,7 +4167,7 @@ function exportMktgCSV(){
     'MktgSpend_TGT(L)','MktgSpend_ACT(L)',
     'GoogleSpend_ACT(L)','MetaSpend_ACT(L)',
     'Google_ROAS','Meta_ROAS'];
-  const pct=(t,a)=>t>0?(a/t*100).toFixed(1)+'%':'—';
+  const pct=(t,a)=>t>0?(a/t*100).toFixed(2)+'%':'—';
   // Grand total paid leads for contrib%
   const grandPaid=mRows.reduce((s,{d})=>s+mS(d.paid_leads,pid)/100000,0);
   const dataRows=[];
@@ -4188,15 +4188,15 @@ function exportMktgCSV(){
     const meCpl=metaL>0?meSpend/metaL:0;
     const gRoas=gSpend>0?gRevA/gSpend:0;
     const meRoas=meSpend>0?meRevA/meSpend:0;
-    const contrib=grandPaid>0?(paidL/grandPaid*100).toFixed(1)+'%':'—';
+    const contrib=grandPaid>0?(paidL/grandPaid*100).toFixed(2)+'%':'—';
     if(mLT===0&&paidL===0) return;
     dataRows.push([t.client,t.ad_type,t.btl||'—',pLabel,
-      mLT.toFixed(2),paidL.toFixed(2),contrib,
-      tcplT.toFixed(0),tcplA.toFixed(0),
-      googL.toFixed(2),gCpl.toFixed(0),
-      metaL.toFixed(2),meCpl.toFixed(0),
-      mSpT.toFixed(1),mSpA.toFixed(1),gSpend.toFixed(1),meSpend.toFixed(1),
-      gRoas.toFixed(2),meRoas.toFixed(2)]);
+      mLT,paidL,contrib,
+      tcplT,tcplA,
+      googL,gCpl,
+      metaL,meCpl,
+      mSpT,mSpA,gSpend,meSpend,
+      gRoas,meRoas]);
   });
   _dlCSV(_exportStamp(pTag),hdr,dataRows);
 }
@@ -4407,10 +4407,10 @@ function exportRevReconCSV(){
     const accM=d.rev||Array(12).fill(0);
     const billM=d.billed_rev||Array(12).fill(0);
     const isCPS=t.ad_type==='CPS';
-    const m12=(arr)=>Array(12).fill(0).map((_,i)=>((+arr[i]||0)).toFixed(2));
-    const fy=(arr)=>arr.reduce((s,v)=>s+(+v||0),0).toFixed(2);
-    const diff12=(a,b)=>Array(12).fill(0).map((_,i)=>((+a[i]||0)-(+b[i]||0)).toFixed(2));
-    const fy2=(a,b)=>(a.reduce((s,v)=>s+(+v||0),0)-b.reduce((s,v)=>s+(+v||0),0)).toFixed(2);
+    const m12=(arr)=>Array(12).fill(0).map((_,i)=>((+arr[i]||0)));
+    const fy=(arr)=>arr.reduce((s,v)=>s+(+v||0),0);
+    const diff12=(a,b)=>Array(12).fill(0).map((_,i)=>((+a[i]||0)-(+b[i]||0)));
+    const fy2=(a,b)=>(a.reduce((s,v)=>s+(+v||0),0)-b.reduce((s,v)=>s+(+v||0),0));
     dataRows.push([t.client,t.btl||'—',t.ad_type,'Target Revenue (Lacs)',...m12(tgtM),fy(tgtM)]);
     dataRows.push([t.client,t.btl||'—',t.ad_type,'Accrued Revenue (Lacs)',...m12(accM),fy(accM)]);
     dataRows.push([t.client,t.btl||'—',t.ad_type,'Billed Revenue (Lacs)',...(isCPS?m12(billM):Array(12).fill('—')),(isCPS?fy(billM):'—')]);
@@ -4658,9 +4658,9 @@ function exportRetailsCSV(){
     const pTot=visCols.reduce((s,i)=>s+aR[i],0);
     const pTrig=visCols.reduce((s,i)=>s+aT[i],0);
     const pOEM=visCols.reduce((s,i)=>s+oem[i],0);
-    const pCr=pTrig>0?+(pTot/pTrig*100).toFixed(1):0;
-    const pBD=pOEM>0?+(pTot/pOEM*100).toFixed(1):0;
-    data.push([t.client,t.btl||'—','Total',...srcCols,...(showFYcol?[pTot||'',pCr?pCr+'%':'']:[]),pOEM||'',pBD?pBD+'%':'']);
+    const pCr=pTrig>0?(pTot/pTrig*100):0;
+    const pBD=pOEM>0?(pTot/pOEM*100):0;
+    data.push([t.client,t.btl||'—','Total',...srcCols,...(showFYcol?[pTot||'',pCr?pCr.toFixed(2)+'%':'']:[]),pOEM||'',pBD?pBD.toFixed(2)+'%':'']);
     BRANDS.forEach(brand=>{
       const br=a.brands&&a.brands[brand];if(!br)return;
       const brR=Array(12).fill(0).map((_,i)=>gM(br.retails,i));
@@ -4672,10 +4672,10 @@ function exportRetailsCSV(){
       const brPT=visCols.reduce((s,i)=>s+brR[i],0);
       const brPTL=visCols.reduce((s,i)=>s+(+(brTL[i]||0)),0);
       const brPO=visCols.reduce((s,i)=>s+brOEM[i],0);
-      const brCr=brPTL>0?+(brPT/brPTL*100).toFixed(1):0;
-      const brBD=brPO>0?+(brPT/brPO*100).toFixed(1):0;
+      const brCr=brPTL>0?(brPT/brPTL*100):0;
+      const brBD=brPO>0?(brPT/brPO*100):0;
       const lblMap=t.client===TVS_CLIENT?TVS_BRAND_LABELS:t.client===BAJAJ_CLIENT?BAJAJ_BRAND_LABELS:RE_BRAND_LABELS;
-      data.push([t.client,t.btl||'—',(lblMap[brand]||brand),...brSrc,...(showFYcol?[brPT||'',brCr?brCr+'%':'']:[]),brPO||'',brBD?brBD+'%':'']);
+      data.push([t.client,t.btl||'—',(lblMap[brand]||brand),...brSrc,...(showFYcol?[brPT||'',brCr?brCr.toFixed(2)+'%':'']:[]),brPO||'',brBD?brBD.toFixed(2)+'%':'']);
     });
     data.push(Array(hdr.length).fill(''));
   });
@@ -4887,7 +4887,7 @@ function exportCCCSV(){
     'AvgSeats','PerSeatCost_Rs(blended)',
     'CCCost_TGT(L)','CCCost_ACT(L)','CCCost_ACH%',
     'CCpctRev_TGT','CCpctRev_ACT'];
-  const pct=(t,a)=>t>0?(a/t*100).toFixed(1)+'%':'—';
+  const pct=(t,a)=>t>0?(a/t*100).toFixed(2)+'%':'—';
   const dataRows=[];
   ccRows.forEach(({t,a,d})=>{
     const leadT=t.leads?cSlice(t.leads.monthly,pid):0;
@@ -4899,13 +4899,13 @@ function exportCCCSV(){
     const seatsAvg=cSeatsAvg(a.cc_seats||Array(12).fill(0),pid);
     const totalSeats=cSlice(a.cc_seats||Array(12).fill(0),pid);
     const perSeat=totalSeats>0?(ccA*100000/totalSeats):0;
-    const ccPctT=revT>0?(ccT/revT*100).toFixed(1)+'%':'—';
-    const ccPctA=revA>0?(ccA/revA*100).toFixed(1)+'%':'—';
+    const ccPctT=revT>0?(ccT/revT*100).toFixed(2)+'%':'—';
+    const ccPctA=revA>0?(ccA/revA*100).toFixed(2)+'%':'—';
     if(leadT===0&&leadA===0&&ccT===0&&ccA===0) return;
     dataRows.push([t.client,t.ad_type,pLabel,
-      leadT.toFixed(2),leadA.toFixed(2),pct(leadT,leadA),
-      seatsAvg.toFixed(1),Math.round(perSeat),
-      ccT.toFixed(2),ccA.toFixed(2),pct(ccT,ccA),
+      leadT,leadA,pct(leadT,leadA),
+      seatsAvg,perSeat,
+      ccT,ccA,pct(ccT,ccA),
       ccPctT,ccPctA]);
   });
   _dlCSV(_exportStamp('CC_'+pTag),hdr,dataRows);
