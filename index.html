@@ -551,7 +551,7 @@ canvas{max-height:260px}
       <div class="brand-mark">🏍️</div>
       <div class="brand-text">
         <div class="t1">Bike AOP Tracker</div>
-        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.1.5</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 08/05/2026 15:25</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
+        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.1.6</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 08/05/2026 15:48</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
       </div>
     </div>
     <div class="hdr-right">
@@ -821,7 +821,7 @@ function oemBadge(client){
 }
 
 const ACT_KEY='leadbu_actuals_fy27_v2';
-const DEPLOY_TIME='2026-05-08T15:25:09Z'; // replaced with ISO timestamp at deploy time
+const DEPLOY_TIME='2026-05-08T15:48:52Z'; // replaced with ISO timestamp at deploy time
 let ACTUALS=TARGETS.map(()=>newActualRec()); // populated by Firebase onValue
 
 function newActualRec(){
@@ -1647,7 +1647,7 @@ function updateLastSaved(isoStr){
 }
 function showDeployTime(){
   const el=document.getElementById('hdr-deployed');
-  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-05-08T15:25:09Z')return;
+  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-05-08T15:48:52Z')return;
   try{
     const d=new Date(DEPLOY_TIME);
     const pad=n=>String(n).padStart(2,'0');
@@ -4460,42 +4460,70 @@ function renderRetails(rows){
   const mBg=_lt?'rgba(16,185,129,.07)':'rgba(16,185,129,.13)';
   const oBg=_lt?'rgba(234,179,8,.07)':'rgba(234,179,8,.13)';
 
-  // Helper: 4-column source breakdown for one month index
-  function srcCells(i, retails, gAbs, mAbs, small){
+  // Helper: 12-column source breakdown for one month index (Leads | Retails | Cr% per source)
+  function srcCells(i, retails, gAbs, mAbs, gLeads, mLeads, orgLeads, totLeads, small){
     const sz=small?'font-size:10.5px;':'';
+    const crSz=(small?'font-size:9px;':'font-size:10.5px;');
+    const fmtCr=(r,l)=>l>0?pStr(r/l*100):'—';
     const google=gAbs[i]||0, meta=mAbs[i]||0, total=retails[i]||0;
     const organic=Math.max(0,total-google-meta);
-    return `<td style="${tdB};${sz}background:${gBg}">${google?nStr(google):'—'}</td>`
-          +`<td style="${tdB};${sz}background:${mBg}">${meta?nStr(meta):'—'}</td>`
-          +`<td style="${tdB};${sz}background:${oBg}">${organic?nStr(organic):'—'}</td>`
-          +`<td style="${tdB};${sz}">${total?nStr(total):'—'}</td>`;
+    const gL=gLeads[i]||0, mL=mLeads[i]||0, oL=orgLeads[i]||0, tL=totLeads[i]||0;
+    return (
+      `<td style="${tdB};${sz}background:${gBg}">${gL?nStr(gL):'—'}</td>`+
+      `<td style="${tdB};${sz}background:${gBg}">${google?nStr(google):'—'}</td>`+
+      `<td style="${tdB};${crSz};color:var(--blue);background:${gBg}">${fmtCr(google,gL)}</td>`+
+      `<td style="${tdB};${sz}background:${mBg}">${mL?nStr(mL):'—'}</td>`+
+      `<td style="${tdB};${sz}background:${mBg}">${meta?nStr(meta):'—'}</td>`+
+      `<td style="${tdB};${crSz};color:#10b981;background:${mBg}">${fmtCr(meta,mL)}</td>`+
+      `<td style="${tdB};${sz}background:${oBg}">${oL?nStr(oL):'—'}</td>`+
+      `<td style="${tdB};${sz}background:${oBg}">${organic?nStr(organic):'—'}</td>`+
+      `<td style="${tdB};${crSz};color:#ca8a04;background:${oBg}">${fmtCr(organic,oL)}</td>`+
+      `<td style="${tdB};${sz}">${tL?nStr(tL):'—'}</td>`+
+      `<td style="${tdB};${sz}">${total?nStr(total):'—'}</td>`+
+      `<td style="${tdB};${crSz};color:var(--accent)">${fmtCr(total,tL)}</td>`
+    );
   }
 
-  // Header row 1 — each month always spans 4 source columns
+  // 3-row header: row1=month groups (colspan=12), row2=source groups (colspan=3), row3=Leads|Retails|Cr%
+  const sSub='font-size:9px;padding:2px 4px;border-bottom:1px solid var(--border2);font-weight:700;text-align:center';
+  const sSub3='font-size:8px;padding:2px 3px;border-bottom:2px solid var(--border2);text-align:center;border-left:1px solid var(--border2);font-weight:400;color:var(--text3)';
   let html=`<div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center;margin-bottom:12px">${pb}${expBtn}</div>`;
-  html+=`<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr>`;
-  html+=`<th rowspan="2" style="${thH};text-align:left;position:sticky;left:0;z-index:3;min-width:160px">Account / Brand</th>`;
-  lbls.forEach(m=>{html+=`<th colspan="4" style="${thH}">${m}</th>`;});
-  if(showFY)html+=`<th colspan="2" style="${thH};background:${fyBg};color:var(--accent3);${fyBdr}">Period Total</th>`;
-  html+=`<th style="${thH};background:${oemBg}">OEM Sale<small style="display:block;font-weight:400;font-size:9px;color:var(--text3)">Industry Units</small></th>`;
-  html+=`<th style="${thH};background:${oemBg}">BD Contribution<small style="display:block;font-weight:400;font-size:9px;color:var(--text3)">% of OEM</small></th>`;
-  // Header row 2 — source sub-labels for every month
-  html+=`</tr><tr>`;
-  lbls.forEach(()=>{
-    html+=`<th style="font-size:9px;color:var(--blue);padding:2px 4px;border-left:1px solid var(--border2);background:${gBg}">Google</th>`;
-    html+=`<th style="font-size:9px;color:#10b981;padding:2px 4px;background:${mBg}">Meta</th>`;
-    html+=`<th style="font-size:9px;color:#ca8a04;padding:2px 4px;background:${oBg}">Organic</th>`;
-    html+=`<th style="font-size:9px;color:var(--text2);padding:2px 4px;background:var(--bg3)">Total</th>`;
-  });
+  html+=`<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead>`;
+  // Row 1: month group headers
+  html+=`<tr>`;
+  html+=`<th rowspan="3" style="${thH};text-align:left;position:sticky;left:0;z-index:3;min-width:160px">Account / Brand</th>`;
+  lbls.forEach(m=>{html+=`<th colspan="12" style="${thH}">${m}</th>`;});
   if(showFY){
-    html+=`<th style="font-size:9px;color:var(--blue);padding:2px 4px;${fyBdr};background:${fyBg}">Retails</th>`;
-    html+=`<th style="font-size:9px;color:var(--text3);padding:2px 4px;background:${fyBg}">Cr%</th>`;
+    html+=`<th rowspan="3" style="${thH};background:${fyBg};color:var(--accent3);${fyBdr}">Period<br><small style="font-weight:400;font-size:9px">Retails</small></th>`;
+    html+=`<th rowspan="3" style="${thH};background:${fyBg};color:var(--blue)">Period<br><small style="font-weight:400;font-size:9px">Cr%</small></th>`;
   }
-  html+=`<th style="background:${oemBg};border-left:1px solid var(--border2)"></th><th style="background:${oemBg}"></th>`;
-  html+=`</tr></thead><tbody>`;
+  html+=`<th rowspan="3" style="${thH};background:${oemBg}">OEM Sale<small style="display:block;font-weight:400;font-size:9px;color:var(--text3)">Industry Units</small></th>`;
+  html+=`<th rowspan="3" style="${thH};background:${oemBg}">BD Contribution<small style="display:block;font-weight:400;font-size:9px;color:var(--text3)">% of OEM</small></th>`;
+  html+=`</tr>`;
+  // Row 2: source group headers (colspan=3 each)
+  html+=`<tr>`;
+  lbls.forEach(()=>{
+    html+=`<th colspan="3" style="${sSub};color:var(--blue);border-left:1px solid var(--border2);background:${gBg}">Google</th>`;
+    html+=`<th colspan="3" style="${sSub};color:#10b981;background:${mBg}">Meta</th>`;
+    html+=`<th colspan="3" style="${sSub};color:#ca8a04;background:${oBg}">Organic</th>`;
+    html+=`<th colspan="3" style="${sSub};color:var(--text2);background:var(--bg3)">Total</th>`;
+  });
+  html+=`</tr>`;
+  // Row 3: Leads | Retails | Cr% sub-headers
+  html+=`<tr>`;
+  lbls.forEach(()=>{
+    const srcs=[{bg:gBg,cr:'var(--blue)'},{bg:mBg,cr:'#10b981'},{bg:oBg,cr:'#ca8a04'},{bg:'var(--bg3)',cr:'var(--accent)'}];
+    srcs.forEach(({bg,cr})=>{
+      html+=`<th style="${sSub3};background:${bg}">Leads</th>`;
+      html+=`<th style="${sSub3};background:${bg}">Retails</th>`;
+      html+=`<th style="${sSub3};color:${cr};background:${bg}">Cr%</th>`;
+    });
+  });
+  html+=`</tr>`;
+  html+=`</thead><tbody>`;
 
   // Grand total accumulators
-  let gR=Array(12).fill(0),gT=Array(12).fill(0),gO=Array(12).fill(0),gGA=Array(12).fill(0),gMA=Array(12).fill(0);
+  let gR=Array(12).fill(0),gT=Array(12).fill(0),gO=Array(12).fill(0),gGA=Array(12).fill(0),gMA=Array(12).fill(0),gGL=Array(12).fill(0),gML=Array(12).fill(0),gOL=Array(12).fill(0);
 
   cpsRows.forEach(({t,a,d})=>{
     const ri=TARGETS.indexOf(t);
@@ -4505,19 +4533,21 @@ function renderRetails(rows){
     const accR=Array(12).fill(0).map((_,i)=>gM(a.retails,i)+(_isJawa?gM(a.ims_retail,i):0));
     const accT=Array(12).fill(0).map((_,i)=>gM(d.trig_leads,i));
     const oemArr=Array(12).fill(0).map((_,i)=>gM(ACTUALS[ri]&&ACTUALS[ri].oem_sale,i));
-    cols.forEach(i=>{gR[i]+=accR[i];gT[i]+=accT[i];gO[i]+=oemArr[i];gGA[i]+=gM(a.google_abs_retails,i);gMA[i]+=gM(a.meta_abs_retails,i);});
+    const accGAbs=Array(12).fill(0).map((_,i)=>gM(a.google_abs_retails,i));
+    const accMAbs=Array(12).fill(0).map((_,i)=>gM(a.meta_abs_retails,i));
+    const accGL=Array(12).fill(0).map((_,i)=>gM(d.google_leads,i));
+    const accML=Array(12).fill(0).map((_,i)=>gM(d.meta_leads,i));
+    const accOL=Array(12).fill(0).map((_,i)=>gM(a.organic_leads,i));
+    cols.forEach(i=>{gR[i]+=accR[i];gT[i]+=accT[i];gO[i]+=oemArr[i];gGA[i]+=gM(a.google_abs_retails,i);gMA[i]+=gM(a.meta_abs_retails,i);gGL[i]+=accGL[i];gML[i]+=accML[i];gOL[i]+=accOL[i];});
     const pR=cSum(accR),pT=cSum(accT),pO=cSum(oemArr);
     const pCr=pT>0?pR/pT*100:0,pBD=pO>0?pR/pO*100:0;
     const bdCol=pBD>=20?'#3fb950':pBD>=10?'#e3b341':'var(--text2)';
     const abg=_lt?'rgba(99,102,241,.04)':'rgba(99,102,241,.06)';
 
-    const accGAbs=Array(12).fill(0).map((_,i)=>gM(a.google_abs_retails,i));
-    const accMAbs=Array(12).fill(0).map((_,i)=>gM(a.meta_abs_retails,i));
-
     // Account row
     html+=`<tr style="background:${abg}">`;
     html+=`<td style="${sL};background:${abg};font-weight:700;color:var(--accent)">${t.client}${t.btl?` <span style="font-size:9px;font-weight:400;color:var(--text3)">${t.btl}</span>`:''}</td>`;
-    cols.forEach(i=>{html+=srcCells(i,accR,accGAbs,accMAbs,false);});
+    cols.forEach(i=>{html+=srcCells(i,accR,accGAbs,accMAbs,accGL,accML,accOL,accT,false);});
     if(showFY)html+=`<td style="${tdB};${fyBdr};background:${fyBg};font-weight:700">${pR?nStr(pR):'—'}</td><td style="${tdB};background:${fyBg};color:var(--blue)">${pR?pStr(pCr):'—'}</td>`;
     html+=`<td style="${tdB};background:${oemBg}">${pO?nStr(pO):'—'}</td>`;
     html+=`<td style="${tdB};background:${oemBg};color:${bdCol};font-weight:600">${pO?pStr(pBD):'—'}</td>`;
@@ -4540,8 +4570,11 @@ function renderRetails(rows){
         const brGAbs=Array(12).fill(0).map((_,i)=>gM(br.google_abs_retails,i));
         const brMAbs=Array(12).fill(0).map((_,i)=>gM(br.meta_abs_retails,i));
         const brTLArr=Array(12).fill(0).map((_,i)=>gM(brTL,i));
+        const brGL=Array(12).fill(0).map((_,i)=>gM(br.google_leads,i));
+        const brML=Array(12).fill(0).map((_,i)=>gM(br.meta_leads,i));
+        const brOL=Array(12).fill(0).map((_,i)=>gM(br.organic_leads,i));
         html+=`<td style="${sL};padding-left:22px;color:var(--text2);font-size:10.5px">↳ ${shortLbl}</td>`;
-        cols.forEach(i=>{html+=srcCells(i,brR,brGAbs,brMAbs,true);});
+        cols.forEach(i=>{html+=srcCells(i,brR,brGAbs,brMAbs,brGL,brML,brOL,brTLArr,true);});
         if(showFY)html+=`<td style="${tdB};${fyBdr}">${brPR?nStr(brPR):'—'}</td><td style="${tdB};color:var(--blue)">${brPR?pStr(brCr):'—'}</td>`;
         html+=`<td style="${tdB};background:${oemBg}">${brPO?nStr(brPO):'—'}</td>`;
         html+=`<td style="${tdB};background:${oemBg};color:${brBdCol}">${brPO?pStr(brBD):'—'}</td></tr>`;
@@ -4554,7 +4587,7 @@ function renderRetails(rows){
   const gtCr=gtT>0?gtR/gtT*100:0,gtBD=gtO>0?gtR/gtO*100:0;
   const gtBg=_lt?'rgba(99,102,241,.09)':'rgba(99,102,241,.14)';
   html+=`<tr style="background:${gtBg}"><td style="${sL};background:${gtBg};font-weight:700;color:var(--accent)">◈ Grand Total</td>`;
-  cols.forEach(i=>{html+=srcCells(i,gR,gGA,gMA,false);});
+  cols.forEach(i=>{html+=srcCells(i,gR,gGA,gMA,gGL,gML,gOL,gT,false);});
   if(showFY)html+=`<td style="${tdB};${fyBdr};background:${gtBg};font-weight:700">${gtR?nStr(gtR):'—'}</td><td style="${tdB};background:${gtBg};color:var(--blue)">${gtR?pStr(gtCr):'—'}</td>`;
   html+=`<td style="${tdB};background:${gtBg};font-weight:700">${gtO?nStr(gtO):'—'}</td><td style="${tdB};background:${gtBg};font-weight:700;color:var(--blue)">${gtO?pStr(gtBD):'—'}</td></tr>`;
   html+=`</tbody></table></div>`;
@@ -4640,7 +4673,12 @@ function exportRetailsCSV(){
   const showFYcol=visCols.length>1;
   const gM=(arr,i)=>+(arr&&arr[i])||0;
   // Header: Account | BTL | Brand | [month Google, Meta, Organic, Total] × visCols | [Period Total, Cr%] | OEM Sale | BD%
-  const mHdrs=visCols.flatMap(i=>[MONTHS[i]+' Google',MONTHS[i]+' Meta',MONTHS[i]+' Organic',MONTHS[i]+' Total']);
+  const mHdrs=visCols.flatMap(i=>[
+    MONTHS[i]+' Google Leads',MONTHS[i]+' Google Retails',MONTHS[i]+' Google Cr%',
+    MONTHS[i]+' Meta Leads',MONTHS[i]+' Meta Retails',MONTHS[i]+' Meta Cr%',
+    MONTHS[i]+' Organic Leads',MONTHS[i]+' Organic Retails',MONTHS[i]+' Organic Cr%',
+    MONTHS[i]+' Total Leads',MONTHS[i]+' Total Retails',MONTHS[i]+' Total Cr%'
+  ]);
   const hdr=['Account','BTL','Brand/Sub-brand',...mHdrs,...(showFYcol?['Period Total','Period Cr%']:[]),'OEM Sale','BD Contribution%'];
   const data=[];
 
@@ -4653,8 +4691,16 @@ function exportRetailsCSV(){
     const aT=Array(12).fill(0).map((_,i)=>gM(d.trig_leads,i));
     const aG=Array(12).fill(0).map((_,i)=>gM(a.google_abs_retails,i));
     const aM=Array(12).fill(0).map((_,i)=>gM(a.meta_abs_retails,i));
+    const aGL=Array(12).fill(0).map((_,i)=>gM(d.google_leads,i));
+    const aML=Array(12).fill(0).map((_,i)=>gM(d.meta_leads,i));
+    const aOL=Array(12).fill(0).map((_,i)=>gM(a.organic_leads,i));
     // account source row
-    const srcCols=visCols.flatMap(i=>{const g=aG[i],m=aM[i],tot=aR[i],org=Math.max(0,tot-g-m);return[g||'',m||'',org||'',tot||''];});
+    const _xCr=(r,l)=>l>0?(r/l*100).toFixed(2)+'%':'';
+    const srcCols=visCols.flatMap(i=>{
+      const g=aG[i],m=aM[i],tot=aR[i],org=Math.max(0,tot-g-m);
+      const gL=aGL[i],mL=aML[i],oL=aOL[i],tL=aT[i];
+      return[gL||'',g||'',_xCr(g,gL),mL||'',m||'',_xCr(m,mL),oL||'',org||'',_xCr(org,oL),tL||'',tot||'',_xCr(tot,tL)];
+    });
     const pTot=visCols.reduce((s,i)=>s+aR[i],0);
     const pTrig=visCols.reduce((s,i)=>s+aT[i],0);
     const pOEM=visCols.reduce((s,i)=>s+oem[i],0);
@@ -4668,7 +4714,14 @@ function exportRetailsCSV(){
       const brM=Array(12).fill(0).map((_,i)=>gM(br.meta_abs_retails,i));
       const brTL=deriveActuals(br,t.ad_type).trig_leads;
       const brOEM=Array(12).fill(0).map((_,i)=>gM(br.oem_sale,i));
-      const brSrc=visCols.flatMap(i=>{const g=brG[i],m=brM[i],tot=brR[i],org=Math.max(0,tot-g-m);return[g||'',m||'',org||'',tot||''];});
+      const brGL=Array(12).fill(0).map((_,i)=>gM(br.google_leads,i));
+      const brML=Array(12).fill(0).map((_,i)=>gM(br.meta_leads,i));
+      const brOL=Array(12).fill(0).map((_,i)=>gM(br.organic_leads,i));
+      const brSrc=visCols.flatMap(i=>{
+        const g=brG[i],m=brM[i],tot=brR[i],org=Math.max(0,tot-g-m);
+        const gL=brGL[i],mL=brML[i],oL=brOL[i],tL=+(brTL[i]||0);
+        return[gL||'',g||'',_xCr(g,gL),mL||'',m||'',_xCr(m,mL),oL||'',org||'',_xCr(org,oL),tL||'',tot||'',_xCr(tot,tL)];
+      });
       const brPT=visCols.reduce((s,i)=>s+brR[i],0);
       const brPTL=visCols.reduce((s,i)=>s+(+(brTL[i]||0)),0);
       const brPO=visCols.reduce((s,i)=>s+brOEM[i],0);
