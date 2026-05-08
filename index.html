@@ -551,7 +551,7 @@ canvas{max-height:260px}
       <div class="brand-mark">🏍️</div>
       <div class="brand-text">
         <div class="t1">Bike AOP Tracker</div>
-        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.0.94</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 08/05/2026 11:14</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
+        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.0.95</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 08/05/2026 11:19</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
       </div>
     </div>
     <div class="hdr-right">
@@ -819,7 +819,7 @@ function oemBadge(client){
 }
 
 const ACT_KEY='leadbu_actuals_fy27_v2';
-const DEPLOY_TIME='2026-05-08T11:14:10Z'; // replaced with ISO timestamp at deploy time
+const DEPLOY_TIME='2026-05-08T11:19:12Z'; // replaced with ISO timestamp at deploy time
 let ACTUALS=TARGETS.map(()=>newActualRec()); // populated by Firebase onValue
 
 function newActualRec(){
@@ -1643,7 +1643,7 @@ function updateLastSaved(isoStr){
 }
 function showDeployTime(){
   const el=document.getElementById('hdr-deployed');
-  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-05-08T11:14:10Z')return;
+  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-05-08T11:19:12Z')return;
   try{
     const d=new Date(DEPLOY_TIME);
     const pad=n=>String(n).padStart(2,'0');
@@ -1866,7 +1866,7 @@ function deriveActuals(a, adType){
   return {
     paid_leads, google_leads, meta_leads, organic_leads:a.organic_leads,
     google_mktg, meta_mktg, mktg_cost:mc2,
-    google_rev, meta_rev, google_cr_pct:gCrPct, meta_cr_pct:mCrPct,
+    google_rev, meta_rev,
     ai_cost, ai_cost_q:qSum(ai_cost), ai_cost_fy:ai_cost.reduce((s,v)=>s+v,0),
     trig_leads:tl, rev, rev_calc, cc, gm:gmArr, gpm:gpmArr,
     billed_rev, billed_rev_q:qSum(billed_rev), billed_rev_fy:billed_rev.reduce((s,v)=>s+v,0),
