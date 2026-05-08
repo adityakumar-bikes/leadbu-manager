@@ -551,7 +551,7 @@ canvas{max-height:260px}
       <div class="brand-mark">🏍️</div>
       <div class="brand-text">
         <div class="t1">Bike AOP Tracker</div>
-        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.1.3</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 08/05/2026 13:25</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
+        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.1.4</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 08/05/2026 14:53</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
       </div>
     </div>
     <div class="hdr-right">
@@ -821,7 +821,7 @@ function oemBadge(client){
 }
 
 const ACT_KEY='leadbu_actuals_fy27_v2';
-const DEPLOY_TIME='2026-05-08T13:25:43Z'; // replaced with ISO timestamp at deploy time
+const DEPLOY_TIME='2026-05-08T14:53:23Z'; // replaced with ISO timestamp at deploy time
 let ACTUALS=TARGETS.map(()=>newActualRec()); // populated by Firebase onValue
 
 function newActualRec(){
@@ -1647,7 +1647,7 @@ function updateLastSaved(isoStr){
 }
 function showDeployTime(){
   const el=document.getElementById('hdr-deployed');
-  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-05-08T13:25:43Z')return;
+  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-05-08T14:53:23Z')return;
   try{
     const d=new Date(DEPLOY_TIME);
     const pad=n=>String(n).padStart(2,'0');
@@ -4264,8 +4264,14 @@ function renderRevRecon(rows){
   const tdL='padding:5px 10px;font-size:11px;border-bottom:1px solid var(--border2);position:sticky;left:0;z-index:1;background:var(--bg)';
   const tdType='padding:5px 6px;font-size:10px;border-bottom:1px solid var(--border2);border-left:1px solid var(--border2)';
 
-  // Totals accumulators (12-month arrays)
+  // Pre-compute grand totals (pass 1)
   const gTgt=Array(12).fill(0),gAccrued=Array(12).fill(0),gBilled=Array(12).fill(0);
+  revRows.forEach(({t,a,d})=>{
+    const tgtM=t.rev&&t.rev.monthly?t.rev.monthly:Array(12).fill(0);
+    const accM=d.rev||Array(12).fill(0);
+    const billM=d.billed_rev||Array(12).fill(0);
+    cols.forEach(i=>{gTgt[i]+=(+tgtM[i]||0);gAccrued[i]+=(+accM[i]||0);gBilled[i]+=(+billM[i]||0);});
+  });
 
   // Build header
   const showFY=cols.length>1; // show FY total column when multiple months visible
@@ -4291,15 +4297,37 @@ function renderRevRecon(rows){
     {key:'bill',  label:'Billed Revenue (Lacs)',   color:'#3fb950',      italic:false},
   ];
 
+  // ── Grand Total block — rendered at TOP ──
+  const gtBg=_lt?'rgba(99,102,241,.06)':'rgba(99,102,241,.1)';
+  html+=`<tr><td colspan="${2+1+cols.length+(showFY?1:0)}" style="padding:2px 10px;background:var(--bg2);border-bottom:2px solid var(--accent)44;font-size:10px;color:var(--accent);font-weight:700;letter-spacing:.3px">◈ GRAND TOTAL</td></tr>`;
+  [
+    {key:'tgt', label:'Target Revenue (Lacs)',  color:'var(--text2)'},
+    {key:'acc', label:'Accrued Revenue (Lacs)', color:'#58a6ff'},
+    {key:'bill',label:'Billed Revenue (Lacs)',  color:'#3fb950'},
+  ].forEach(({key,label,color})=>{
+    html+=`<tr style="background:${gtBg}">`;
+    html+=`<td colspan="2" style="padding:5px 10px;font-size:10.5px;font-weight:700;border-bottom:1px solid var(--border2);color:var(--accent);position:sticky;left:0;background:${gtBg}">Total</td>`;
+    html+=`<td style="padding:5px 8px;font-size:10.5px;border-bottom:1px solid var(--border2);border-left:1px solid var(--border2);color:${color}">${label}</td>`;
+    cols.forEach(i=>{
+      const v=key==='tgt'?gTgt[i]:key==='acc'?gAccrued[i]:gBilled[i];
+      html+=`<td style="${td};color:${color};font-weight:700;background:${gtBg}">${v===0?'—':v.toFixed(2)}</td>`;
+    });
+    if(showFY){
+      const fySt='border-left:2px solid var(--accent3);background:'+(_lt?'rgba(99,102,241,.09)':'#1a1a2a');
+      const v=cols.reduce((s,i)=>s+(key==='tgt'?gTgt[i]:key==='acc'?gAccrued[i]:gBilled[i]),0);
+      html+=`<td style="${td};${fySt};font-weight:700;color:${color}">${v===0?'—':v.toFixed(2)}</td>`;
+    }
+    html+='</tr>';
+  });
+  // Separator before account rows
+  html+=`<tr><td colspan="${2+1+cols.length+(showFY?1:0)}" style="padding:0;border-top:2px solid var(--accent)33"></td></tr>`;
+
   let lastClient='';
   revRows.forEach(({t,a,d},ri)=>{
     const tgtM  =t.rev&&t.rev.monthly?t.rev.monthly:Array(12).fill(0);
     const accM  =d.rev||Array(12).fill(0);
     const billM =d.billed_rev||Array(12).fill(0);
     const isCPS =t.ad_type==='CPS';
-
-    // Accumulate totals
-    cols.forEach(i=>{gTgt[i]+=(+tgtM[i]||0);gAccrued[i]+=(+accM[i]||0);gBilled[i]+=(+billM[i]||0);});
 
     const isNewClient=t.client!==lastClient;
     lastClient=t.client;
@@ -4355,49 +4383,6 @@ function renderRevRecon(rows){
       }
       html+='</tr>';
     });
-  });
-
-  // Grand Total rows
-  const totSpan=3;
-  const gtBg=_lt?'rgba(99,102,241,.06)':'rgba(99,102,241,.1)';
-  html+=`<tr><td colspan="${2+1+cols.length+(showFY?1:0)}" style="padding:2px 10px;background:var(--bg2);border-top:2px solid var(--accent)44;font-size:10px;color:var(--accent);font-weight:700;letter-spacing:.3px">◈ GRAND TOTAL</td></tr>`;
-  [
-    {key:'tgt', label:'Target Revenue (Lacs)',   color:'var(--text2)'},
-    {key:'acc', label:'Accrued Revenue (Lacs)',   color:'#58a6ff'},
-    {key:'bill',label:'Billed Revenue (Lacs)',    color:'#3fb950'},
-  ].forEach(({key,label,color,italic})=>{
-    html+=`<tr style="background:${gtBg}" onmouseenter="this.style.background='var(--bg2)'" onmouseleave="this.style.background='${gtBg}'">`;
-    html+=`<td colspan="2" style="padding:5px 10px;font-size:10.5px;font-weight:700;border-bottom:1px solid var(--border2);color:var(--accent);border-top:1px solid var(--accent)22;position:sticky;left:0;background:${gtBg}">Total</td>`;
-    html+=`<td style="padding:5px 8px;font-size:10.5px;border-bottom:1px solid var(--border2);border-left:1px solid var(--border2);color:${color};${italic?'font-style:italic':''}">${label}</td>`;
-    cols.forEach(i=>{
-      let v;
-      if(key==='tgt')     v=+gTgt[i]||0;
-      else if(key==='acc') v=+gAccrued[i]||0;
-      else if(key==='bill')v=+gBilled[i]||0;
-      else if(key==='diff')v=(+gAccrued[i]||0)-(+gBilled[i]||0);
-      else                 v=(+gBilled[i]||0)-(+gTgt[i]||0);
-      if(key==='diff'||key==='tdiff'){
-        html+=`<td style="${td};color:${diffColor(key==='diff'?-v:v)};font-weight:600;background:${gtBg}">${Math.abs(v)<0.005?'—':(v>0?'+':'')+v.toFixed(2)}</td>`;
-      }else{
-        html+=`<td style="${td};color:${color};font-weight:700;background:${gtBg}">${v===0?'—':v.toFixed(2)}</td>`;
-      }
-    });
-    if(showFY){
-      const fySt='border-left:2px solid var(--accent3);background:'+(_lt?'rgba(99,102,241,.09)':'#1a1a2a');
-      const gv=(arr)=>cols.reduce((s,i)=>s+(+arr[i]||0),0);
-      let v;
-      if(key==='tgt')     v=gv(gTgt);
-      else if(key==='acc') v=gv(gAccrued);
-      else if(key==='bill')v=gv(gBilled);
-      else if(key==='diff')v=gv(gAccrued)-gv(gBilled);
-      else                 v=gv(gBilled)-gv(gTgt);
-      if(key==='diff'||key==='tdiff'){
-        html+=`<td style="${td};${fySt};color:${diffColor(key==='diff'?-v:v)};font-weight:700">${Math.abs(v)<0.005?'—':(v>0?'+':'')+v.toFixed(2)}</td>`;
-      }else{
-        html+=`<td style="${td};${fySt};font-weight:700;color:${color}">${v===0?'—':v.toFixed(2)}</td>`;
-      }
-    }
-    html+='</tr>';
   });
 
   html+='</tbody></table></div>';
