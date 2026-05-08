@@ -551,7 +551,7 @@ canvas{max-height:260px}
       <div class="brand-mark">🏍️</div>
       <div class="brand-text">
         <div class="t1">Bike AOP Tracker</div>
-        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.1.7</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 08/05/2026 15:58</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
+        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.1.8</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 08/05/2026 16:05</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
       </div>
     </div>
     <div class="hdr-right">
@@ -821,7 +821,7 @@ function oemBadge(client){
 }
 
 const ACT_KEY='leadbu_actuals_fy27_v2';
-const DEPLOY_TIME='2026-05-08T15:58:19Z'; // replaced with ISO timestamp at deploy time
+const DEPLOY_TIME='2026-05-08T16:05:46Z'; // replaced with ISO timestamp at deploy time
 let ACTUALS=TARGETS.map(()=>newActualRec()); // populated by Firebase onValue
 
 function newActualRec(){
@@ -1647,7 +1647,7 @@ function updateLastSaved(isoStr){
 }
 function showDeployTime(){
   const el=document.getElementById('hdr-deployed');
-  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-05-08T15:58:19Z')return;
+  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-05-08T16:05:46Z')return;
   try{
     const d=new Date(DEPLOY_TIME);
     const pad=n=>String(n).padStart(2,'0');
@@ -4450,7 +4450,7 @@ function renderRetails(rows){
 
   // Styles
   const thH='padding:5px 8px;font-size:10.5px;font-weight:700;border-bottom:2px solid var(--border2);border-left:1px solid var(--border2);text-align:center;background:var(--bg3);white-space:nowrap';
-  const tdB='padding:3px 5px;font-size:10.5px;border-bottom:1px solid var(--border2);text-align:right;border-left:1px solid var(--border2);white-space:nowrap';
+  const tdB='padding:3px 6px;font-size:10.5px;border-bottom:1px solid var(--border2);text-align:right;border-left:1px solid var(--border2);white-space:nowrap;min-width:56px';
   const sL='padding:4px 10px;font-size:11px;border-bottom:1px solid var(--border2);position:sticky;left:0;z-index:1;background:var(--bg3);min-width:160px';
   const fyBg=_lt?'rgba(99,102,241,.06)':'#1a1a28';
   const fyBdr='border-left:2px solid var(--accent3)';
@@ -4486,7 +4486,7 @@ function renderRetails(rows){
 
   // 3-row header: row1=month groups (colspan=12), row2=source groups (colspan=3), row3=Leads|Retails|Cr%
   const sSub='font-size:9px;padding:2px 4px;border-bottom:1px solid var(--border2);font-weight:700;text-align:center';
-  const sSub3='font-size:8px;padding:1px 2px;border-bottom:2px solid var(--border2);text-align:center;border-left:1px solid var(--border2);font-weight:400;color:var(--text3);white-space:nowrap;overflow:hidden;min-width:42px';
+  const sSub3='font-size:8px;padding:1px 2px;border-bottom:2px solid var(--border2);text-align:center;border-left:1px solid var(--border2);font-weight:400;color:var(--text3);min-width:56px';
   let html=`<div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center;margin-bottom:12px">${pb}${expBtn}</div>`;
   html+=`<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead>`;
   // Row 1: month group headers
@@ -4515,7 +4515,7 @@ function renderRetails(rows){
     const srcs=[{bg:gBg,cr:'var(--blue)'},{bg:mBg,cr:'#10b981'},{bg:oBg,cr:'#ca8a04'},{bg:'var(--bg3)',cr:'var(--accent)'}];
     srcs.forEach(({bg,cr})=>{
       html+=`<th style="${sSub3};background:${bg}">Leads</th>`;
-      html+=`<th style="${sSub3};background:${bg}">Ret.</th>`;
+      html+=`<th style="${sSub3};background:${bg}">Retails</th>`;
       html+=`<th style="${sSub3};color:${cr};background:${bg}">Cr%</th>`;
     });
   });
