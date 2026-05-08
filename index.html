@@ -551,7 +551,7 @@ canvas{max-height:260px}
       <div class="brand-mark">🏍️</div>
       <div class="brand-text">
         <div class="t1">Bike AOP Tracker</div>
-        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.0.91</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 08/05/2026 10:26</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
+        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.0.92</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 08/05/2026 10:46</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
       </div>
     </div>
     <div class="hdr-right">
@@ -819,7 +819,7 @@ function oemBadge(client){
 }
 
 const ACT_KEY='leadbu_actuals_fy27_v2';
-const DEPLOY_TIME='2026-05-08T10:26:36Z'; // replaced with ISO timestamp at deploy time
+const DEPLOY_TIME='2026-05-08T10:46:04Z'; // replaced with ISO timestamp at deploy time
 let ACTUALS=TARGETS.map(()=>newActualRec()); // populated by Firebase onValue
 
 function newActualRec(){
@@ -1640,7 +1640,7 @@ function updateLastSaved(isoStr){
 }
 function showDeployTime(){
   const el=document.getElementById('hdr-deployed');
-  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-05-08T10:26:36Z')return;
+  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-05-08T10:46:04Z')return;
   try{
     const d=new Date(DEPLOY_TIME);
     const pad=n=>String(n).padStart(2,'0');
@@ -2027,8 +2027,18 @@ function setView(v){
 function setMode(m){DISP_MODE=m;['tgt','act','tva','all'].forEach(x=>document.getElementById('m-'+x).classList.toggle('active',x===m));render();}
 function buildPeriodBar(){
   const pb=document.getElementById('period-bar');
-  if(VIEW==='fy'||VIEW==='charts'||VIEW==='leads'||VIEW==='team'||VIEW==='mktg'||VIEW==='cc'||VIEW==='revrec'){pb.classList.remove('show');return;}
+  if(VIEW==='charts'||VIEW==='leads'||VIEW==='team'||VIEW==='mktg'||VIEW==='cc'||VIEW==='revrec'){pb.classList.remove('show');return;}
   pb.classList.add('show');
+  const exportBtn=document.createElement('button');
+  exportBtn.textContent='⬇ Export CSV';
+  exportBtn.title='Export current view as CSV';
+  exportBtn.style.cssText='margin-left:auto;padding:4px 12px;font-size:11px;border-radius:4px;border:1px solid var(--border2);cursor:pointer;background:var(--bg2);color:var(--text2);white-space:nowrap';
+  exportBtn.onclick=()=>exportCSVDispatch();
+  if(VIEW==='fy'){
+    pb.innerHTML='';
+    pb.appendChild(exportBtn);
+    return;
+  }
   const labels=VIEW==='mon'?MONTHS:QTRS.map(q=>q+' FY27');
   pb.innerHTML=`<span style="font-size:10px;color:var(--text2);margin-right:4px">${VIEW==='mon'?'Month:':'Quarter:'}</span>`;
   labels.forEach((l,i)=>{
@@ -2036,6 +2046,7 @@ function buildPeriodBar(){
     ch.onclick=()=>{PERIOD=i;pb.querySelectorAll('.pchip').forEach((c,j)=>c.classList.toggle('active',j===i));render();};
     pb.appendChild(ch);
   });
+  pb.appendChild(exportBtn);
 }
 
 // ═══════════════════════════
