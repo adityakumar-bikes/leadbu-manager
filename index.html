@@ -551,7 +551,7 @@ canvas{max-height:260px}
       <div class="brand-mark">🏍️</div>
       <div class="brand-text">
         <div class="t1">Bike AOP Tracker</div>
-        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.0.98</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 08/05/2026 11:56</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
+        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.0.99</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 08/05/2026 12:18</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
       </div>
     </div>
     <div class="hdr-right">
@@ -821,7 +821,7 @@ function oemBadge(client){
 }
 
 const ACT_KEY='leadbu_actuals_fy27_v2';
-const DEPLOY_TIME='2026-05-08T11:56:59Z'; // replaced with ISO timestamp at deploy time
+const DEPLOY_TIME='2026-05-08T12:18:24Z'; // replaced with ISO timestamp at deploy time
 let ACTUALS=TARGETS.map(()=>newActualRec()); // populated by Firebase onValue
 
 function newActualRec(){
@@ -1646,7 +1646,7 @@ function updateLastSaved(isoStr){
 }
 function showDeployTime(){
   const el=document.getElementById('hdr-deployed');
-  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-05-08T11:56:59Z')return;
+  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-05-08T12:18:24Z')return;
   try{
     const d=new Date(DEPLOY_TIME);
     const pad=n=>String(n).padStart(2,'0');
@@ -2196,6 +2196,7 @@ function newBrandRec(){
     dms_retails:Array(12).fill(0),
     voc_retails:Array(12).fill(0),
     billed_retails:Array(12).fill(0),
+    oem_sale:Array(12).fill(0),      // Total OEM industry retails for this brand (feeds Retails tab)
     // AI Bot Cost
     ai_per_lead_cost:Array(12).fill(0),   // Rs per lead (Absolute)
     ai_leads_processed:Array(12).fill(0), // count of leads processed by AI
@@ -2561,6 +2562,8 @@ function renderModal(recIdx){
       +sectionRow('── BILLED REVENUE (Post Reconciliation) ──')
       +inputRow('Billed Retails (units reconciled)','','billed_retails',aBilledRet,'1')
       +compRow('= Billed Revenue (Billed Retails × CAC)',d.billed_rev,'cv-rev',1)
+      +sectionRow('── OEM SALE ──')
+      +inputRow('OEM Industry Sale (units)','','oem_sale',a.oem_sale||Array(12).fill(0),'1','Total industry retails for this account')
       +sectionRow('── ROAS INPUTS (Ad Revenue) ──')
       +inputRow('Google Absolute Retails (count)','','google_abs_retails',aGAbsR,'1','Google ROAS retails → Rev = Retails × CAC')
       +compRow('Google Revenue from Ads (Rs Lacs)',d.google_rev,'cv-rev',2)
@@ -2742,7 +2745,7 @@ function onRevAdjCommentChange(input){
 function recomputeBrandTotals(recIdx,BRANDS){
   const a=ACTUALS[recIdx]; if(!a.brands)return;
   const get=(b,f,i)=>(+(a.brands[b]&&a.brands[b][f]&&a.brands[b][f][i])||0);
-  ['google_leads','meta_leads','organic_leads','non_ms_leads','retails','billed_retails','total_leads','seats','cc_seats','google_rev','meta_rev','google_abs_retails','meta_abs_retails','dms_retails','voc_retails','ai_leads_processed','rev_adj'].forEach(f=>{
+  ['google_leads','meta_leads','organic_leads','non_ms_leads','retails','billed_retails','oem_sale','total_leads','seats','cc_seats','google_rev','meta_rev','google_abs_retails','meta_abs_retails','dms_retails','voc_retails','ai_leads_processed','rev_adj'].forEach(f=>{
     a[f]=Array(12).fill(0).map((_,i)=>BRANDS.reduce((s,b)=>s+get(b,f,i),0));
   });
   const wtd=(f,wf)=>Array(12).fill(0).map((_,i)=>{const den=a[wf][i];return den>0?BRANDS.reduce((s,b)=>s+get(b,wf,i)*get(b,f,i),0)/den:0;});
@@ -2887,7 +2890,7 @@ function renderBajajModal(recIdx){
     const brGmTotal=bd.gm;
     const brGpmTotal=bd.gpm;
     let rev='';
-    if(adType==='CPS')rev=sec('REVENUE (CAC × Retails)')+bInp('CAC (Rs/Retail)','','cac',br.cac,'1',brand)+bInp('Retails','','retails',br.retails,'1',brand)+bCmp('= Calculated Revenue (Lacs)',bd.rev_calc,'cv-rev',1)+bInp('Revenue Adjustment (Lacs)','cv-adj','rev_adj',br.rev_adj||Array(12).fill(0),'0.01',brand)+bTxt('Adj. Comment','rev_adj_comment',br.rev_adj_comment||Array(12).fill(''),brand)+bCmp('= Total Revenue / Notional (Calc+Adj)',brRevTotal,'cv-rev-total',1)+sec('── BILLED REVENUE ──')+bInp('Billed Retails (reconciled)','','billed_retails',br.billed_retails||Array(12).fill(0),'1',brand)+bCmp('= Billed Revenue (Billed Retails × CAC)',bd.billed_rev,'cv-rev',1)+sec('ROAS INPUTS (Ad Revenue)')+bInp('Google Absolute Retails (count)','','google_abs_retails',br.google_abs_retails||Array(12).fill(0),'1',brand)+bCmp('Google Revenue from Ads (Rs Lacs)',bd.google_rev,'cv-rev',2)+bInp('Meta Absolute Retails (count)','','meta_abs_retails',br.meta_abs_retails||Array(12).fill(0),'1',brand)+bCmp('Meta Revenue from Ads (Rs Lacs)',bd.meta_rev,'cv-rev',2);
+    if(adType==='CPS')rev=sec('REVENUE (CAC × Retails)')+bInp('CAC (Rs/Retail)','','cac',br.cac,'1',brand)+bInp('Retails','','retails',br.retails,'1',brand)+bCmp('= Calculated Revenue (Lacs)',bd.rev_calc,'cv-rev',1)+bInp('Revenue Adjustment (Lacs)','cv-adj','rev_adj',br.rev_adj||Array(12).fill(0),'0.01',brand)+bTxt('Adj. Comment','rev_adj_comment',br.rev_adj_comment||Array(12).fill(''),brand)+bCmp('= Total Revenue / Notional (Calc+Adj)',brRevTotal,'cv-rev-total',1)+sec('── BILLED REVENUE ──')+bInp('Billed Retails (reconciled)','','billed_retails',br.billed_retails||Array(12).fill(0),'1',brand)+bCmp('= Billed Revenue (Billed Retails × CAC)',bd.billed_rev,'cv-rev',1)+sec('── OEM SALE ──')+bInp('OEM Industry Sale (units)','','oem_sale',br.oem_sale||Array(12).fill(0),'1',brand)+sec('ROAS INPUTS (Ad Revenue)')+bInp('Google Absolute Retails (count)','','google_abs_retails',br.google_abs_retails||Array(12).fill(0),'1',brand)+bCmp('Google Revenue from Ads (Rs Lacs)',bd.google_rev,'cv-rev',2)+bInp('Meta Absolute Retails (count)','','meta_abs_retails',br.meta_abs_retails||Array(12).fill(0),'1',brand)+bCmp('Meta Revenue from Ads (Rs Lacs)',bd.meta_rev,'cv-rev',2);
     else if(adType==='Media Leads')rev=sec('REVENUE (CPL × Leads)')+bInp('CPL Charged (Rs/Lead)','cpl-input','cpl_rate',br.cpl_rate,'1',brand)+bInp('Total Leads (count)','','total_leads',br.total_leads,'1',brand)+bCmp('= Calculated Revenue (Lacs)',bd.rev_calc,'cv-rev',1)+bInp('Revenue Adjustment (Lacs)','cv-adj','rev_adj',br.rev_adj||Array(12).fill(0),'0.01',brand)+bTxt('Adj. Comment','rev_adj_comment',br.rev_adj_comment||Array(12).fill(''),brand)+bCmp('= Total Revenue (Calc+Adj)',brRevTotal,'cv-rev-total',1)+sec('ROAS INPUTS (Ad Revenue)')+bInp('Google Absolute Retails (count)','','google_abs_retails',br.google_abs_retails||Array(12).fill(0),'1',brand)+bCmp('Google Revenue from Ads (Rs Lacs)',bd.google_rev,'cv-rev',2)+bInp('Meta Absolute Retails (count)','','meta_abs_retails',br.meta_abs_retails||Array(12).fill(0),'1',brand)+bCmp('Meta Revenue from Ads (Rs Lacs)',bd.meta_rev,'cv-rev',2);
     else if(adType==='CC contract')rev=sec('REVENUE (SeatCost × Seats)')+bInp('Seat Cost (Rs Abs)','cpl-input','seat_cost',br.seat_cost,'1',brand)+bInp('No. of Seats','','seats',br.seats,'1',brand)+bCmp('= Calculated Revenue (Lacs)',bd.rev_calc,'cv-rev',1)+bInp('Revenue Adjustment (Lacs)','cv-adj','rev_adj',br.rev_adj||Array(12).fill(0),'0.01',brand)+bTxt('Adj. Comment','rev_adj_comment',br.rev_adj_comment||Array(12).fill(''),brand)+bCmp('= Total Revenue (Calc+Adj)',brRevTotal,'cv-rev-total',1);
     return '<table class="pl-table" style="margin-bottom:14px"><thead>'+colHdrs()+'</thead><tbody>'
@@ -3117,6 +3120,8 @@ function renderTVSModal(recIdx){
     html+=sec('── BILLED REVENUE ──');
     html+=bInpR('Billed Retails (reconciled)','','billed_retails',brBilledRet,'1',brand);
     html+=bCmpR('= Billed Revenue (Billed Retails × CAC)',brBilledRev,'cv-rev',1);
+    html+=sec('── OEM SALE ──');
+    html+=bInpR('OEM Industry Sale (units)','','oem_sale',sa(br.oem_sale),'1',brand,'Total industry retails for this brand');
     html+=sec('── ROAS INPUTS (Ad Revenue) ──');
     html+=bInpR('Google Absolute Retails (count)','','google_abs_retails',brGAbsR,'1',brand,'Google ROAS retails → Rev = Retails × CAC');
     html+=bCmpR('Google Revenue from Ads (Rs Lacs)',gRev,'cv-rev',2);
@@ -3255,6 +3260,8 @@ function renderREModal(recIdx){
       +sec('── BILLED REVENUE ──')
       +bInp('Billed Retails (reconciled)','','billed_retails',br.billed_retails||Array(12).fill(0),'1',brand)
       +bCmp('= Billed Revenue (Billed Retails × CAC)',bd.billed_rev,'cv-rev',1)
+      +sec('── OEM SALE ──')
+      +bInp('OEM Industry Sale (units)','','oem_sale',br.oem_sale||Array(12).fill(0),'1',brand)
       +sec('ROAS INPUTS (Ad Revenue)')
       +bInp('Google Absolute Retails (count)','','google_abs_retails',brGAbsR,'1',brand)
       +bCmp('Google Rev from Ads (Lacs)',bd.google_rev,'cv-rev',2)
@@ -4506,15 +4513,19 @@ function renderRetails(rows){
         const br=a.brands[brand];if(!br)return;
         const brR=Array(12).fill(0).map((_,i)=>gM(br.retails,i));
         const brTL=deriveActuals(br,t.ad_type).trig_leads;
-        const brPR=cSum(brR),brPT=cSum(brTL);
+        const brOEM=Array(12).fill(0).map((_,i)=>gM(br.oem_sale,i));
+        const brPR=cSum(brR),brPT=cSum(brTL),brPO=cSum(brOEM);
         const brCr=brPT>0?brPR/brPT*100:0;
+        const brBD=brPO>0?brPR/brPO*100:0;
+        const brBdCol=brBD>=20?'#3fb950':brBD>=10?'#e3b341':'var(--text2)';
         const lblMap=isTVS?TVS_BRAND_LABELS:isBajaj?BAJAJ_BRAND_LABELS:RE_BRAND_LABELS;
         const shortLbl=(lblMap[brand]||brand).split('(')[0].trim().replace(/^(TVS|RE|Bajaj)\s*/,'');
         html+=`<tr onmouseenter="this.style.background='var(--bg2)'" onmouseleave="this.style.background=''">`;
         html+=`<td style="${sL};padding-left:22px;color:var(--text2);font-size:10.5px">↳ ${shortLbl}</td>`;
         cols.forEach(i=>{const r=brR[i],tl=gM(brTL,i),cr=tl>0?r/tl*100:0;html+=`<td style="${tdB};font-size:10.5px">${r?nStr(r):'—'}</td><td style="${tdB};color:var(--text3);font-size:10px">${r?pStr(cr):'—'}</td>`;});
         if(showFY)html+=`<td style="${tdB};${fyBdr}">${brPR?nStr(brPR):'—'}</td><td style="${tdB};color:var(--blue)">${brPR?pStr(brCr):'—'}</td>`;
-        html+=`<td style="${tdB}" colspan="2">—</td></tr>`;
+        html+=`<td style="${tdB};background:${oemBg}">${brPO?nStr(brPO):'—'}</td>`;
+        html+=`<td style="${tdB};background:${oemBg};color:${brBdCol}">${brPO?pStr(brBD):'—'}</td></tr>`;
       });
     }
   });
@@ -4528,27 +4539,6 @@ function renderRetails(rows){
   if(showFY)html+=`<td style="${tdB};${fyBdr};background:${gtBg};font-weight:700">${gtR?nStr(gtR):'—'}</td><td style="${tdB};background:${gtBg};color:var(--blue)">${gtR?pStr(gtCr):'—'}</td>`;
   html+=`<td style="${tdB};background:${gtBg};font-weight:700">${gtO?nStr(gtO):'—'}</td><td style="${tdB};background:${gtBg};font-weight:700;color:var(--blue)">${gtO?pStr(gtBD):'—'}</td></tr>`;
   html+=`</tbody></table></div>`;
-
-  // OEM Monthly Input section
-  html+=`<div style="margin-top:16px;background:var(--bg2);border-radius:10px;padding:14px 16px;border:1px solid var(--border2)">`;
-  html+=`<div style="font-size:12px;font-weight:700;color:var(--text1);margin-bottom:10px">📊 OEM Monthly Sale — Enter Total Industry Retails per Month</div>`;
-  html+=`<div style="overflow-x:auto"><table style="border-collapse:collapse;font-size:11px"><thead><tr>`;
-  html+=`<th style="padding:5px 10px;text-align:left;border-bottom:1px solid var(--border2);min-width:160px;font-size:10.5px">Account</th>`;
-  MONTHS.forEach(m=>html+=`<th style="padding:4px 6px;text-align:center;border-bottom:1px solid var(--border2);border-left:1px solid var(--border2);font-size:10px;min-width:58px;background:var(--bg3)">${m}</th>`);
-  html+=`<th style="padding:4px 6px;text-align:center;border-bottom:1px solid var(--border2);${fyBdr};font-size:10px;background:${fyBg};color:var(--accent3)">FY Total</th>`;
-  html+=`</tr></thead><tbody>`;
-  cpsRows.forEach(({t})=>{
-    const ri=TARGETS.indexOf(t);
-    const oemArr=Array(12).fill(0).map((_,i)=>gM(ACTUALS[ri]&&ACTUALS[ri].oem_sale,i));
-    const fyO=oemArr.reduce((s,v)=>s+v,0);
-    html+=`<tr><td style="padding:5px 10px;border-bottom:1px solid var(--border2);font-weight:500">${t.client}${t.btl?` <span style="font-size:9px;color:var(--text3)">${t.btl}</span>`:''}</td>`;
-    for(let mi=0;mi<12;mi++){
-      const v=oemArr[mi];
-      html+=`<td style="padding:3px 4px;border-bottom:1px solid var(--border2);border-left:1px solid var(--border2);text-align:center"><input type="number" min="0" step="1" value="${v||''}" placeholder="—" style="width:54px;background:transparent;border:1px solid var(--border2);border-radius:3px;color:var(--text1);font-size:10.5px;text-align:center;padding:2px 4px" data-rec="${ri}" data-month="${mi}" onchange="onRetailsOemChange(this)" onfocus="if(!+this.value)this.value=''" onblur="if(!this.value.trim())this.value=''"></td>`;
-    }
-    html+=`<td style="padding:5px 8px;border-bottom:1px solid var(--border2);${fyBdr};text-align:right;font-weight:700;background:${fyBg};color:var(--accent3)">${fyO?nStr(fyO):'—'}</td></tr>`;
-  });
-  html+=`</tbody></table></div></div>`;
 
   // Charts
   const PALETTE=['#818cf8','#34d399','#fb923c','#f472b6','#60a5fa','#a78bfa','#fbbf24','#22d3ee'];
@@ -4620,21 +4610,6 @@ function buildRetailsContribChart(cpsRows){
   _retailsContribChart=new Chart(ctx,{type:'bar',data:{labels:MONTHS,datasets},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:_lt?'#334155':'#cbd5e1',font:{size:10},boxWidth:12}},tooltip:{callbacks:{label:ctx=>`${ctx.dataset.label}: ${ctx.parsed.y!==null?ctx.parsed.y+'%':'—'}`}}},scales:{y:{ticks:{color:_lt?'#64748b':'#94a3b8',callback:v=>v+'%'},grid:{color:_lt?'rgba(0,0,0,.06)':'rgba(255,255,255,.06)'},beginAtZero:true},x:{ticks:{color:_lt?'#64748b':'#94a3b8',font:{size:10}},grid:{color:_lt?'rgba(0,0,0,.06)':'rgba(255,255,255,.06)'}}}}});
 }
 
-function onRetailsOemChange(inp){
-  const ri=parseInt(inp.getAttribute('data-rec'));
-  const mi=parseInt(inp.getAttribute('data-month'));
-  const v=parseFloat(inp.value)||0;
-  if(!ACTUALS[ri].oem_sale)ACTUALS[ri].oem_sale=Array(12).fill(0);
-  ACTUALS[ri].oem_sale[mi]=v;
-  saveActuals();
-  // Update only the FY total cell for this account row (no full re-render)
-  const fyTotal=Array(12).fill(0).map((_,i)=>+(ACTUALS[ri].oem_sale&&ACTUALS[ri].oem_sale[i])||0).reduce((s,x)=>s+x,0);
-  const fyCell=inp.closest('tr')&&inp.closest('tr').querySelector('td:last-child');
-  if(fyCell)fyCell.textContent=fyTotal?Math.round(fyTotal).toLocaleString('en-IN'):'—';
-  // Rebuild charts silently
-  const el=document.getElementById('retails-area');
-  if(el&&el._cpsRows){buildRetailsCrChart(el._cpsRows);buildRetailsContribChart(el._cpsRows);}
-}
 
 function exportRetailsCSV(){
   const rows=getFiltered().filter(({t})=>t.ad_type==='CPS');
