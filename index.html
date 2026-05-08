@@ -551,7 +551,7 @@ canvas{max-height:260px}
       <div class="brand-mark">🏍️</div>
       <div class="brand-text">
         <div class="t1">Bike AOP Tracker</div>
-        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.0.97</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 08/05/2026 11:48</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
+        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.0.98</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 08/05/2026 11:56</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
       </div>
     </div>
     <div class="hdr-right">
@@ -821,7 +821,7 @@ function oemBadge(client){
 }
 
 const ACT_KEY='leadbu_actuals_fy27_v2';
-const DEPLOY_TIME='2026-05-08T11:48:58Z'; // replaced with ISO timestamp at deploy time
+const DEPLOY_TIME='2026-05-08T11:56:59Z'; // replaced with ISO timestamp at deploy time
 let ACTUALS=TARGETS.map(()=>newActualRec()); // populated by Firebase onValue
 
 function newActualRec(){
@@ -1646,7 +1646,7 @@ function updateLastSaved(isoStr){
 }
 function showDeployTime(){
   const el=document.getElementById('hdr-deployed');
-  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-05-08T11:48:58Z')return;
+  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-05-08T11:56:59Z')return;
   try{
     const d=new Date(DEPLOY_TIME);
     const pad=n=>String(n).padStart(2,'0');
@@ -4568,9 +4568,15 @@ function renderRetails(rows){
   html+=`<div style="position:relative;height:260px"><canvas id="rt-contrib-chart"></canvas></div></div>`;
   html+=`</div>`;
 
+  // Prevent layout shift: lock height and restore scroll position
+  const _sy=window.scrollY;
+  el.style.minHeight=el.offsetHeight+'px';
   el.innerHTML=html;
-  // Store rows for chart updates
   el._cpsRows=cpsRows;
+  requestAnimationFrame(()=>{
+    window.scrollTo({top:_sy,behavior:'instant'});
+    el.style.minHeight='';
+  });
   setTimeout(()=>{buildRetailsCrChart(cpsRows);buildRetailsContribChart(cpsRows);},60);
 }
 
@@ -4621,7 +4627,13 @@ function onRetailsOemChange(inp){
   if(!ACTUALS[ri].oem_sale)ACTUALS[ri].oem_sale=Array(12).fill(0);
   ACTUALS[ri].oem_sale[mi]=v;
   saveActuals();
-  renderRetails(getFiltered());
+  // Update only the FY total cell for this account row (no full re-render)
+  const fyTotal=Array(12).fill(0).map((_,i)=>+(ACTUALS[ri].oem_sale&&ACTUALS[ri].oem_sale[i])||0).reduce((s,x)=>s+x,0);
+  const fyCell=inp.closest('tr')&&inp.closest('tr').querySelector('td:last-child');
+  if(fyCell)fyCell.textContent=fyTotal?Math.round(fyTotal).toLocaleString('en-IN'):'—';
+  // Rebuild charts silently
+  const el=document.getElementById('retails-area');
+  if(el&&el._cpsRows){buildRetailsCrChart(el._cpsRows);buildRetailsContribChart(el._cpsRows);}
 }
 
 function exportRetailsCSV(){
