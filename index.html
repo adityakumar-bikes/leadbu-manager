@@ -551,7 +551,7 @@ canvas{max-height:260px}
       <div class="brand-mark">🏍️</div>
       <div class="brand-text">
         <div class="t1">Bike AOP Tracker</div>
-        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.1.9</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 08/05/2026 16:12</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
+        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.2.0</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 08/05/2026 16:25</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
       </div>
     </div>
     <div class="hdr-right">
@@ -821,7 +821,7 @@ function oemBadge(client){
 }
 
 const ACT_KEY='leadbu_actuals_fy27_v2';
-const DEPLOY_TIME='2026-05-08T16:12:29Z'; // replaced with ISO timestamp at deploy time
+const DEPLOY_TIME='2026-05-08T16:25:32Z'; // replaced with ISO timestamp at deploy time
 let ACTUALS=TARGETS.map(()=>newActualRec()); // populated by Firebase onValue
 
 function newActualRec(){
@@ -1647,7 +1647,7 @@ function updateLastSaved(isoStr){
 }
 function showDeployTime(){
   const el=document.getElementById('hdr-deployed');
-  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-05-08T16:12:29Z')return;
+  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-05-08T16:25:32Z')return;
   try{
     const d=new Date(DEPLOY_TIME);
     const pad=n=>String(n).padStart(2,'0');
@@ -2420,7 +2420,7 @@ function renderModal(recIdx){
   const t=TARGETS[recIdx];
   if(t.client===BAJAJ_CLIENT){renderBajajModal(recIdx);return;}
   if(t.client===TVS_CLIENT){renderTVSModal(recIdx);return;}
-  if(t.client===RE_CLIENT && t.ad_type!=='CC contract'){renderREModal(recIdx);return;}
+  if(t.client===RE_CLIENT){renderREModal(recIdx);return;}
   const a=ACTUALS[recIdx];
   const d=deriveActuals(a, t.ad_type);
   const vis=getVisibleMonths();
@@ -3228,13 +3228,14 @@ function renderREModal(recIdx){
         +(adType==='CPS'?bCmp('Total Retails (count)',reRetails,'cv',0):'')
         +(adType==='CPS'?bPct('Overall Cr%',reRetails,d.trig_leads,'cv-pct'):'')
         +bCmp('Total Mktg Cost (Lacs)',d.mktg_cost,'cv-mktg',1,tMktgM);
+    const isCC=adType==='CC contract';
     return '<table class="pl-table" style="border:2px solid var(--blue);margin-bottom:18px"><thead>'+colHdrs()+'</thead><tbody>'
       +bhdr('◈ '+label,'#2a1a0a')
       +leadsRow
       +bCmp('Calculated Revenue (Lacs)',d.rev_calc,'cv-rev',1)
       +bCmp('Revenue Adjustment (Lacs)',reRevAdj,'cv-adj',1)
       +bCmp('= Total Revenue / Notional (Calc+Adj)',reRevTotal,'cv-rev-total',1,tRevM)
-      +bCmp('Billed Revenue (Billed Retails × CAC)',d.billed_rev,'cv-rev',1)
+      +(!isCC?bCmp('Billed Revenue (Billed Retails × CAC)',d.billed_rev,'cv-rev',1):'')
       +bCmp('Total CC Seats (count)',Array(12).fill(0).map((_,i)=>+(a.cc_seats&&a.cc_seats[i])||0),'cv',0)
       +bCmp('CC Cost (Lacs)',d.cc,'cv-mktg',2,tCCM)
       +bCmp('Abs GM',reGmTotal,'cv-gm',1,tGM)
@@ -3337,7 +3338,8 @@ function renderREModal(recIdx){
   const tLeadsM=t.leads.monthly.map(v=>Math.round(v*100000));
   const COLS={ICE:'#4a1a0a',EV:'#1a3a1a'};
   let html=filterBar()+'<div style="overflow-x:auto">';
-  html+=totalTable(d,'TOTAL — RE ICE + EV Flying Flea',tRevM,tMktgM,tCCM,tGM,tGPM,tLeadsM,adType==='CPS'?a.retails:null);
+  const _reTotalLbl=adType==='CC contract'?'TOTAL — RE ICE CC + RE EV CC':'TOTAL — RE ICE + EV Flying Flea';
+  html+=totalTable(d,_reTotalLbl,tRevM,tMktgM,tCCM,tGM,tGPM,tLeadsM,adType==='CPS'?a.retails:null);
   RE_BRANDS.forEach(brand=>{
     const br=a.brands[brand],bd=deriveActuals(br,adType);
     html+=brandTable(brand,br,bd,adType,RE_BRAND_LABELS[brand],COLS[brand]||'#4a1a0a');
