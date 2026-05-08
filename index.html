@@ -551,7 +551,7 @@ canvas{max-height:260px}
       <div class="brand-mark">🏍️</div>
       <div class="brand-text">
         <div class="t1">Bike AOP Tracker</div>
-        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.1.1</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 08/05/2026 12:59</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
+        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.1.2</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 08/05/2026 13:14</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
       </div>
     </div>
     <div class="hdr-right">
@@ -821,7 +821,7 @@ function oemBadge(client){
 }
 
 const ACT_KEY='leadbu_actuals_fy27_v2';
-const DEPLOY_TIME='2026-05-08T12:59:18Z'; // replaced with ISO timestamp at deploy time
+const DEPLOY_TIME='2026-05-08T13:14:08Z'; // replaced with ISO timestamp at deploy time
 let ACTUALS=TARGETS.map(()=>newActualRec()); // populated by Firebase onValue
 
 function newActualRec(){
@@ -1646,7 +1646,7 @@ function updateLastSaved(isoStr){
 }
 function showDeployTime(){
   const el=document.getElementById('hdr-deployed');
-  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-05-08T12:59:18Z')return;
+  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-05-08T13:14:08Z')return;
   try{
     const d=new Date(DEPLOY_TIME);
     const pad=n=>String(n).padStart(2,'0');
@@ -4431,7 +4431,6 @@ function exportRevReconCSV(){
 // RETAILS TAB
 // ═══════════════════════════
 let RETAILS_PERIOD='fy';
-let RETAILS_DRILL_MONTH=null;   // null=collapsed, 0-11=expanded month index
 let _retailsCrChart=null, _retailsContribChart=null;
 
 function renderRetails(rows){
@@ -4443,7 +4442,7 @@ function renderRetails(rows){
 
   // Period selector
   const RPER=[{id:'fy',label:'Full Year'},{id:'q0',label:'Q1'},{id:'q1',label:'Q2'},{id:'q2',label:'Q3'},{id:'q3',label:'Q4'},...MONTHS.map((m,i)=>({id:'m'+i,label:m}))];
-  const pb=RPER.map(p=>{const a=RETAILS_PERIOD===p.id;return`<button class="pchip"${a?' style="background:var(--blue2);color:#fff;border-color:var(--blue)"':''} onclick="RETAILS_PERIOD='${p.id}';RETAILS_DRILL_MONTH=null;renderRetails(getFiltered())">${p.label}</button>`;}).join('');
+  const pb=RPER.map(p=>{const a=RETAILS_PERIOD===p.id;return`<button class="pchip"${a?' style="background:var(--blue2);color:#fff;border-color:var(--blue)"':''} onclick="RETAILS_PERIOD='${p.id}';renderRetails(getFiltered())">${p.label}</button>`;}).join('');
   const expBtn=`<button onclick="exportRetailsCSV()" style="margin-left:auto;padding:4px 12px;font-size:11px;border-radius:4px;border:1px solid var(--border2);cursor:pointer;background:var(--bg2);color:var(--text2);white-space:nowrap">⬇ Export CSV</button>`;
 
   function colIdx(pid){if(pid==='fy')return Array.from({length:12},(_,i)=>i);if(pid.startsWith('q')){const s=+pid[1]*3;return[s,s+1,s+2];}return[+pid.slice(1)];}
@@ -4462,52 +4461,37 @@ function renderRetails(rows){
   const fyBg=_lt?'rgba(99,102,241,.06)':'#1a1a28';
   const fyBdr='border-left:2px solid var(--accent3)';
   const oemBg=_lt?'rgba(20,184,166,.07)':'rgba(20,184,166,.12)';
-  // Source-drill column colours
+  // Source column colours
   const gBg=_lt?'rgba(59,130,246,.07)':'rgba(59,130,246,.13)';
   const mBg=_lt?'rgba(16,185,129,.07)':'rgba(16,185,129,.13)';
   const oBg=_lt?'rgba(234,179,8,.07)':'rgba(234,179,8,.13)';
 
-  // Helper: render data cells for one column index (drilled = 4 source cols, normal = retails+cr%)
-  function drillCells(i, retails, trigLeads, gAbs, mAbs, rowBg, small){
+  // Helper: 4-column source breakdown for one month index
+  function srcCells(i, retails, gAbs, mAbs, small){
     const sz=small?'font-size:10.5px;':'';
-    if(RETAILS_DRILL_MONTH===i){
-      const google=gAbs[i]||0, meta=mAbs[i]||0, total=retails[i]||0;
-      const organic=Math.max(0,total-google-meta);
-      return `<td style="${tdB};${sz}background:${gBg}">${google?nStr(google):'—'}</td>`
-            +`<td style="${tdB};${sz}background:${mBg}">${meta?nStr(meta):'—'}</td>`
-            +`<td style="${tdB};${sz}background:${oBg}">${organic?nStr(organic):'—'}</td>`
-            +`<td style="${tdB};${sz}font-weight:700">${total?nStr(total):'—'}</td>`;
-    }
-    const r=retails[i]||0,tl=trigLeads[i]||0,cr=tl>0?r/tl*100:0;
-    return `<td style="${tdB};${sz}">${r?nStr(r):'—'}</td><td style="${tdB};${sz}color:var(--${small?'text3':'blue'});font-size:10px">${r?pStr(cr):'—'}</td>`;
+    const google=gAbs[i]||0, meta=mAbs[i]||0, total=retails[i]||0;
+    const organic=Math.max(0,total-google-meta);
+    return `<td style="${tdB};${sz}background:${gBg}">${google?nStr(google):'—'}</td>`
+          +`<td style="${tdB};${sz}background:${mBg}">${meta?nStr(meta):'—'}</td>`
+          +`<td style="${tdB};${sz}background:${oBg}">${organic?nStr(organic):'—'}</td>`
+          +`<td style="${tdB};${sz}">${total?nStr(total):'—'}</td>`;
   }
 
-  // Header row 1
+  // Header row 1 — each month always spans 4 source columns
   let html=`<div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center;margin-bottom:12px">${pb}${expBtn}</div>`;
   html+=`<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr>`;
   html+=`<th rowspan="2" style="${thH};text-align:left;position:sticky;left:0;z-index:3;min-width:160px">Account / Brand</th>`;
-  lbls.forEach((m,ci)=>{
-    const mi=cols[ci],isA=RETAILS_DRILL_MONTH===mi;
-    const span=isA?4:2;
-    const bg=isA?'background:var(--blue2);color:#fff;border-bottom:2px solid var(--blue)':'';
-    html+=`<th colspan="${span}" data-drill-month="${mi}" style="${thH};cursor:pointer;user-select:none;${bg}" onclick="toggleRetailsDrill(${mi})" title="Click for source breakdown">${m}${isA?' ▲':' ▾'}</th>`;
-  });
+  lbls.forEach(m=>{html+=`<th colspan="4" style="${thH}">${m}</th>`;});
   if(showFY)html+=`<th colspan="2" style="${thH};background:${fyBg};color:var(--accent3);${fyBdr}">Period Total</th>`;
   html+=`<th style="${thH};background:${oemBg}">OEM Sale<small style="display:block;font-weight:400;font-size:9px;color:var(--text3)">Industry Units</small></th>`;
   html+=`<th style="${thH};background:${oemBg}">BD Contribution<small style="display:block;font-weight:400;font-size:9px;color:var(--text3)">% of OEM</small></th>`;
-  // Header row 2 (sub-labels)
+  // Header row 2 — source sub-labels for every month
   html+=`</tr><tr>`;
-  lbls.forEach((_,ci)=>{
-    const mi=cols[ci];
-    if(RETAILS_DRILL_MONTH===mi){
-      html+=`<th style="font-size:9px;color:var(--blue);padding:2px 4px;border-left:1px solid var(--border2);background:${gBg}">Google</th>`;
-      html+=`<th style="font-size:9px;color:#10b981;padding:2px 4px;background:${mBg}">Meta</th>`;
-      html+=`<th style="font-size:9px;color:#ca8a04;padding:2px 4px;background:${oBg}">Organic</th>`;
-      html+=`<th style="font-size:9px;color:var(--text2);padding:2px 4px">Total</th>`;
-    } else {
-      html+=`<th style="font-size:9px;color:var(--blue);padding:2px 4px;border-left:1px solid var(--border2);background:var(--bg3)">Retails</th>`;
-      html+=`<th style="font-size:9px;color:var(--text3);padding:2px 4px;background:var(--bg3)">Cr%</th>`;
-    }
+  lbls.forEach(()=>{
+    html+=`<th style="font-size:9px;color:var(--blue);padding:2px 4px;border-left:1px solid var(--border2);background:${gBg}">Google</th>`;
+    html+=`<th style="font-size:9px;color:#10b981;padding:2px 4px;background:${mBg}">Meta</th>`;
+    html+=`<th style="font-size:9px;color:#ca8a04;padding:2px 4px;background:${oBg}">Organic</th>`;
+    html+=`<th style="font-size:9px;color:var(--text2);padding:2px 4px;background:var(--bg3)">Total</th>`;
   });
   if(showFY){
     html+=`<th style="font-size:9px;color:var(--blue);padding:2px 4px;${fyBdr};background:${fyBg}">Retails</th>`;
@@ -4538,7 +4522,7 @@ function renderRetails(rows){
     // Account row
     html+=`<tr style="background:${abg}">`;
     html+=`<td style="${sL};background:${abg};font-weight:700;color:var(--accent)">${t.client}${t.btl?` <span style="font-size:9px;font-weight:400;color:var(--text3)">${t.btl}</span>`:''}</td>`;
-    cols.forEach(i=>{html+=drillCells(i,accR,accT,accGAbs,accMAbs,'',false);});
+    cols.forEach(i=>{html+=srcCells(i,accR,accGAbs,accMAbs,false);});
     if(showFY)html+=`<td style="${tdB};${fyBdr};background:${fyBg};font-weight:700">${pR?nStr(pR):'—'}</td><td style="${tdB};background:${fyBg};color:var(--blue)">${pR?pStr(pCr):'—'}</td>`;
     html+=`<td style="${tdB};background:${oemBg}">${pO?nStr(pO):'—'}</td>`;
     html+=`<td style="${tdB};background:${oemBg};color:${bdCol};font-weight:600">${pO?pStr(pBD):'—'}</td>`;
@@ -4562,7 +4546,7 @@ function renderRetails(rows){
         const brMAbs=Array(12).fill(0).map((_,i)=>gM(br.meta_abs_retails,i));
         const brTLArr=Array(12).fill(0).map((_,i)=>gM(brTL,i));
         html+=`<td style="${sL};padding-left:22px;color:var(--text2);font-size:10.5px">↳ ${shortLbl}</td>`;
-        cols.forEach(i=>{html+=drillCells(i,brR,brTLArr,brGAbs,brMAbs,'',true);});
+        cols.forEach(i=>{html+=srcCells(i,brR,brGAbs,brMAbs,true);});
         if(showFY)html+=`<td style="${tdB};${fyBdr}">${brPR?nStr(brPR):'—'}</td><td style="${tdB};color:var(--blue)">${brPR?pStr(brCr):'—'}</td>`;
         html+=`<td style="${tdB};background:${oemBg}">${brPO?nStr(brPO):'—'}</td>`;
         html+=`<td style="${tdB};background:${oemBg};color:${brBdCol}">${brPO?pStr(brBD):'—'}</td></tr>`;
@@ -4575,7 +4559,7 @@ function renderRetails(rows){
   const gtCr=gtT>0?gtR/gtT*100:0,gtBD=gtO>0?gtR/gtO*100:0;
   const gtBg=_lt?'rgba(99,102,241,.09)':'rgba(99,102,241,.14)';
   html+=`<tr style="background:${gtBg}"><td style="${sL};background:${gtBg};font-weight:700;color:var(--accent)">◈ Grand Total</td>`;
-  cols.forEach(i=>{html+=drillCells(i,gR,gT,gGA,gMA,'',false);});
+  cols.forEach(i=>{html+=srcCells(i,gR,gGA,gMA,false);});
   if(showFY)html+=`<td style="${tdB};${fyBdr};background:${gtBg};font-weight:700">${gtR?nStr(gtR):'—'}</td><td style="${tdB};background:${gtBg};color:var(--blue)">${gtR?pStr(gtCr):'—'}</td>`;
   html+=`<td style="${tdB};background:${gtBg};font-weight:700">${gtO?nStr(gtO):'—'}</td><td style="${tdB};background:${gtBg};font-weight:700;color:var(--blue)">${gtO?pStr(gtBD):'—'}</td></tr>`;
   html+=`</tbody></table></div>`;
@@ -4610,10 +4594,6 @@ function renderRetails(rows){
   setTimeout(()=>{buildRetailsCrChart(cpsRows);buildRetailsContribChart(cpsRows);},60);
 }
 
-function toggleRetailsDrill(mi){
-  RETAILS_DRILL_MONTH=RETAILS_DRILL_MONTH===mi?null:mi;
-  renderRetails(getFiltered());
-}
 
 
 function buildRetailsCrChart(cpsRows){
@@ -4659,28 +4639,47 @@ function buildRetailsContribChart(cpsRows){
 
 function exportRetailsCSV(){
   const rows=getFiltered().filter(({t})=>t.ad_type==='CPS');
-  const hdr=['Account','BTL','Brand/Sub-brand','Metric',...MONTHS,'FY Total'];
+  // Compute visible columns from current period selector
+  function _colIdx(pid){if(pid==='fy')return Array.from({length:12},(_,i)=>i);if(pid.startsWith('q')){const s=+pid[1]*3;return[s,s+1,s+2];}return[+pid.slice(1)];}
+  const visCols=_colIdx(RETAILS_PERIOD);
+  const showFYcol=visCols.length>1;
+  const gM=(arr,i)=>+(arr&&arr[i])||0;
+  // Header: Account | BTL | Brand | [month Google, Meta, Organic, Total] × visCols | [Period Total, Cr%] | OEM Sale | BD%
+  const mHdrs=visCols.flatMap(i=>[MONTHS[i]+' Google',MONTHS[i]+' Meta',MONTHS[i]+' Organic',MONTHS[i]+' Total']);
+  const hdr=['Account','BTL','Brand/Sub-brand',...mHdrs,...(showFYcol?['Period Total','Period Cr%']:[]),'OEM Sale','BD Contribution%'];
   const data=[];
+
   rows.forEach(({t,a,d})=>{
     const ri=TARGETS.indexOf(t);
     const BRANDS=t.client===TVS_CLIENT?TVS_BRANDS:t.client===BAJAJ_CLIENT?BAJAJ_BRANDS:t.client===RE_CLIENT?RE_BRANDS:[];
-    const oem=Array(12).fill(0).map((_,i)=>+(ACTUALS[ri]&&ACTUALS[ri].oem_sale&&ACTUALS[ri].oem_sale[i])||0);
-    const aR=Array(12).fill(0).map((_,i)=>+(a.retails&&a.retails[i])||0);
-    const aT=Array(12).fill(0).map((_,i)=>+(d.trig_leads&&d.trig_leads[i])||0);
-    const crA=aR.map((r,i)=>aT[i]>0?+(r/aT[i]*100).toFixed(1):0);
-    const bdA=aR.map((r,i)=>oem[i]>0?+(r/oem[i]*100).toFixed(1):0);
-    data.push([t.client,t.btl||'—','Total','Retails',...aR,aR.reduce((s,v)=>s+v,0)]);
-    data.push([t.client,t.btl||'—','Total','Cr%',...crA,'']);
-    data.push([t.client,t.btl||'—','Total','OEM Sale',...oem,oem.reduce((s,v)=>s+v,0)]);
-    data.push([t.client,t.btl||'—','Total','BD Contribution%',...bdA,'']);
+    const oem=Array(12).fill(0).map((_,i)=>gM(ACTUALS[ri]&&ACTUALS[ri].oem_sale,i));
+    const aR=Array(12).fill(0).map((_,i)=>gM(a.retails,i));
+    const aT=Array(12).fill(0).map((_,i)=>gM(d.trig_leads,i));
+    const aG=Array(12).fill(0).map((_,i)=>gM(a.google_abs_retails,i));
+    const aM=Array(12).fill(0).map((_,i)=>gM(a.meta_abs_retails,i));
+    // account source row
+    const srcCols=visCols.flatMap(i=>{const g=aG[i],m=aM[i],tot=aR[i],org=Math.max(0,tot-g-m);return[g||'',m||'',org||'',tot||''];});
+    const pTot=visCols.reduce((s,i)=>s+aR[i],0);
+    const pTrig=visCols.reduce((s,i)=>s+aT[i],0);
+    const pOEM=visCols.reduce((s,i)=>s+oem[i],0);
+    const pCr=pTrig>0?+(pTot/pTrig*100).toFixed(1):0;
+    const pBD=pOEM>0?+(pTot/pOEM*100).toFixed(1):0;
+    data.push([t.client,t.btl||'—','Total',...srcCols,...(showFYcol?[pTot||'',pCr?pCr+'%':'']:[]),pOEM||'',pBD?pBD+'%':'']);
     BRANDS.forEach(brand=>{
       const br=a.brands&&a.brands[brand];if(!br)return;
-      const brR=Array(12).fill(0).map((_,i)=>+(br.retails&&br.retails[i])||0);
-      const brT=deriveActuals(br,t.ad_type).trig_leads;
-      const brCr=brR.map((r,i)=>(+(brT[i]||0))>0?+(r/brT[i]*100).toFixed(1):0);
+      const brR=Array(12).fill(0).map((_,i)=>gM(br.retails,i));
+      const brG=Array(12).fill(0).map((_,i)=>gM(br.google_abs_retails,i));
+      const brM=Array(12).fill(0).map((_,i)=>gM(br.meta_abs_retails,i));
+      const brTL=deriveActuals(br,t.ad_type).trig_leads;
+      const brOEM=Array(12).fill(0).map((_,i)=>gM(br.oem_sale,i));
+      const brSrc=visCols.flatMap(i=>{const g=brG[i],m=brM[i],tot=brR[i],org=Math.max(0,tot-g-m);return[g||'',m||'',org||'',tot||''];});
+      const brPT=visCols.reduce((s,i)=>s+brR[i],0);
+      const brPTL=visCols.reduce((s,i)=>s+(+(brTL[i]||0)),0);
+      const brPO=visCols.reduce((s,i)=>s+brOEM[i],0);
+      const brCr=brPTL>0?+(brPT/brPTL*100).toFixed(1):0;
+      const brBD=brPO>0?+(brPT/brPO*100).toFixed(1):0;
       const lblMap=t.client===TVS_CLIENT?TVS_BRAND_LABELS:t.client===BAJAJ_CLIENT?BAJAJ_BRAND_LABELS:RE_BRAND_LABELS;
-      data.push([t.client,t.btl||'—',(lblMap[brand]||brand),'Retails',...brR,brR.reduce((s,v)=>s+v,0)]);
-      data.push([t.client,t.btl||'—',(lblMap[brand]||brand),'Cr%',...brCr,'']);
+      data.push([t.client,t.btl||'—',(lblMap[brand]||brand),...brSrc,...(showFYcol?[brPT||'',brCr?brCr+'%':'']:[]),brPO||'',brBD?brBD+'%':'']);
     });
     data.push(Array(hdr.length).fill(''));
   });
