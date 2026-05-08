@@ -551,7 +551,7 @@ canvas{max-height:260px}
       <div class="brand-mark">🏍️</div>
       <div class="brand-text">
         <div class="t1">Bike AOP Tracker</div>
-        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.1.0</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 08/05/2026 12:48</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
+        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.1.1</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 08/05/2026 12:59</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
       </div>
     </div>
     <div class="hdr-right">
@@ -821,7 +821,7 @@ function oemBadge(client){
 }
 
 const ACT_KEY='leadbu_actuals_fy27_v2';
-const DEPLOY_TIME='2026-05-08T12:48:14Z'; // replaced with ISO timestamp at deploy time
+const DEPLOY_TIME='2026-05-08T12:59:18Z'; // replaced with ISO timestamp at deploy time
 let ACTUALS=TARGETS.map(()=>newActualRec()); // populated by Firebase onValue
 
 function newActualRec(){
@@ -1646,7 +1646,7 @@ function updateLastSaved(isoStr){
 }
 function showDeployTime(){
   const el=document.getElementById('hdr-deployed');
-  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-05-08T12:48:14Z')return;
+  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-05-08T12:59:18Z')return;
   try{
     const d=new Date(DEPLOY_TIME);
     const pad=n=>String(n).padStart(2,'0');
@@ -4462,19 +4462,52 @@ function renderRetails(rows){
   const fyBg=_lt?'rgba(99,102,241,.06)':'#1a1a28';
   const fyBdr='border-left:2px solid var(--accent3)';
   const oemBg=_lt?'rgba(20,184,166,.07)':'rgba(20,184,166,.12)';
+  // Source-drill column colours
+  const gBg=_lt?'rgba(59,130,246,.07)':'rgba(59,130,246,.13)';
+  const mBg=_lt?'rgba(16,185,129,.07)':'rgba(16,185,129,.13)';
+  const oBg=_lt?'rgba(234,179,8,.07)':'rgba(234,179,8,.13)';
 
-  // Header
+  // Helper: render data cells for one column index (drilled = 4 source cols, normal = retails+cr%)
+  function drillCells(i, retails, trigLeads, gAbs, mAbs, rowBg, small){
+    const sz=small?'font-size:10.5px;':'';
+    if(RETAILS_DRILL_MONTH===i){
+      const google=gAbs[i]||0, meta=mAbs[i]||0, total=retails[i]||0;
+      const organic=Math.max(0,total-google-meta);
+      return `<td style="${tdB};${sz}background:${gBg}">${google?nStr(google):'—'}</td>`
+            +`<td style="${tdB};${sz}background:${mBg}">${meta?nStr(meta):'—'}</td>`
+            +`<td style="${tdB};${sz}background:${oBg}">${organic?nStr(organic):'—'}</td>`
+            +`<td style="${tdB};${sz}font-weight:700">${total?nStr(total):'—'}</td>`;
+    }
+    const r=retails[i]||0,tl=trigLeads[i]||0,cr=tl>0?r/tl*100:0;
+    return `<td style="${tdB};${sz}">${r?nStr(r):'—'}</td><td style="${tdB};${sz}color:var(--${small?'text3':'blue'});font-size:10px">${r?pStr(cr):'—'}</td>`;
+  }
+
+  // Header row 1
   let html=`<div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center;margin-bottom:12px">${pb}${expBtn}</div>`;
   html+=`<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr>`;
   html+=`<th rowspan="2" style="${thH};text-align:left;position:sticky;left:0;z-index:3;min-width:160px">Account / Brand</th>`;
-  lbls.forEach((m,ci)=>{const mi=cols[ci];const isA=RETAILS_DRILL_MONTH===mi;html+=`<th colspan="2" data-drill-month="${mi}" style="${thH};cursor:pointer;user-select:none;${isA?'background:var(--blue2);color:#fff;border-bottom:2px solid var(--blue)':'border-bottom:2px solid var(--border2)'}" onclick="toggleRetailsDrill(${mi})" title="Click to see Google / Meta / Organic breakdown">${m}<span style="font-size:8px;margin-left:3px;opacity:.6">${isA?'▲':'▼'}</span></th>`;});
+  lbls.forEach((m,ci)=>{
+    const mi=cols[ci],isA=RETAILS_DRILL_MONTH===mi;
+    const span=isA?4:2;
+    const bg=isA?'background:var(--blue2);color:#fff;border-bottom:2px solid var(--blue)':'';
+    html+=`<th colspan="${span}" data-drill-month="${mi}" style="${thH};cursor:pointer;user-select:none;${bg}" onclick="toggleRetailsDrill(${mi})" title="Click for source breakdown">${m}${isA?' ▲':' ▾'}</th>`;
+  });
   if(showFY)html+=`<th colspan="2" style="${thH};background:${fyBg};color:var(--accent3);${fyBdr}">Period Total</th>`;
   html+=`<th style="${thH};background:${oemBg}">OEM Sale<small style="display:block;font-weight:400;font-size:9px;color:var(--text3)">Industry Units</small></th>`;
   html+=`<th style="${thH};background:${oemBg}">BD Contribution<small style="display:block;font-weight:400;font-size:9px;color:var(--text3)">% of OEM</small></th>`;
+  // Header row 2 (sub-labels)
   html+=`</tr><tr>`;
-  lbls.forEach(()=>{
-    html+=`<th style="font-size:9px;color:var(--blue);padding:2px 4px;border-left:1px solid var(--border2);background:var(--bg3)">Retails</th>`;
-    html+=`<th style="font-size:9px;color:var(--text3);padding:2px 4px;background:var(--bg3)">Cr%</th>`;
+  lbls.forEach((_,ci)=>{
+    const mi=cols[ci];
+    if(RETAILS_DRILL_MONTH===mi){
+      html+=`<th style="font-size:9px;color:var(--blue);padding:2px 4px;border-left:1px solid var(--border2);background:${gBg}">Google</th>`;
+      html+=`<th style="font-size:9px;color:#10b981;padding:2px 4px;background:${mBg}">Meta</th>`;
+      html+=`<th style="font-size:9px;color:#ca8a04;padding:2px 4px;background:${oBg}">Organic</th>`;
+      html+=`<th style="font-size:9px;color:var(--text2);padding:2px 4px">Total</th>`;
+    } else {
+      html+=`<th style="font-size:9px;color:var(--blue);padding:2px 4px;border-left:1px solid var(--border2);background:var(--bg3)">Retails</th>`;
+      html+=`<th style="font-size:9px;color:var(--text3);padding:2px 4px;background:var(--bg3)">Cr%</th>`;
+    }
   });
   if(showFY){
     html+=`<th style="font-size:9px;color:var(--blue);padding:2px 4px;${fyBdr};background:${fyBg}">Retails</th>`;
@@ -4484,7 +4517,7 @@ function renderRetails(rows){
   html+=`</tr></thead><tbody>`;
 
   // Grand total accumulators
-  let gR=Array(12).fill(0),gT=Array(12).fill(0),gO=Array(12).fill(0);
+  let gR=Array(12).fill(0),gT=Array(12).fill(0),gO=Array(12).fill(0),gGA=Array(12).fill(0),gMA=Array(12).fill(0);
 
   cpsRows.forEach(({t,a,d})=>{
     const ri=TARGETS.indexOf(t);
@@ -4493,16 +4526,19 @@ function renderRetails(rows){
     const accR=Array(12).fill(0).map((_,i)=>gM(a.retails,i));
     const accT=Array(12).fill(0).map((_,i)=>gM(d.trig_leads,i));
     const oemArr=Array(12).fill(0).map((_,i)=>gM(ACTUALS[ri]&&ACTUALS[ri].oem_sale,i));
-    cols.forEach(i=>{gR[i]+=accR[i];gT[i]+=accT[i];gO[i]+=oemArr[i];});
+    cols.forEach(i=>{gR[i]+=accR[i];gT[i]+=accT[i];gO[i]+=oemArr[i];gGA[i]+=gM(a.google_abs_retails,i);gMA[i]+=gM(a.meta_abs_retails,i);});
     const pR=cSum(accR),pT=cSum(accT),pO=cSum(oemArr);
     const pCr=pT>0?pR/pT*100:0,pBD=pO>0?pR/pO*100:0;
     const bdCol=pBD>=20?'#3fb950':pBD>=10?'#e3b341':'var(--text2)';
     const abg=_lt?'rgba(99,102,241,.04)':'rgba(99,102,241,.06)';
 
+    const accGAbs=Array(12).fill(0).map((_,i)=>gM(a.google_abs_retails,i));
+    const accMAbs=Array(12).fill(0).map((_,i)=>gM(a.meta_abs_retails,i));
+
     // Account row
     html+=`<tr style="background:${abg}">`;
     html+=`<td style="${sL};background:${abg};font-weight:700;color:var(--accent)">${t.client}${t.btl?` <span style="font-size:9px;font-weight:400;color:var(--text3)">${t.btl}</span>`:''}</td>`;
-    cols.forEach(i=>{const r=accR[i],tl=accT[i],cr=tl>0?r/tl*100:0;html+=`<td style="${tdB}">${r?nStr(r):'—'}</td><td style="${tdB};color:var(--blue);font-size:10px">${r?pStr(cr):'—'}</td>`;});
+    cols.forEach(i=>{html+=drillCells(i,accR,accT,accGAbs,accMAbs,'',false);});
     if(showFY)html+=`<td style="${tdB};${fyBdr};background:${fyBg};font-weight:700">${pR?nStr(pR):'—'}</td><td style="${tdB};background:${fyBg};color:var(--blue)">${pR?pStr(pCr):'—'}</td>`;
     html+=`<td style="${tdB};background:${oemBg}">${pO?nStr(pO):'—'}</td>`;
     html+=`<td style="${tdB};background:${oemBg};color:${bdCol};font-weight:600">${pO?pStr(pBD):'—'}</td>`;
@@ -4522,8 +4558,11 @@ function renderRetails(rows){
         const lblMap=isTVS?TVS_BRAND_LABELS:isBajaj?BAJAJ_BRAND_LABELS:RE_BRAND_LABELS;
         const shortLbl=(lblMap[brand]||brand).split('(')[0].trim().replace(/^(TVS|RE|Bajaj)\s*/,'');
         html+=`<tr onmouseenter="this.style.background='var(--bg2)'" onmouseleave="this.style.background=''">`;
+        const brGAbs=Array(12).fill(0).map((_,i)=>gM(br.google_abs_retails,i));
+        const brMAbs=Array(12).fill(0).map((_,i)=>gM(br.meta_abs_retails,i));
+        const brTLArr=Array(12).fill(0).map((_,i)=>gM(brTL,i));
         html+=`<td style="${sL};padding-left:22px;color:var(--text2);font-size:10.5px">↳ ${shortLbl}</td>`;
-        cols.forEach(i=>{const r=brR[i],tl=gM(brTL,i),cr=tl>0?r/tl*100:0;html+=`<td style="${tdB};font-size:10.5px">${r?nStr(r):'—'}</td><td style="${tdB};color:var(--text3);font-size:10px">${r?pStr(cr):'—'}</td>`;});
+        cols.forEach(i=>{html+=drillCells(i,brR,brTLArr,brGAbs,brMAbs,'',true);});
         if(showFY)html+=`<td style="${tdB};${fyBdr}">${brPR?nStr(brPR):'—'}</td><td style="${tdB};color:var(--blue)">${brPR?pStr(brCr):'—'}</td>`;
         html+=`<td style="${tdB};background:${oemBg}">${brPO?nStr(brPO):'—'}</td>`;
         html+=`<td style="${tdB};background:${oemBg};color:${brBdCol}">${brPO?pStr(brBD):'—'}</td></tr>`;
@@ -4536,7 +4575,7 @@ function renderRetails(rows){
   const gtCr=gtT>0?gtR/gtT*100:0,gtBD=gtO>0?gtR/gtO*100:0;
   const gtBg=_lt?'rgba(99,102,241,.09)':'rgba(99,102,241,.14)';
   html+=`<tr style="background:${gtBg}"><td style="${sL};background:${gtBg};font-weight:700;color:var(--accent)">◈ Grand Total</td>`;
-  cols.forEach(i=>{const r=gR[i],tl=gT[i],cr=tl>0?r/tl*100:0;html+=`<td style="${tdB};background:${gtBg};font-weight:700">${r?nStr(r):'—'}</td><td style="${tdB};background:${gtBg};color:var(--blue)">${r?pStr(cr):'—'}</td>`;});
+  cols.forEach(i=>{html+=drillCells(i,gR,gT,gGA,gMA,'',false);});
   if(showFY)html+=`<td style="${tdB};${fyBdr};background:${gtBg};font-weight:700">${gtR?nStr(gtR):'—'}</td><td style="${tdB};background:${gtBg};color:var(--blue)">${gtR?pStr(gtCr):'—'}</td>`;
   html+=`<td style="${tdB};background:${gtBg};font-weight:700">${gtO?nStr(gtO):'—'}</td><td style="${tdB};background:${gtBg};font-weight:700;color:var(--blue)">${gtO?pStr(gtBD):'—'}</td></tr>`;
   html+=`</tbody></table></div>`;
@@ -4558,15 +4597,12 @@ function renderRetails(rows){
   html+=`<div style="font-size:12px;font-weight:700;color:var(--text1);margin-bottom:6px">BD Retail Contribution% — Month on Month</div>`;
   html+=`<div style="position:relative;height:260px"><canvas id="rt-contrib-chart"></canvas></div></div>`;
   html+=`</div>`;
-  // Drill-down panel placeholder (populated after innerHTML swap)
-  html+=`<div id="retails-drill-panel"></div>`;
 
   // Prevent layout shift: lock height and restore scroll position
   const _sy=window.scrollY;
   el.style.minHeight=el.offsetHeight+'px';
   el.innerHTML=html;
   el._cpsRows=cpsRows;
-  renderRetailsDrillPanel(cpsRows);
   requestAnimationFrame(()=>{
     window.scrollTo({top:_sy,behavior:'instant'});
     el.style.minHeight='';
@@ -4576,101 +4612,9 @@ function renderRetails(rows){
 
 function toggleRetailsDrill(mi){
   RETAILS_DRILL_MONTH=RETAILS_DRILL_MONTH===mi?null:mi;
-  const el=document.getElementById('retails-area');
-  if(!el||!el._cpsRows)return;
-  // Update header highlight without re-render
-  el.querySelectorAll('th[data-drill-month]').forEach(th=>{
-    const m=parseInt(th.getAttribute('data-drill-month'));
-    const isA=m===RETAILS_DRILL_MONTH;
-    th.style.background=isA?'var(--blue2)':'';
-    th.style.color=isA?'#fff':'';
-    th.style.borderBottom=isA?'2px solid var(--blue)':'';
-    const arrow=th.querySelector('span');
-    if(arrow)arrow.textContent=isA?'▲':'▼';
-  });
-  renderRetailsDrillPanel(el._cpsRows);
+  renderRetails(getFiltered());
 }
 
-function renderRetailsDrillPanel(cpsRows){
-  const panel=document.getElementById('retails-drill-panel');
-  if(!panel)return;
-  if(RETAILS_DRILL_MONTH===null){panel.innerHTML='';return;}
-  const mi=RETAILS_DRILL_MONTH;
-  const _lt=document.body.classList.contains('light');
-  const gM=(arr,i)=>+(arr&&arr[i])||0;
-  const nStr=v=>Math.round(v).toLocaleString('en-IN');
-  // colour bands per source
-  const gBg=_lt?'rgba(59,130,246,.07)':'rgba(59,130,246,.12)';
-  const mBg=_lt?'rgba(16,185,129,.07)':'rgba(16,185,129,.12)';
-  const oBg=_lt?'rgba(234,179,8,.07)':'rgba(234,179,8,.12)';
-  const tBg=_lt?'rgba(99,102,241,.07)':'rgba(99,102,241,.12)';
-  const thS='padding:5px 10px;font-size:10.5px;font-weight:700;border-bottom:2px solid var(--border2);border-left:1px solid var(--border2);text-align:right;white-space:nowrap';
-  const tdS='padding:4px 10px;font-size:11px;border-bottom:1px solid var(--border2);text-align:right;border-left:1px solid var(--border2)';
-  const sLS='padding:4px 10px;font-size:11px;border-bottom:1px solid var(--border2);position:sticky;left:0;z-index:1;min-width:170px';
-
-  let html=`<div style="margin-top:14px;background:var(--bg2);border-radius:10px;padding:14px 16px;border:1px solid var(--border2)">`;
-  html+=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">`;
-  html+=`<div style="font-size:12px;font-weight:700;color:var(--text1)">📊 Source Breakdown — ${MONTHS[mi]}</div>`;
-  html+=`<button onclick="toggleRetailsDrill(${mi})" style="padding:2px 10px;font-size:11px;border-radius:4px;border:1px solid var(--border2);cursor:pointer;background:var(--bg3);color:var(--text3)">✕ Close</button>`;
-  html+=`</div>`;
-  html+=`<div style="overflow-x:auto"><table style="border-collapse:collapse;font-size:11px;width:100%"><thead><tr>`;
-  html+=`<th style="${thS};text-align:left;background:var(--bg3)">Account / Brand</th>`;
-  html+=`<th style="${thS};background:${gBg};color:var(--blue)">Google Retails</th>`;
-  html+=`<th style="${thS};background:${mBg};color:#10b981">Meta Retails</th>`;
-  html+=`<th style="${thS};background:${oBg};color:#ca8a04">Organic Retails<small style="display:block;font-weight:400;font-size:9px;color:var(--text3)">Total − G − M</small></th>`;
-  html+=`<th style="${thS};background:${tBg}">Total Retails</th>`;
-  html+=`</tr></thead><tbody>`;
-
-  let gtG=0,gtM=0,gtT=0;
-  cpsRows.forEach(({t,a})=>{
-    const isTVS=t.client===TVS_CLIENT,isBajaj=t.client===BAJAJ_CLIENT,isRE=t.client===RE_CLIENT;
-    const BRANDS=isTVS?TVS_BRANDS:isBajaj?BAJAJ_BRANDS:isRE?RE_BRANDS:[];
-    const google=gM(a.google_abs_retails,mi);
-    const meta=gM(a.meta_abs_retails,mi);
-    const total=gM(a.retails,mi);
-    const organic=Math.max(0,total-google-meta);
-    gtG+=google;gtM+=meta;gtT+=total;
-    const abg=_lt?'rgba(99,102,241,.04)':'rgba(99,102,241,.06)';
-    html+=`<tr style="background:${abg}">`;
-    html+=`<td style="${sLS};background:${abg};font-weight:700;color:var(--accent)">${t.client}${t.btl?` <span style="font-size:9px;font-weight:400;color:var(--text3)">${t.btl}</span>`:''}</td>`;
-    html+=`<td style="${tdS};background:${gBg}">${google?nStr(google):'—'}</td>`;
-    html+=`<td style="${tdS};background:${mBg}">${meta?nStr(meta):'—'}</td>`;
-    html+=`<td style="${tdS};background:${oBg}">${organic?nStr(organic):'—'}</td>`;
-    html+=`<td style="${tdS};background:${tBg};font-weight:700">${total?nStr(total):'—'}</td>`;
-    html+=`</tr>`;
-    if(BRANDS.length&&a.brands){
-      BRANDS.forEach(brand=>{
-        const br=a.brands[brand];if(!br)return;
-        const brG=gM(br.google_abs_retails,mi);
-        const brM=gM(br.meta_abs_retails,mi);
-        const brT=gM(br.retails,mi);
-        const brO=Math.max(0,brT-brG-brM);
-        if(!brT&&!brG&&!brM)return;
-        const lblMap=isTVS?TVS_BRAND_LABELS:isBajaj?BAJAJ_BRAND_LABELS:RE_BRAND_LABELS;
-        const shortLbl=(lblMap[brand]||brand).split('(')[0].trim().replace(/^(TVS|RE|Bajaj)\s*/,'');
-        html+=`<tr onmouseenter="this.style.background='var(--bg3)'" onmouseleave="this.style.background=''">`;
-        html+=`<td style="${sLS};padding-left:24px;color:var(--text2);font-size:10.5px">↳ ${shortLbl}</td>`;
-        html+=`<td style="${tdS};background:${gBg};font-size:10.5px">${brG?nStr(brG):'—'}</td>`;
-        html+=`<td style="${tdS};background:${mBg};font-size:10.5px">${brM?nStr(brM):'—'}</td>`;
-        html+=`<td style="${tdS};background:${oBg};font-size:10.5px">${brO?nStr(brO):'—'}</td>`;
-        html+=`<td style="${tdS};background:${tBg};font-size:10.5px">${brT?nStr(brT):'—'}</td>`;
-        html+=`</tr>`;
-      });
-    }
-  });
-
-  const gtO=Math.max(0,gtT-gtG-gtM);
-  const gtBg=_lt?'rgba(99,102,241,.09)':'rgba(99,102,241,.14)';
-  html+=`<tr style="background:${gtBg}">`;
-  html+=`<td style="${sLS};background:${gtBg};font-weight:700;color:var(--accent)">◈ Grand Total</td>`;
-  html+=`<td style="${tdS};background:${gBg};font-weight:700">${gtG?nStr(gtG):'—'}</td>`;
-  html+=`<td style="${tdS};background:${mBg};font-weight:700">${gtM?nStr(gtM):'—'}</td>`;
-  html+=`<td style="${tdS};background:${oBg};font-weight:700">${gtO?nStr(gtO):'—'}</td>`;
-  html+=`<td style="${tdS};background:${tBg};font-weight:700">${gtT?nStr(gtT):'—'}</td>`;
-  html+=`</tr>`;
-  html+=`</tbody></table></div></div>`;
-  panel.innerHTML=html;
-}
 
 function buildRetailsCrChart(cpsRows){
   const ctx=document.getElementById('rt-cr-chart');
