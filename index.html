@@ -551,7 +551,7 @@ canvas{max-height:260px}
       <div class="brand-mark">🏍️</div>
       <div class="brand-text">
         <div class="t1">Bike AOP Tracker</div>
-        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.1.2</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 08/05/2026 13:14</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
+        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.1.3</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 08/05/2026 13:25</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
       </div>
     </div>
     <div class="hdr-right">
@@ -821,7 +821,7 @@ function oemBadge(client){
 }
 
 const ACT_KEY='leadbu_actuals_fy27_v2';
-const DEPLOY_TIME='2026-05-08T13:14:08Z'; // replaced with ISO timestamp at deploy time
+const DEPLOY_TIME='2026-05-08T13:25:43Z'; // replaced with ISO timestamp at deploy time
 let ACTUALS=TARGETS.map(()=>newActualRec()); // populated by Firebase onValue
 
 function newActualRec(){
@@ -865,6 +865,7 @@ function newActualRec(){
     dms_retails:Array(12).fill(0),
     voc_retails:Array(12).fill(0),
     billed_retails:Array(12).fill(0),  // Actual units reconciled after month-end → Billed Revenue & Billed Cr%
+    ims_retail:Array(12).fill(0),      // Jawa/Yezdi only — IMS channel retails (display-only, not used in revenue)
     oem_sale:Array(12).fill(0),        // Total OEM industry retails (for BD contribution % calc)
     // AI Bot Cost
     ai_per_lead_cost:Array(12).fill(0),   // Rs per lead (Absolute)
@@ -1646,7 +1647,7 @@ function updateLastSaved(isoStr){
 }
 function showDeployTime(){
   const el=document.getElementById('hdr-deployed');
-  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-05-08T13:14:08Z')return;
+  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-05-08T13:25:43Z')return;
   try{
     const d=new Date(DEPLOY_TIME);
     const pad=n=>String(n).padStart(2,'0');
@@ -2170,6 +2171,7 @@ const TVS_BRAND_LABELS={Commuter:'TVS Commuter (Raider, Radeon, Sports, Star Cit
 const RE_CLIENT='Royal Enfield';
 const RE_BRANDS=['ICE','EV'];
 const PIAGGIO_CLIENT='Piaggio';
+const JAWA_CLIENT='Jawa/Yezdi';
 const RE_BRAND_LABELS={ICE:'RE ICE',EV:'RE EV — Flying Flea'};
 
 function newBrandRec(){
@@ -2533,6 +2535,7 @@ function renderModal(recIdx){
 
   const showDMSVoC=(t.client===TVS_CLIENT||t.client===AMPERE_CLIENT);
   const isPiaggioRetainer=(t.client===PIAGGIO_CLIENT&&adType==='CPS');
+  const isJawa=(t.client===JAWA_CLIENT);
   const aDMS=a.dms_retails||Array(12).fill(0);
   const aVoC=a.voc_retails||Array(12).fill(0);
   const aBilledRet=a.billed_retails||Array(12).fill(0);
@@ -2540,15 +2543,21 @@ function renderModal(recIdx){
   const aGAbsR=a.google_abs_retails||Array(12).fill(0);
   const aMAbsR=a.meta_abs_retails||Array(12).fill(0);
   const aPR=a.piaggio_retainer||Array(12).fill(0);
+  const aImsR=(a.ims_retail||Array(12).fill(0)).map(v=>+(v)||0);
   let revSection='';
   if(adType==='CPS'){
+    const jawaTotalR=isJawa?(a.retails||Array(12).fill(0)).map((v,i)=>(+(v)||0)+aImsR[i]):null;
     const dmsVoCRows=showDMSVoC
       ? inputRow('DMS Retails','','dms_retails',aDMS,'1','DMS channel retails')
         +inputRow('VoC Retails','','voc_retails',aVoC,'1','Voice-of-Customer retails')
         +compRow('= Total Retails (DMS + VoC)',a.retails,'cv',0)
         +pctRow('DMS Cr% = DMS / Triggered Leads',aDMS,d.trig_leads,'cv-pct')
         +pctRow('VoC Cr% = VoC / Triggered Leads',aVoC,d.trig_leads,'cv-pct')
-      : inputRow('Retails (Units Sold)','','retails',a.retails,'1','or enter Overall Cr% below');
+      : inputRow('Retails (Units Sold)','','retails',a.retails,'1','or enter Overall Cr% below')
+        +(isJawa
+          ? inputRow('IMS Retail','','ims_retail',aImsR,'1','IMS channel retails — counted in Retails tab total, not used in revenue')
+            +compRow('= Total Retails (Retails + IMS)',jawaTotalR,'cv',0)
+          : '');
     const revLabel=isPiaggioRetainer?'── REVENUE (CPS: CAC × Retails + Retainer) ──':'── REVENUE (CPS: CAC × Retails) ──';
     revSection=sectionRow(revLabel)
       +inputRow('CAC — Rate Charged (Rs/Retail)','','cac',a.cac,'1','Revenue driver')
@@ -4507,7 +4516,8 @@ function renderRetails(rows){
     const ri=TARGETS.indexOf(t);
     const isTVS=t.client===TVS_CLIENT,isBajaj=t.client===BAJAJ_CLIENT,isRE=t.client===RE_CLIENT;
     const BRANDS=isTVS?TVS_BRANDS:isBajaj?BAJAJ_BRANDS:isRE?RE_BRANDS:[];
-    const accR=Array(12).fill(0).map((_,i)=>gM(a.retails,i));
+    const _isJawa=t.client===JAWA_CLIENT;
+    const accR=Array(12).fill(0).map((_,i)=>gM(a.retails,i)+(_isJawa?gM(a.ims_retail,i):0));
     const accT=Array(12).fill(0).map((_,i)=>gM(d.trig_leads,i));
     const oemArr=Array(12).fill(0).map((_,i)=>gM(ACTUALS[ri]&&ACTUALS[ri].oem_sale,i));
     cols.forEach(i=>{gR[i]+=accR[i];gT[i]+=accT[i];gO[i]+=oemArr[i];gGA[i]+=gM(a.google_abs_retails,i);gMA[i]+=gM(a.meta_abs_retails,i);});
@@ -4653,7 +4663,8 @@ function exportRetailsCSV(){
     const ri=TARGETS.indexOf(t);
     const BRANDS=t.client===TVS_CLIENT?TVS_BRANDS:t.client===BAJAJ_CLIENT?BAJAJ_BRANDS:t.client===RE_CLIENT?RE_BRANDS:[];
     const oem=Array(12).fill(0).map((_,i)=>gM(ACTUALS[ri]&&ACTUALS[ri].oem_sale,i));
-    const aR=Array(12).fill(0).map((_,i)=>gM(a.retails,i));
+    const _isJawaExp=t.client===JAWA_CLIENT;
+    const aR=Array(12).fill(0).map((_,i)=>gM(a.retails,i)+(_isJawaExp?gM(a.ims_retail,i):0));
     const aT=Array(12).fill(0).map((_,i)=>gM(d.trig_leads,i));
     const aG=Array(12).fill(0).map((_,i)=>gM(a.google_abs_retails,i));
     const aM=Array(12).fill(0).map((_,i)=>gM(a.meta_abs_retails,i));
