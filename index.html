@@ -551,7 +551,7 @@ canvas{max-height:260px}
       <div class="brand-mark">🏍️</div>
       <div class="brand-text">
         <div class="t1">Bike AOP Tracker</div>
-        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.0.90</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 07/05/2026 13:00</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
+        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.0.91</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 08/05/2026 10:26</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
       </div>
     </div>
     <div class="hdr-right">
@@ -819,7 +819,7 @@ function oemBadge(client){
 }
 
 const ACT_KEY='leadbu_actuals_fy27_v2';
-const DEPLOY_TIME='2026-05-07T13:00:31Z'; // replaced with ISO timestamp at deploy time
+const DEPLOY_TIME='2026-05-08T10:26:36Z'; // replaced with ISO timestamp at deploy time
 let ACTUALS=TARGETS.map(()=>newActualRec()); // populated by Firebase onValue
 
 function newActualRec(){
@@ -1640,7 +1640,7 @@ function updateLastSaved(isoStr){
 }
 function showDeployTime(){
   const el=document.getElementById('hdr-deployed');
-  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-05-07T13:00:31Z')return;
+  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-05-08T10:26:36Z')return;
   try{
     const d=new Date(DEPLOY_TIME);
     const pad=n=>String(n).padStart(2,'0');
@@ -2926,10 +2926,9 @@ function renderBajajModal(recIdx){
 function renderTVSModal(recIdx){
   const t=TARGETS[recIdx],a=ACTUALS[recIdx];
   if(!a.brands)a.brands={};
-  const _tvsNR=newBrandRec();
   TVS_BRANDS.forEach(b=>{
     if(!a.brands[b])a.brands[b]=newBrandRec();
-    else Object.keys(_tvsNR).forEach(k=>{if(a.brands[b][k]==null)a.brands[b][k]=_tvsNR[k];});
+    else{const _nr=newBrandRec();Object.keys(_nr).forEach(k=>{if(a.brands[b][k]==null)a.brands[b][k]=_nr[k];});}
   });
   // Sync brand retails & recompute totals
   TVS_BRANDS.forEach(b=>{
@@ -3130,10 +3129,9 @@ function renderTVSModal(recIdx){
 function renderREModal(recIdx){
   const t=TARGETS[recIdx],a=ACTUALS[recIdx];
   if(!a.brands)a.brands={};
-  const _reNR=newBrandRec();
   RE_BRANDS.forEach(b=>{
     if(!a.brands[b])a.brands[b]=newBrandRec();
-    else Object.keys(_reNR).forEach(k=>{if(a.brands[b][k]==null)a.brands[b][k]=_reNR[k];});
+    else{const _nr=newBrandRec();Object.keys(_nr).forEach(k=>{if(a.brands[b][k]==null)a.brands[b][k]=_nr[k];});}
   });
   // Sync each brand's retails from DMS+VoC
   RE_BRANDS.forEach(b=>{const br=a.brands[b];if(!br)return;const dms=Array(12).fill(0).map((_,i)=>+(br.dms_retails&&br.dms_retails[i])||0);const voc=Array(12).fill(0).map((_,i)=>+(br.voc_retails&&br.voc_retails[i])||0);br.retails=dms.map((d,i)=>d+voc[i]);});
