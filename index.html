@@ -551,7 +551,7 @@ canvas{max-height:260px}
       <div class="brand-mark">🏍️</div>
       <div class="brand-text">
         <div class="t1">Bike AOP Tracker</div>
-        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.2.3</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 09/05/2026 13:06</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
+        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.2.3</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 09/05/2026 13:08</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
       </div>
     </div>
     <div class="hdr-right">
@@ -821,7 +821,7 @@ function oemBadge(client){
 }
 
 const ACT_KEY='leadbu_actuals_fy27_v2';
-const DEPLOY_TIME='2026-05-09T13:06:22Z'; // replaced with ISO timestamp at deploy time
+const DEPLOY_TIME='2026-05-09T13:08:43Z'; // replaced with ISO timestamp at deploy time
 let ACTUALS=TARGETS.map(()=>newActualRec()); // populated by Firebase onValue
 
 function newActualRec(){
@@ -1648,7 +1648,7 @@ function updateLastSaved(isoStr){
 }
 function showDeployTime(){
   const el=document.getElementById('hdr-deployed');
-  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-05-09T13:06:22Z')return;
+  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-05-09T13:08:43Z')return;
   try{
     const d=new Date(DEPLOY_TIME);
     const pad=n=>String(n).padStart(2,'0');
@@ -4526,7 +4526,7 @@ function renderRevRecon(rows){
 
   // ── Grand Total block — rendered at TOP ──
   const gtBg=_lt?'rgba(99,102,241,.06)':'rgba(99,102,241,.1)';
-  html+=`<tr><td colspan="${2+1+1+cols.length+(showFY?1:0)}" style="padding:2px 10px;background:var(--bg2);border-bottom:2px solid var(--accent)44;font-size:10px;color:var(--accent);font-weight:700;letter-spacing:.3px">◈ GRAND TOTAL</td></tr>`;
+  html+=`<tr><td colspan="${2+1+1+cols.length+(showFY?1:0)}" style="padding:2px 10px;background:var(--bg2);border-bottom:2px solid var(--accent)44;font-size:10px;color:var(--accent);font-weight:700;letter-spacing:.3px;text-align:left">◈ GRAND TOTAL</td></tr>`;
   [
     {key:'tgt',    label:'Target Revenue (Lacs)',          color:'var(--text2)'},
     {key:'acc',    label:'Accrued Revenue (Lacs)',         color:'#58a6ff'},
