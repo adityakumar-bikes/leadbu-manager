@@ -551,7 +551,7 @@ canvas{max-height:260px}
       <div class="brand-mark">🏍️</div>
       <div class="brand-text">
         <div class="t1">Bike AOP Tracker</div>
-        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.2.2</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 09/05/2026 12:47</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
+        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.2.3</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 09/05/2026 13:00</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
       </div>
     </div>
     <div class="hdr-right">
@@ -821,7 +821,7 @@ function oemBadge(client){
 }
 
 const ACT_KEY='leadbu_actuals_fy27_v2';
-const DEPLOY_TIME='2026-05-09T12:47:39Z'; // replaced with ISO timestamp at deploy time
+const DEPLOY_TIME='2026-05-09T13:00:09Z'; // replaced with ISO timestamp at deploy time
 let ACTUALS=TARGETS.map(()=>newActualRec()); // populated by Firebase onValue
 
 function newActualRec(){
@@ -874,6 +874,7 @@ function newActualRec(){
     piaggio_retainer:Array(12).fill(0),
     rev_adj: Array(12).fill(0),           // Revenue adjustment (Rs Lacs, +/-)
     rev_adj_comment: Array(12).fill(''),  // Per-month comment for the adjustment
+    fy26_closing: 0,                      // FY26 closing gap carry-forward (Lacs) — Rev Recon tab
   };
 }
 // migrateActuals: shape-checks and migrates raw data (from Firebase or backup)
@@ -1647,7 +1648,7 @@ function updateLastSaved(isoStr){
 }
 function showDeployTime(){
   const el=document.getElementById('hdr-deployed');
-  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-05-09T12:47:39Z')return;
+  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-05-09T13:00:09Z')return;
   try{
     const d=new Date(DEPLOY_TIME);
     const pad=n=>String(n).padStart(2,'0');
@@ -4472,11 +4473,16 @@ function renderRevRecon(rows){
     <button onclick="exportRevReconCSV()" style="margin-left:auto;padding:4px 12px;font-size:11px;border-radius:4px;border:1px solid var(--border2);cursor:pointer;background:var(--bg2);color:var(--text2);display:inline-flex;align-items:center;gap:5px">⬇ Export CSV</button>
   </div>`;
 
+  // FY26 Closing column style
+  const tdClos='padding:5px 8px;font-size:11.5px;text-align:right;border-bottom:1px solid var(--border2);border-left:2px solid var(--border2);border-right:1px solid var(--border2);background:'+(_lt?'rgba(20,184,166,.06)':'rgba(20,184,166,.08)');
+  const thClos=thH+';background:'+(_lt?'rgba(20,184,166,.10)':'rgba(20,184,166,.15)')+';color:#14b8a6;border-left:2px solid #14b8a644;min-width:88px';
+
   html+='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">';
   html+='<thead><tr>';
   html+='<th style="text-align:left;padding:6px 10px;position:sticky;left:0;z-index:3;background:var(--bg3);border-bottom:2px solid var(--border2);min-width:150px">Account</th>';
   html+='<th style="text-align:left;padding:6px 6px;background:var(--bg3);border-bottom:2px solid var(--border2);font-size:10px;color:var(--text3);min-width:55px;border-left:1px solid var(--border2)">Type</th>';
   html+='<th style="'+thH+';background:var(--bg3);color:var(--text2);min-width:100px;border-left:1px solid var(--border2)">Metric</th>';
+  html+=`<th style="${thClos}">FY26<br><small style="font-weight:400;font-size:9px;color:#14b8a6aa">Closing (Lacs)</small></th>`;
   lbls.forEach(m=>{html+=`<th style="${thH};background:var(--bg2);color:var(--text1);min-width:72px">${m}</th>`;});
   if(showFY)html+=`<th style="${thH};background:${_lt?'rgba(99,102,241,.07)':'#1a1a25'};color:${_lt?'var(--text1)':'var(--accent3)'};border-left:2px solid var(--accent3)">FY Total</th>`;
   html+='</tr></thead><tbody>';
@@ -4485,28 +4491,66 @@ function renderRevRecon(rows){
   const diffColor=v=>Math.abs(v)<0.005?'var(--text3)':v>=0?'#3fb950':'#f85149';
 
   const METRICS=[
-    {key:'tgt',   label:'Target Revenue (Lacs)',          color:'var(--text2)',  italic:false},
-    {key:'acc',   label:'Accrued Revenue (Lacs)',          color:'#58a6ff',      italic:false},
-    {key:'bill',  label:'Billed Revenue (Lacs)',           color:'#3fb950',      italic:false},
-    {key:'gap',   label:'Gap (Billed − Accrued) (Lacs)',  color:'dynamic',      italic:true},
+    {key:'tgt',    label:'Target Revenue (Lacs)',          color:'var(--text2)',  italic:false},
+    {key:'acc',    label:'Accrued Revenue (Lacs)',          color:'#58a6ff',      italic:false},
+    {key:'bill',   label:'Billed Revenue (Lacs)',           color:'#3fb950',      italic:false},
+    {key:'gap',    label:'Gap (Billed − Accrued) (Lacs)',  color:'dynamic',      italic:true},
+    {key:'cumgap', label:'Cumulative Gap (Lacs)',           color:'dynamic',      italic:true},
   ];
+
+  // ── Pre-compute per-account fy26_closing sums for grand total ──
+  let gFY26=0;
+  const gCumGap=Array(12).fill(0); // grand total cumulative gap per month
+  {
+    // We must compute each account's cumulative gap independently and sum per month
+    const _perAccCum=revRows.map(({t,a,d})=>{
+      const accM=d.rev||Array(12).fill(0);
+      const billM=d.billed_rev||Array(12).fill(0);
+      const isCPS=t.ad_type==='CPS';
+      const fc=+(a.fy26_closing)||0;
+      if(!isCPS)return Array(12).fill(null);
+      const cum=Array(12);
+      for(let k=0;k<12;k++){
+        const gap=(+billM[k]||0)-(+accM[k]||0);
+        cum[k]=(k===0?fc:cum[k-1])+gap;
+      }
+      return cum;
+    });
+    revRows.forEach(({t,a},ri)=>{
+      if(t.ad_type==='CPS'){
+        gFY26+=(+(a.fy26_closing)||0);
+        for(let k=0;k<12;k++) gCumGap[k]+=(_perAccCum[ri][k]||0);
+      }
+    });
+  }
 
   // ── Grand Total block — rendered at TOP ──
   const gtBg=_lt?'rgba(99,102,241,.06)':'rgba(99,102,241,.1)';
-  html+=`<tr><td colspan="${2+1+cols.length+(showFY?1:0)}" style="padding:2px 10px;background:var(--bg2);border-bottom:2px solid var(--accent)44;font-size:10px;color:var(--accent);font-weight:700;letter-spacing:.3px">◈ GRAND TOTAL</td></tr>`;
+  html+=`<tr><td colspan="${2+1+1+cols.length+(showFY?1:0)}" style="padding:2px 10px;background:var(--bg2);border-bottom:2px solid var(--accent)44;font-size:10px;color:var(--accent);font-weight:700;letter-spacing:.3px">◈ GRAND TOTAL</td></tr>`;
   [
-    {key:'tgt', label:'Target Revenue (Lacs)',          color:'var(--text2)'},
-    {key:'acc', label:'Accrued Revenue (Lacs)',         color:'#58a6ff'},
-    {key:'bill',label:'Billed Revenue (Lacs)',          color:'#3fb950'},
-    {key:'gap', label:'Gap (Billed − Accrued) (Lacs)', color:'dynamic'},
+    {key:'tgt',    label:'Target Revenue (Lacs)',          color:'var(--text2)'},
+    {key:'acc',    label:'Accrued Revenue (Lacs)',         color:'#58a6ff'},
+    {key:'bill',   label:'Billed Revenue (Lacs)',          color:'#3fb950'},
+    {key:'gap',    label:'Gap (Billed − Accrued) (Lacs)', color:'dynamic'},
+    {key:'cumgap', label:'Cumulative Gap (Lacs)',          color:'dynamic'},
   ].forEach(({key,label,color})=>{
     html+=`<tr style="background:${gtBg}">`;
     html+=`<td colspan="2" style="padding:5px 10px;font-size:10.5px;font-weight:700;border-bottom:1px solid var(--border2);color:var(--accent);position:sticky;left:0;background:${gtBg}">Total</td>`;
-    const lblColor=key==='gap'?'var(--text3)':color;
-    html+=`<td style="padding:5px 8px;font-size:10.5px;border-bottom:1px solid var(--border2);border-left:1px solid var(--border2);color:${lblColor};${key==='gap'?'font-style:italic':''}">${label}</td>`;
+    const lblColor=(key==='gap'||key==='cumgap')?'var(--text3)':color;
+    html+=`<td style="padding:5px 8px;font-size:10.5px;border-bottom:1px solid var(--border2);border-left:1px solid var(--border2);color:${lblColor};${(key==='gap'||key==='cumgap')?'font-style:italic':''}">${label}</td>`;
+    // FY26 Closing column
+    if(key==='cumgap'){
+      html+=`<td style="${tdClos};color:#14b8a6;font-weight:700;background:${gtBg}">${gFY26===0?'—':gFY26.toFixed(2)}</td>`;
+    }else{
+      html+=`<td style="${tdClos};color:var(--text3);background:${gtBg}">—</td>`;
+    }
     cols.forEach(i=>{
       if(key==='gap'){
         const v=gBilled[i]-gAccrued[i];
+        const col=diffColor(v);
+        html+=`<td style="${td};color:${col};font-weight:700;background:${gtBg}">${Math.abs(v)<0.005?'—':(v>0?'+':'')+v.toFixed(2)}</td>`;
+      }else if(key==='cumgap'){
+        const v=gCumGap[i];
         const col=diffColor(v);
         html+=`<td style="${td};color:${col};font-weight:700;background:${gtBg}">${Math.abs(v)<0.005?'—':(v>0?'+':'')+v.toFixed(2)}</td>`;
       }else{
@@ -4520,6 +4564,11 @@ function renderRevRecon(rows){
         const v=cols.reduce((s,i)=>s+gBilled[i]-gAccrued[i],0);
         const col=diffColor(v);
         html+=`<td style="${td};${fySt};font-weight:700;color:${col}">${Math.abs(v)<0.005?'—':(v>0?'+':'')+v.toFixed(2)}</td>`;
+      }else if(key==='cumgap'){
+        // FY Total = end-of-FY (month 11) cumulative
+        const v=gCumGap[11];
+        const col=diffColor(v);
+        html+=`<td style="${td};${fySt};font-weight:700;color:${col}">${Math.abs(v)<0.005?'—':(v>0?'+':'')+v.toFixed(2)}</td>`;
       }else{
         const v=cols.reduce((s,i)=>s+(key==='tgt'?gTgt[i]:key==='acc'?gAccrued[i]:gBilled[i]),0);
         html+=`<td style="${td};${fySt};font-weight:700;color:${color}">${v===0?'—':v.toFixed(2)}</td>`;
@@ -4528,7 +4577,7 @@ function renderRevRecon(rows){
     html+='</tr>';
   });
   // Separator before account rows
-  html+=`<tr><td colspan="${2+1+cols.length+(showFY?1:0)}" style="padding:0;border-top:2px solid var(--accent)33"></td></tr>`;
+  html+=`<tr><td colspan="${2+1+1+cols.length+(showFY?1:0)}" style="padding:0;border-top:2px solid var(--accent)33"></td></tr>`;
 
   let lastClient='';
   revRows.forEach(({t,a,d},ri)=>{
@@ -4536,13 +4585,23 @@ function renderRevRecon(rows){
     const accM  =d.rev||Array(12).fill(0);
     const billM =d.billed_rev||Array(12).fill(0);
     const isCPS =t.ad_type==='CPS';
+    const fc    =+(a.fy26_closing)||0;
+
+    // Pre-compute all 12 months of cumulative gap for this account
+    const cumGap12=Array(12);
+    if(isCPS){
+      for(let k=0;k<12;k++){
+        const gap=(+billM[k]||0)-(+accM[k]||0);
+        cumGap12[k]=(k===0?fc:cumGap12[k-1])+gap;
+      }
+    }
 
     const isNewClient=t.client!==lastClient;
     lastClient=t.client;
 
     // Client group header
     if(isNewClient){
-      const span=2+1+cols.length+(showFY?1:0);
+      const span=2+1+1+cols.length+(showFY?1:0);
       html+=`<tr><td colspan="${span}" style="padding:4px 10px;background:${_lt?'rgba(99,102,241,.05)':'rgba(99,102,241,.08)'};font-size:11px;font-weight:700;color:var(--accent);border-top:2px solid var(--accent)44;letter-spacing:.3px">${t.client}</td></tr>`;
     }
 
@@ -4552,26 +4611,42 @@ function renderRevRecon(rows){
       html+=`<tr style="background:${rowBg}" onmouseenter="this.style.background='var(--bg2)'" onmouseleave="this.style.background='${rowBg}'">`;
       // Account + type only on first metric row
       if(isFirst){
-        html+=`<td rowspan="4" style="${tdL};color:var(--text1);font-weight:500">${t.client}<br><span style="font-size:10px;color:var(--text3)">${t.btl||'—'}</span></td>`;
-        html+=`<td rowspan="4" style="${tdType}"><span style="display:inline-block;padding:1px 6px;border-radius:4px;font-size:9.5px;font-weight:600;background:var(--accent)22;color:var(--accent)">${t.ad_type}</span></td>`;
+        html+=`<td rowspan="5" style="${tdL};color:var(--text1);font-weight:500">${t.client}<br><span style="font-size:10px;color:var(--text3)">${t.btl||'—'}</span></td>`;
+        html+=`<td rowspan="5" style="${tdType}"><span style="display:inline-block;padding:1px 6px;border-radius:4px;font-size:9.5px;font-weight:600;background:var(--accent)22;color:var(--accent)">${t.ad_type}</span></td>`;
       }
-      const _metricColor=key==='gap'?'var(--text3)':color;
+      const _metricColor=(key==='gap'||key==='cumgap')?'var(--text3)':color;
       html+=`<td style="padding:5px 8px;font-size:10.5px;border-bottom:1px solid var(--border2);border-left:1px solid var(--border2);color:${_metricColor};${italic?'font-style:italic':''};white-space:nowrap">${label}</td>`;
+
+      // ── FY26 Closing column ──
+      if(key==='cumgap'){
+        if(isCPS){
+          html+=`<td style="${tdClos}"><input type="number" step="0.01" value="${fc||''}" placeholder="0.00" oninput="onFY26ClosingChange(${ri},this.value)" style="width:72px;background:transparent;border:none;color:#14b8a6;font-size:11px;text-align:right;outline:none;font-weight:600"></td>`;
+        }else{
+          html+=`<td style="${tdClos};color:var(--text3)">—</td>`;
+        }
+      }else{
+        html+=`<td style="${tdClos};color:var(--text3)">—</td>`;
+      }
+
+      // ── Month value columns ──
       cols.forEach(i=>{
         let v;
-        if(key==='tgt')    v=+tgtM[i]||0;
-        else if(key==='acc')  v=+accM[i]||0;
-        else if(key==='bill') v=isCPS?(+billM[i]||0):null;
-        else if(key==='gap')  v=isCPS?((+billM[i]||0)-(+accM[i]||0)):null;
+        if(key==='tgt')      v=+tgtM[i]||0;
+        else if(key==='acc') v=+accM[i]||0;
+        else if(key==='bill')v=isCPS?(+billM[i]||0):null;
+        else if(key==='gap') v=isCPS?((+billM[i]||0)-(+accM[i]||0)):null;
+        else if(key==='cumgap')v=isCPS?cumGap12[i]:null;
         else if(key==='diff') v=isCPS?((+accM[i]||0)-(+billM[i]||0)):null;
         else if(key==='tdiff')v=isCPS?((+billM[i]||0)-(+tgtM[i]||0)):null;
         if(v===null){html+=`<td style="${td};color:var(--text3)">—</td>`;return;}
-        if(key==='gap'||key==='diff'||key==='tdiff'){
+        if(key==='gap'||key==='cumgap'||key==='diff'||key==='tdiff'){
           html+=`<td style="${td};color:${diffColor(key==='diff'?-v:v)};font-weight:600">${Math.abs(v)<0.005?'—':(v>0?'+':'')+v.toFixed(2)}</td>`;
         }else{
           html+=`<td style="${td};color:${color}">${v===0?'—':v.toFixed(2)}</td>`;
         }
       });
+
+      // ── FY Total column ──
       if(showFY){
         const fySt='border-left:2px solid var(--accent3);background:'+(_lt?'rgba(99,102,241,.05)':'#15152080');
         if(key==='tgt'){
@@ -4585,6 +4660,11 @@ function renderRevRecon(rows){
           html+=v===null?`<td style="${td};${fySt};color:var(--text3)">—</td>`:`<td style="${td};${fySt};font-weight:700;color:#3fb950">${v===0?'—':v.toFixed(2)}</td>`;
         }else if(key==='gap'){
           const v=isCPS?cols.reduce((s,i)=>s+(+billM[i]||0)-(+accM[i]||0),0):null;
+          const col=v===null?'var(--text3)':diffColor(v);
+          html+=v===null?`<td style="${td};${fySt};color:var(--text3)">—</td>`:`<td style="${td};${fySt};font-weight:700;color:${col}">${Math.abs(v)<0.005?'—':(v>0?'+':'')+v.toFixed(2)}</td>`;
+        }else if(key==='cumgap'){
+          // FY Total = end-of-FY cumulative (month 11 = Mar)
+          const v=isCPS?cumGap12[11]:null;
           const col=v===null?'var(--text3)':diffColor(v);
           html+=v===null?`<td style="${td};${fySt};color:var(--text3)">—</td>`:`<td style="${td};${fySt};font-weight:700;color:${col}">${Math.abs(v)<0.005?'—':(v>0?'+':'')+v.toFixed(2)}</td>`;
         }else if(key==='diff'){
@@ -4607,31 +4687,43 @@ function renderRevRecon(rows){
     <span><span style="color:#58a6ff;font-weight:600">Accrued</span> — Notional revenue reported to management (Retails × CAC + Adj)</span>
     <span><span style="color:#3fb950;font-weight:600">Billed</span> — Post-reconciliation revenue (Billed Retails × CAC) · CPS only</span>
     <span><span style="color:#3fb950;font-weight:600">Gap</span> <span style="color:#f85149;font-weight:600">(+/−)</span> — Billed minus Accrued · <span style="color:#3fb950">green = Billed &gt; Accrued</span>, <span style="color:#f85149">red = shortfall</span> · CPS only</span>
+    <span><span style="color:#14b8a6;font-weight:600">FY26 Closing</span> — Carry-forward gap from FY26 (editable, CPS only)</span>
+    <span><span style="color:var(--text2);font-weight:600">Cumulative Gap</span> — Running total: FY26 Closing + monthly gaps · Apr = FY26 + Apr Gap · May = Apr Cum + May Gap · FY Total = Mar cumulative</span>
   </div>`;
   el.innerHTML=html;
+}
+
+function onFY26ClosingChange(recIdx, val){
+  ACTUALS[recIdx].fy26_closing = parseFloat(val) || 0;
+  saveActuals();
+  renderRevRecon(getFiltered());
 }
 
 function exportRevReconCSV(){
   const rows=getFiltered();
   const revRows=rows.filter(({t,d})=>(t.rev&&t.rev.fy>0)||(d.rev_fy>0)||(d.billed_rev_fy>0));
-  const hdr=['Account','BTL','Type','Metric',...MONTHS,'FY Total'];
+  const hdr=['Account','BTL','Type','Metric','FY26 Closing',...MONTHS,'FY Total (Mar Cum)'];
   const dataRows=[];
-  function cSlice(arr,pid){if(!arr||!arr.length)return 0;if(pid==='fy')return arr.reduce((s,v)=>s+(+v||0),0);if(pid.startsWith('q')){const s=+pid[1]*3;return(+arr[s]||0)+(+arr[s+1]||0)+(+arr[s+2]||0);}return+(arr[+pid.slice(1)])||0;}
   revRows.forEach(({t,a,d})=>{
     const tgtM=t.rev&&t.rev.monthly?t.rev.monthly:Array(12).fill(0);
     const accM=d.rev||Array(12).fill(0);
     const billM=d.billed_rev||Array(12).fill(0);
     const isCPS=t.ad_type==='CPS';
+    const fc=+(a.fy26_closing)||0;
     const m12=(arr)=>Array(12).fill(0).map((_,i)=>((+arr[i]||0)));
     const fy=(arr)=>arr.reduce((s,v)=>s+(+v||0),0);
-    const diff12=(a,b)=>Array(12).fill(0).map((_,i)=>((+a[i]||0)-(+b[i]||0)));
-    const fy2=(a,b)=>(a.reduce((s,v)=>s+(+v||0),0)-b.reduce((s,v)=>s+(+v||0),0));
     const gap12=isCPS?Array(12).fill(0).map((_,i)=>((+billM[i]||0)-(+accM[i]||0))):Array(12).fill('—');
     const gapFY=isCPS?(fy(billM)-fy(accM)):'—';
-    dataRows.push([t.client,t.btl||'—',t.ad_type,'Target Revenue (Lacs)',...m12(tgtM),fy(tgtM)]);
-    dataRows.push([t.client,t.btl||'—',t.ad_type,'Accrued Revenue (Lacs)',...m12(accM),fy(accM)]);
-    dataRows.push([t.client,t.btl||'—',t.ad_type,'Billed Revenue (Lacs)',...(isCPS?m12(billM):Array(12).fill('—')),(isCPS?fy(billM):'—')]);
-    dataRows.push([t.client,t.btl||'—',t.ad_type,'Gap (Billed − Accrued) (Lacs)',...gap12,gapFY]);
+    // Cumulative gap: FY26 Closing + running monthly gap
+    const cum12=isCPS?Array(12):null;
+    if(isCPS){for(let k=0;k<12;k++){const g=(+billM[k]||0)-(+accM[k]||0);cum12[k]=(k===0?fc:cum12[k-1])+g;}}
+    const cum12Exp=isCPS?cum12:Array(12).fill('—');
+    const cumFY=isCPS?cum12[11]:'—';
+    dataRows.push([t.client,t.btl||'—',t.ad_type,'Target Revenue (Lacs)','—',...m12(tgtM),fy(tgtM)]);
+    dataRows.push([t.client,t.btl||'—',t.ad_type,'Accrued Revenue (Lacs)','—',...m12(accM),fy(accM)]);
+    dataRows.push([t.client,t.btl||'—',t.ad_type,'Billed Revenue (Lacs)','—',...(isCPS?m12(billM):Array(12).fill('—')),(isCPS?fy(billM):'—')]);
+    dataRows.push([t.client,t.btl||'—',t.ad_type,'Gap (Billed − Accrued) (Lacs)','—',...gap12,gapFY]);
+    dataRows.push([t.client,t.btl||'—',t.ad_type,'Cumulative Gap (Lacs)',isCPS?fc:'—',...cum12Exp,cumFY]);
     dataRows.push(Array(hdr.length).fill(''));
   });
   const now=new Date(),p=n=>String(n).padStart(2,'0');
