@@ -551,7 +551,7 @@ canvas{max-height:260px}
       <div class="brand-mark">🏍️</div>
       <div class="brand-text">
         <div class="t1">Bike AOP Tracker</div>
-        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.2.3</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 09/05/2026 13:00</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
+        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.2.3</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 09/05/2026 13:06</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
       </div>
     </div>
     <div class="hdr-right">
@@ -821,7 +821,7 @@ function oemBadge(client){
 }
 
 const ACT_KEY='leadbu_actuals_fy27_v2';
-const DEPLOY_TIME='2026-05-09T13:00:09Z'; // replaced with ISO timestamp at deploy time
+const DEPLOY_TIME='2026-05-09T13:06:22Z'; // replaced with ISO timestamp at deploy time
 let ACTUALS=TARGETS.map(()=>newActualRec()); // populated by Firebase onValue
 
 function newActualRec(){
@@ -1648,7 +1648,7 @@ function updateLastSaved(isoStr){
 }
 function showDeployTime(){
   const el=document.getElementById('hdr-deployed');
-  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-05-09T13:00:09Z')return;
+  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-05-09T13:06:22Z')return;
   try{
     const d=new Date(DEPLOY_TIME);
     const pad=n=>String(n).padStart(2,'0');
@@ -4602,7 +4602,7 @@ function renderRevRecon(rows){
     // Client group header
     if(isNewClient){
       const span=2+1+1+cols.length+(showFY?1:0);
-      html+=`<tr><td colspan="${span}" style="padding:4px 10px;background:${_lt?'rgba(99,102,241,.05)':'rgba(99,102,241,.08)'};font-size:11px;font-weight:700;color:var(--accent);border-top:2px solid var(--accent)44;letter-spacing:.3px">${t.client}</td></tr>`;
+      html+=`<tr><td colspan="${span}" style="padding:4px 10px;background:${_lt?'rgba(99,102,241,.05)':'rgba(99,102,241,.08)'};font-size:11px;font-weight:700;color:var(--accent);border-top:2px solid var(--accent)44;letter-spacing:.3px;text-align:left">${t.client}</td></tr>`;
     }
 
     METRICS.forEach(({key,label,color,italic},mi)=>{
