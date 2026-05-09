@@ -551,7 +551,7 @@ canvas{max-height:260px}
       <div class="brand-mark">🏍️</div>
       <div class="brand-text">
         <div class="t1">Bike AOP Tracker</div>
-        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.2.3</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 09/05/2026 13:08</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
+        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.2.4</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 09/05/2026 13:18</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
       </div>
     </div>
     <div class="hdr-right">
@@ -641,6 +641,12 @@ canvas{max-height:260px}
       Clients &amp; Contracts
       <span class="pn-sub">Master data</span>
       <span class="pn-badge" id="pn-client-count">—</span>
+    </div>
+    <div class="pnav" data-p="insights" onclick="setPage('insights')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a7 7 0 0 1 7 7c0 2.6-1.4 4.9-3.5 6.2V17a1 1 0 0 1-1 1h-5a1 1 0 0 1-1-1v-1.8C6.4 13.9 5 11.6 5 9a7 7 0 0 1 7-7z"/><path d="M9 21h6"/><path d="M12 17v4"/></svg>
+      Insights
+      <span class="pn-sub">AI Analysis</span>
+      <span class="pn-badge" style="background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff">✦ AI</span>
     </div>
   </div>
 </div>
@@ -738,6 +744,9 @@ canvas{max-height:260px}
 <!-- ============= PAGE: CLIENTS ============= -->
 <div class="page" id="page-clients"></div>
 
+<!-- ============= PAGE: INSIGHTS ============= -->
+<div class="page" id="page-insights" style="padding:0"></div>
+
 <!-- P&L DETAIL MODAL -->
 <div class="modal-overlay" id="modal">
   <div class="modal">
@@ -821,7 +830,7 @@ function oemBadge(client){
 }
 
 const ACT_KEY='leadbu_actuals_fy27_v2';
-const DEPLOY_TIME='2026-05-09T13:08:43Z'; // replaced with ISO timestamp at deploy time
+const DEPLOY_TIME='2026-05-09T13:18:19Z'; // replaced with ISO timestamp at deploy time
 let ACTUALS=TARGETS.map(()=>newActualRec()); // populated by Firebase onValue
 
 function newActualRec(){
@@ -1648,7 +1657,7 @@ function updateLastSaved(isoStr){
 }
 function showDeployTime(){
   const el=document.getElementById('hdr-deployed');
-  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-05-09T13:08:43Z')return;
+  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-05-09T13:18:19Z')return;
   try{
     const d=new Date(DEPLOY_TIME);
     const pad=n=>String(n).padStart(2,'0');
@@ -2004,6 +2013,7 @@ function setPage(p){
   if(cb) cb.style.display = p==='tracker' ? '' : 'none';
   if(p==='overview') renderOverview();
   else if(p==='clients') renderClients();
+  else if(p==='insights') renderInsights();
   else { buildPeriodBar(); render(); }
 }
 function setView(v){
@@ -7327,6 +7337,559 @@ function toggleAIChat(){
 }
 function clearChat(){_chatHistory=[];renderChat();}
 function resetAIKey(){toggleAIKeyMgmt();} // legacy — now opens key mgmt panel
+
+// ═══════════════════════════════════════════════════════════════════════════
+// INSIGHTS TAB
+// ═══════════════════════════════════════════════════════════════════════════
+let INSIGHTS_PERIOD='fy';
+let _insightsAIResult=null;
+let _insightsAIGenerating=false;
+
+function _insightsPeriodCols(pid){
+  if(pid==='fy')return Array.from({length:12},(_,i)=>i);
+  if(pid.startsWith('q')){const s=+pid[1]*3;return[s,s+1,s+2];}
+  return[+pid.slice(1)];
+}
+function _insightsPeriodLabel(pid){
+  if(pid==='fy')return'Full Year FY27';
+  if(pid.startsWith('q'))return['Q1 Apr–Jun','Q2 Jul–Sep','Q3 Oct–Dec','Q4 Jan–Mar'][+pid[1]];
+  return MONTHS[+pid.slice(1)]+" '27";
+}
+
+function renderInsights(){
+  const el=document.getElementById('page-insights');
+  if(!el)return;
+  const _lt=document.body.classList.contains('light');
+  const rows=getFiltered();
+  const pid=INSIGHTS_PERIOD;
+  const cols=_insightsPeriodCols(pid);
+  const plabel=_insightsPeriodLabel(pid);
+
+  // ── Aggregate per-account metrics ──
+  let totTgt=0,totRev=0,totMktg=0,totGM=0,totGPM=0,totLeads=0,totCC=0,totBilled=0;
+  const oemMap={};
+  const adTypeMap={};
+  const acctData=[];
+
+  // Track monthly totals for trend/projection
+  const mRev=Array(12).fill(0),mGM=Array(12).fill(0),mLeads=Array(12).fill(0),mMktg=Array(12).fill(0);
+
+  rows.forEach(({t,a,d})=>{
+    const tgtM=t.rev&&t.rev.monthly?t.rev.monthly:Array(12).fill(0);
+    const tgt =cols.reduce((s,i)=>s+(+tgtM[i]||0),0);
+    const rev =cols.reduce((s,i)=>s+(+d.rev[i]||0),0);
+    const mktg=cols.reduce((s,i)=>s+(+d.mktg_cost[i]||0),0);
+    const gm  =cols.reduce((s,i)=>s+(+d.gm[i]||0),0);
+    const gpm =cols.reduce((s,i)=>s+(+d.gpm[i]||0),0);
+    const leads=cols.reduce((s,i)=>s+(+d.trig_leads[i]||0),0);
+    const cc  =cols.reduce((s,i)=>s+(+d.cc[i]||0),0);
+    const bill=cols.reduce((s,i)=>s+(+(d.billed_rev&&d.billed_rev[i])||0),0);
+    const gpmPct=rev>0?(gpm/rev*100):0;
+    const gmPct =rev>0?(gm/rev*100):0;
+    const cpl   =leads>0?(mktg*100000/leads):0;
+
+    totTgt+=tgt;totRev+=rev;totMktg+=mktg;totGM+=gm;totGPM+=gpm;
+    totLeads+=leads;totCC+=cc;totBilled+=bill;
+
+    d.rev.forEach((v,i)=>{mRev[i]+=v;mGM[i]+=d.gm[i]||0;mLeads[i]+=d.trig_leads[i]||0;mMktg[i]+=d.mktg_cost[i]||0;});
+
+    if(!oemMap[t.client])oemMap[t.client]={tgt:0,rev:0,mktg:0,gm:0,gpm:0,leads:0,accts:0,adTypes:new Set()};
+    const o=oemMap[t.client];
+    o.tgt+=tgt;o.rev+=rev;o.mktg+=mktg;o.gm+=gm;o.gpm+=gpm;o.leads+=leads;o.accts++;o.adTypes.add(t.ad_type);
+
+    if(!adTypeMap[t.ad_type])adTypeMap[t.ad_type]={rev:0,gm:0,gpm:0,mktg:0,leads:0,accts:0};
+    const at=adTypeMap[t.ad_type];
+    at.rev+=rev;at.gm+=gm;at.gpm+=gpm;at.mktg+=mktg;at.leads+=leads;at.accts++;
+
+    acctData.push({t,rev,tgt,gm,gpm,gpmPct,gmPct,mktg,leads,cc,bill,cpl});
+  });
+
+  const avgGPMpct=totRev>0?(totGPM/totRev*100):0;
+  const avgGMpct =totRev>0?(totGM/totRev*100):0;
+  const revAchv  =totTgt>0?(totRev/totTgt*100):0;
+  const avgCPL   =totLeads>0?(totMktg*100000/totLeads):0;
+
+  // ── Projections (FY run-rate from months with data) ──
+  const monthsActive=mRev.filter(v=>v>0).length;
+  const projRevFY=monthsActive>0?(mRev.reduce((s,v)=>s+v,0)/monthsActive*12):0;
+  const projGMFY =monthsActive>0?(mGM.reduce((s,v)=>s+v,0)/monthsActive*12):0;
+  const totTgtFY =rows.reduce((s,{t})=>s+(t.rev&&t.rev.fy?t.rev.fy:0),0);
+
+  // ── Spotlights ──
+  const withRev=acctData.filter(r=>r.rev>0);
+  const topGPM=[...withRev].sort((a,b)=>b.gpmPct-a.gpmPct).slice(0,5);
+  const lossMakers=withRev.filter(r=>r.gpm<0).sort((a,b)=>a.gpm-b.gpm).slice(0,5);
+  const underAchievers=acctData.filter(r=>r.tgt>0&&r.rev>0&&r.rev/r.tgt<0.5).sort((a,b)=>(a.rev/a.tgt)-(b.rev/b.tgt)).slice(0,5);
+  const topRevOEMs=Object.entries(oemMap).sort((a,b)=>b[1].rev-a[1].rev);
+  const maxOEMrev=topRevOEMs.length?topRevOEMs[0][1].rev:1;
+
+  // ── MoM trend (last 3 months with data) ──
+  let trendMonths=[];
+  for(let i=11;i>=0&&trendMonths.length<4;i--){if(mRev[i]>0)trendMonths.unshift(i);}
+  const trendRev=trendMonths.map(i=>mRev[i]);
+  const trendDir=trendRev.length>=2?(trendRev[trendRev.length-1]>trendRev[0]?'▲':'▼'):'—';
+  const trendColor=trendDir==='▲'?'#3fb950':trendDir==='▼'?'#f85149':'var(--text3)';
+
+  // Helpers
+  const fc=(v,d=2)=>v===0?'—':`${v.toFixed(d)}L`;
+  const fp=(v)=>v===0?'—':`${v.toFixed(1)}%`;
+  const col=(v)=>Math.abs(v)<0.01?'var(--text3)':v>=0?'#3fb950':'#f85149';
+  const badge=(v,threshGood=50,threshWarn=25)=>{
+    const c=v>=threshGood?'#3fb950':v>=threshWarn?'#f0a500':'#f85149';
+    return`<span style="background:${c}22;color:${c};padding:1px 7px;border-radius:10px;font-size:10px;font-weight:700">${fp(v)}</span>`;
+  };
+
+  // ── Period selector ──
+  const periods=[{id:'fy',label:'Full Year'},{id:'q0',label:'Q1'},{id:'q1',label:'Q2'},{id:'q2',label:'Q3'},{id:'q3',label:'Q4'},...MONTHS.map((m,i)=>({id:'m'+i,label:m}))];
+  const pBtns=periods.map(p=>{
+    const act=p.id===pid;
+    return`<button onclick="INSIGHTS_PERIOD='${p.id}';renderInsights()" style="padding:4px 10px;font-size:11px;border-radius:4px;border:1px solid ${act?'var(--accent)':'var(--border2)'};cursor:pointer;margin:2px;background:${act?'var(--accent)22':'var(--bg2)'};color:${act?'var(--accent)':'var(--text2)'};font-weight:${act?700:400}">${p.label}</button>`;
+  }).join('');
+
+  // ── CSS shorthand ──
+  const card=(extra='')=>`background:var(--bg2);border:1px solid var(--border2);border-radius:12px;padding:18px 20px;${extra}`;
+  const scard=(extra='')=>`background:var(--bg3);border:1px solid var(--border2);border-radius:10px;padding:14px 16px;${extra}`;
+  const kpiCard=(label,val,sub,accent='var(--accent)',icon='')=>`
+    <div style="${scard('flex:1;min-width:140px;')}">
+      <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">${icon?icon+' ':''}${label}</div>
+      <div style="font-size:22px;font-weight:800;color:${accent};font-variant-numeric:tabular-nums;letter-spacing:-.5px">${val}</div>
+      <div style="font-size:10.5px;color:var(--text3);margin-top:4px">${sub}</div>
+    </div>`;
+
+  // ── OEM leaderboard rows ──
+  let oemRows='';
+  topRevOEMs.forEach(([client,o])=>{
+    const barW=maxOEMrev>0?Math.round(o.rev/maxOEMrev*100):0;
+    const gpmPct=o.rev>0?(o.gpm/o.rev*100):0;
+    const achvPct=o.tgt>0?(o.rev/o.tgt*100):null;
+    const adTypeBadges=[...o.adTypes].map(at=>{
+      const c=at==='CPS'?'#3fb950':at==='CC contract'?'#f0a500':'#58a6ff';
+      return`<span style="background:${c}22;color:${c};padding:1px 5px;border-radius:4px;font-size:9px;font-weight:600">${at}</span>`;
+    }).join(' ');
+    oemRows+=`<div style="padding:10px 0;border-bottom:1px solid var(--border2)40">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
+        <div style="font-size:12px;font-weight:700;color:var(--text1);min-width:120px">${client}</div>
+        <div style="display:flex;gap:4px">${adTypeBadges}</div>
+        <div style="margin-left:auto;font-size:11px;color:var(--text2);font-weight:600">${fc(o.rev)}</div>
+        <div style="font-size:11px;width:60px;text-align:right">${badge(gpmPct)}</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <div style="flex:1;height:6px;background:var(--border2);border-radius:3px;overflow:hidden">
+          <div style="height:100%;width:${barW}%;background:linear-gradient(90deg,var(--accent),#8b5cf6);border-radius:3px;transition:width .4s"></div>
+        </div>
+        <div style="font-size:10px;color:var(--text3);min-width:80px;text-align:right">
+          ${achvPct!==null?`Achv ${fp(achvPct)}`:'No target set'}
+        </div>
+      </div>
+    </div>`;
+  });
+
+  // ── AdType breakdown ──
+  let adTypeRows='';
+  const adTypeColors={'CPS':'#3fb950','Media Leads':'#58a6ff','CC contract':'#f0a500'};
+  Object.entries(adTypeMap).sort((a,b)=>b[1].rev-a[1].rev).forEach(([at,m])=>{
+    const c=adTypeColors[at]||'var(--accent)';
+    const gpmPct=m.rev>0?(m.gpm/m.rev*100):0;
+    const gmPct =m.rev>0?(m.gm/m.rev*100):0;
+    adTypeRows+=`<div style="padding:10px 0;border-bottom:1px solid var(--border2)40;display:flex;align-items:center;gap:12px">
+      <div style="width:8px;height:8px;border-radius:50%;background:${c};flex-shrink:0"></div>
+      <div style="font-size:12px;font-weight:700;color:${c};min-width:90px">${at}</div>
+      <div style="font-size:11px;color:var(--text2)">${m.accts} acct${m.accts!==1?'s':''}</div>
+      <div style="margin-left:auto;text-align:right">
+        <div style="font-size:13px;font-weight:700;color:var(--text1)">${fc(m.rev)}</div>
+        <div style="font-size:10px;color:var(--text3)">GM ${fp(gmPct)} · GPM ${fp(gpmPct)}</div>
+      </div>
+    </div>`;
+  });
+
+  // ── Spotlight rows ──
+  const spotRow=(r,showGPM=true)=>`
+    <div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border2)33">
+      <div style="font-size:11px;font-weight:600;color:var(--text1);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.t.client}<span style="color:var(--text3);font-weight:400;font-size:10px"> · ${r.t.ad_type}${r.t.btl?` · ${r.t.btl}`:''}</span></div>
+      <div style="font-size:11px;font-weight:700;color:${col(r.gpm)};white-space:nowrap">${fc(r.gpm)}</div>
+      ${showGPM?`<div style="font-size:10px;white-space:nowrap">${badge(r.gpmPct)}</div>`:''}
+    </div>`;
+
+  const underRow=(r)=>`
+    <div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border2)33">
+      <div style="font-size:11px;font-weight:600;color:var(--text1);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.t.client}<span style="color:var(--text3);font-weight:400;font-size:10px"> · ${r.t.ad_type}</span></div>
+      <div style="font-size:10px;color:var(--text3)">${fc(r.rev)} / ${fc(r.tgt)}</div>
+      <div style="font-size:10px;color:#f85149;font-weight:700">${fp(r.rev/r.tgt*100)}</div>
+    </div>`;
+
+  // ── Projection section ──
+  const projAchv=totTgtFY>0?(projRevFY/totTgtFY*100):0;
+  const projGap=projRevFY-totTgtFY;
+  let projRows='';
+  Object.entries(oemMap).sort((a,b)=>b[1].rev-a[1].rev).forEach(([client,o])=>{
+    const projOEM=monthsActive>0?(o.rev/monthsActive*12):0;
+    const tgtOEM=rows.filter(({t})=>t.client===client).reduce((s,{t})=>s+(t.rev&&t.rev.fy?t.rev.fy:0),0);
+    const projAch=tgtOEM>0?(projOEM/tgtOEM*100):null;
+    const gap=projOEM-tgtOEM;
+    projRows+=`<tr>
+      <td style="padding:6px 10px;font-size:11px;font-weight:600;color:var(--text1);border-bottom:1px solid var(--border2)33">${client}</td>
+      <td style="padding:6px 10px;font-size:11px;text-align:right;color:var(--text2);border-bottom:1px solid var(--border2)33">${tgtOEM>0?fc(tgtOEM):'—'}</td>
+      <td style="padding:6px 10px;font-size:11px;text-align:right;color:var(--text2);border-bottom:1px solid var(--border2)33">${fc(o.rev)}</td>
+      <td style="padding:6px 10px;font-size:11px;text-align:right;font-weight:700;color:var(--accent);border-bottom:1px solid var(--border2)33">${fc(projOEM)}</td>
+      <td style="padding:6px 10px;font-size:11px;text-align:right;border-bottom:1px solid var(--border2)33">${projAch!==null?badge(projAch,80,60):'—'}</td>
+      <td style="padding:6px 10px;font-size:11px;text-align:right;font-weight:600;color:${col(gap)};border-bottom:1px solid var(--border2)33">${tgtOEM>0?((gap>0?'+':'')+gap.toFixed(2)+'L'):'—'}</td>
+    </tr>`;
+  });
+
+  // ── Monthly trend mini-chart ──
+  let sparkCells='';
+  const maxRev=Math.max(...mRev.filter(v=>v>0),0.001);
+  MONTHS.forEach((m,i)=>{
+    const h=mRev[i]>0?Math.max(6,Math.round(mRev[i]/maxRev*48)):2;
+    const inPeriod=cols.includes(i);
+    const c=inPeriod?'var(--accent)':'var(--border2)';
+    sparkCells+=`<div title="${m}: ${mRev[i]>0?mRev[i].toFixed(2)+'L':'no data'}" style="display:flex;flex-direction:column;align-items:center;gap:3px;flex:1">
+      <div style="height:${h}px;width:100%;background:${c};border-radius:2px 2px 0 0;max-width:28px;margin:0 auto;transition:height .3s"></div>
+      <div style="font-size:8px;color:${inPeriod?'var(--accent)':'var(--text3)'};writing-mode:vertical-lr;transform:rotate(180deg);height:24px;text-align:center">${m.slice(0,3)}</div>
+    </div>`;
+  });
+
+  // ── AI section ──
+  const aiSection=`<div id="insights-ai-panel" style="${card('margin-top:24px')}">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+      <div style="width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#6366f1,#8b5cf6);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">✦</div>
+      <div>
+        <div style="font-size:14px;font-weight:700;color:var(--text1)">AI Deep-Dive Insights</div>
+        <div style="font-size:11px;color:var(--text3)">Claude analyzes every metric — performance, efficiency, risks and FY projections</div>
+      </div>
+      <button id="insights-gen-btn" onclick="generateAIInsights()" style="margin-left:auto;padding:8px 18px;border-radius:8px;border:none;cursor:pointer;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;gap:6px;white-space:nowrap">✦ Generate Insights</button>
+    </div>
+    <div id="insights-ai-content">
+      <div style="text-align:center;padding:32px;color:var(--text3);font-size:12px">
+        <div style="font-size:28px;margin-bottom:10px;opacity:.5">✦</div>
+        Click <strong style="color:var(--text2)">Generate Insights</strong> to get a full AI analysis of your ${plabel} data — what's working, what's not, and where you're headed by FY-end.
+      </div>
+    </div>
+  </div>`;
+
+  // ── Build full page ──
+  let html=`<div style="max-width:1400px;margin:0 auto;padding:24px 20px">
+
+  <!-- Header -->
+  <div style="display:flex;align-items:flex-start;gap:16px;margin-bottom:24px">
+    <div>
+      <h2 style="font-size:22px;font-weight:800;color:var(--text1);margin:0 0 4px">Business Insights</h2>
+      <div style="font-size:12px;color:var(--text3)">${rows.length} account${rows.length!==1?'s':''} · ${plabel} · Live data from AOP Tracker</div>
+    </div>
+    <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
+      <div style="font-size:10px;color:var(--text3)">Period:</div>
+    </div>
+  </div>
+
+  <!-- Period selector -->
+  <div style="display:flex;flex-wrap:wrap;gap:0;margin-bottom:24px;background:var(--bg2);border:1px solid var(--border2);border-radius:10px;padding:10px 12px;align-items:center">
+    <span style="font-size:10px;color:var(--text3);margin-right:8px;font-weight:600;text-transform:uppercase;letter-spacing:.5px">Period</span>
+    ${pBtns}
+  </div>
+
+  <!-- KPI Cards -->
+  <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:24px">
+    ${kpiCard('Revenue (Accrued)',fc(totRev),`Target: ${fc(totTgt)} · Achv: ${fp(revAchv)}`,'var(--accent)','💰')}
+    ${kpiCard('Gross Margin',fc(totGM),`GM% ${fp(avgGMpct)}`,'#58a6ff','📊')}
+    ${kpiCard('Net GPM',fc(totGPM),`GPM% ${fp(avgGPMpct)}`,avgGPMpct>=20?'#3fb950':avgGPMpct>=0?'#f0a500':'#f85149','📈')}
+    ${kpiCard('Total Leads',totLeads>0?Math.round(totLeads).toLocaleString('en-IN'):'—',`Avg CPL ₹${avgCPL>0?Math.round(avgCPL).toLocaleString('en-IN'):'—'}`,'#a78bfa','🎯')}
+    ${kpiCard('Billed Revenue',fc(totBilled),`vs Accrued: ${totRev>0?fp((totBilled-totRev)/totRev*100+100):'—'}`,'#3fb950','🧾')}
+    ${kpiCard('Active Accounts',rows.length+'',`${Object.keys(oemMap).length} OEMs · ${Object.keys(adTypeMap).length} ad types`,'var(--text2)','🏢')}
+  </div>
+
+  <!-- Row 1: OEM Leaderboard + AdType + MoM Trend -->
+  <div style="display:grid;grid-template-columns:1fr 280px;gap:16px;margin-bottom:16px">
+
+    <!-- OEM Leaderboard -->
+    <div style="${card()}">
+      <div style="font-size:13px;font-weight:700;color:var(--text1);margin-bottom:14px">📊 OEM Revenue Leaderboard <span style="font-size:10px;color:var(--text3);font-weight:400">· sorted by revenue · GPM badge</span></div>
+      ${oemRows||'<div style="color:var(--text3);font-size:12px">No data for selected period</div>'}
+    </div>
+
+    <!-- Right column: AdType + Revenue Trend -->
+    <div style="display:flex;flex-direction:column;gap:16px">
+
+      <!-- AdType Breakdown -->
+      <div style="${card()}">
+        <div style="font-size:13px;font-weight:700;color:var(--text1);margin-bottom:10px">📋 By Ad Type</div>
+        ${adTypeRows||'<div style="color:var(--text3);font-size:12px">—</div>'}
+      </div>
+
+      <!-- Revenue Trend (FY monthly) -->
+      <div style="${card()}">
+        <div style="font-size:13px;font-weight:700;color:var(--text1);margin-bottom:4px">📅 FY Revenue Trend</div>
+        <div style="font-size:10px;color:var(--text3);margin-bottom:12px">${monthsActive} month${monthsActive!==1?'s':''} with data · trend <span style="color:${trendColor};font-weight:700">${trendDir}</span></div>
+        <div style="display:flex;align-items:flex-end;height:60px;gap:2px">
+          ${sparkCells}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Row 2: Spotlights (3 cards) -->
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:16px">
+
+    <!-- Top Performers -->
+    <div style="${card()}">
+      <div style="font-size:13px;font-weight:700;color:#3fb950;margin-bottom:12px">🏆 Top GPM Accounts</div>
+      ${topGPM.length?topGPM.map(r=>spotRow(r)).join(''):'<div style="color:var(--text3);font-size:12px;padding:12px 0">No revenue data yet</div>'}
+    </div>
+
+    <!-- Loss Makers -->
+    <div style="${card('border-color:'+(lossMakers.length?'#f8514922':'var(--border2)')+'')}" >
+      <div style="font-size:13px;font-weight:700;color:#f85149;margin-bottom:12px">⚠️ Loss-Making Accounts <span style="background:#f8514922;color:#f85149;padding:1px 7px;border-radius:8px;font-size:10px">${lossMakers.length}</span></div>
+      ${lossMakers.length?lossMakers.map(r=>spotRow(r)).join(''):'<div style="color:#3fb950;font-size:12px;padding:12px 0">✓ No loss-making accounts in this period</div>'}
+    </div>
+
+    <!-- Under-achievers -->
+    <div style="${card()}">
+      <div style="font-size:13px;font-weight:700;color:#f0a500;margin-bottom:12px">📉 Under 50% Target Achievement</div>
+      ${underAchievers.length?underAchievers.map(r=>underRow(r)).join(''):'<div style="color:#3fb950;font-size:12px;padding:12px 0">✓ All accounts above 50% target</div>'}
+    </div>
+  </div>
+
+  <!-- Row 3: FY Projections -->
+  <div style="${card('margin-bottom:24px')}">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+      <div style="font-size:13px;font-weight:700;color:var(--text1)">🔮 FY27 Run-Rate Projections</div>
+      <div style="font-size:10.5px;color:var(--text3)">Based on average of ${monthsActive} month${monthsActive!==1?'s':''} with data · assumes current pace continues</div>
+      <div style="margin-left:auto;display:flex;gap:16px;font-size:11.5px">
+        <span>FY Target: <strong style="color:var(--text2)">${fc(totTgtFY)}</strong></span>
+        <span>Projected: <strong style="color:var(--accent)">${fc(projRevFY)}</strong></span>
+        <span>Gap vs Target: <strong style="color:${col(projGap)}">${projGap>=0?'+':''}${projGap.toFixed(2)}L</strong></span>
+        <span>Achv: ${badge(projAchv,90,70)}</span>
+      </div>
+    </div>
+    <div style="overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse;font-size:11px">
+        <thead><tr style="background:var(--bg3)">
+          <th style="text-align:left;padding:7px 10px;border-bottom:2px solid var(--border2);color:var(--text2);font-weight:600">OEM</th>
+          <th style="text-align:right;padding:7px 10px;border-bottom:2px solid var(--border2);color:var(--text2);font-weight:600">FY Target</th>
+          <th style="text-align:right;padding:7px 10px;border-bottom:2px solid var(--border2);color:var(--text2);font-weight:600">Accrued So Far</th>
+          <th style="text-align:right;padding:7px 10px;border-bottom:2px solid var(--border2);color:var(--accent);font-weight:600">Projected FY</th>
+          <th style="text-align:right;padding:7px 10px;border-bottom:2px solid var(--border2);color:var(--text2);font-weight:600">Achievement</th>
+          <th style="text-align:right;padding:7px 10px;border-bottom:2px solid var(--border2);color:var(--text2);font-weight:600">Gap vs Target</th>
+        </tr></thead>
+        <tbody>${projRows}</tbody>
+        <tfoot><tr style="background:var(--bg3)">
+          <td style="padding:7px 10px;font-weight:700;color:var(--accent);border-top:2px solid var(--border2)">TOTAL</td>
+          <td style="padding:7px 10px;text-align:right;font-weight:700;color:var(--text2);border-top:2px solid var(--border2)">${fc(totTgtFY)}</td>
+          <td style="padding:7px 10px;text-align:right;font-weight:700;color:var(--text2);border-top:2px solid var(--border2)">${fc(totRev)}</td>
+          <td style="padding:7px 10px;text-align:right;font-weight:700;color:var(--accent);border-top:2px solid var(--border2)">${fc(projRevFY)}</td>
+          <td style="padding:7px 10px;text-align:right;border-top:2px solid var(--border2)">${badge(projAchv,90,70)}</td>
+          <td style="padding:7px 10px;text-align:right;font-weight:700;color:${col(projGap)};border-top:2px solid var(--border2)">${totTgtFY>0?((projGap>=0?'+':'')+projGap.toFixed(2)+'L'):'—'}</td>
+        </tr></tfoot>
+      </table>
+    </div>
+  </div>
+
+  <!-- AI Deep-Dive -->
+  ${aiSection}
+
+  </div>`; // end max-width wrapper
+
+  el.innerHTML=html;
+
+  // Restore AI result if previously generated
+  if(_insightsAIResult){
+    const ac=document.getElementById('insights-ai-content');
+    if(ac)ac.innerHTML=_insightsAIResult;
+  }
+}
+
+async function generateAIInsights(){
+  if(_insightsAIGenerating)return;
+  const btn=document.getElementById('insights-gen-btn');
+  const content=document.getElementById('insights-ai-content');
+  if(!btn||!content)return;
+
+  const apiKey=await _loadAIKey();
+  if(!apiKey){
+    content.innerHTML=`<div style="padding:16px;color:#f85149;font-size:12px">⚠️ No API key configured. Ask your admin to set a shared key via the 🔑 button in the header.</div>`;
+    return;
+  }
+
+  _insightsAIGenerating=true;
+  btn.innerHTML='<span style="animation:pulse 1s infinite">✦</span> Analyzing…';
+  btn.disabled=true;
+  content.innerHTML=`<div style="display:flex;flex-direction:column;gap:16px;padding:16px">
+    ${['Scanning revenue metrics…','Analysing lead quality…','Checking margin health…','Computing projections…','Synthesising findings…'].map((s,i)=>`
+      <div style="display:flex;align-items:center;gap:10px;animation:fadeIn .4s ${i*0.2}s both">
+        <div style="width:24px;height:24px;border-radius:50%;border:2px solid var(--accent);border-top-color:transparent;animation:spin 1s linear infinite;flex-shrink:0"></div>
+        <div style="font-size:12px;color:var(--text3)">${s}</div>
+      </div>`).join('')}
+  </div>`;
+
+  const rows=getFiltered();
+  const pid=INSIGHTS_PERIOD;
+  const cols=_insightsPeriodCols(pid);
+  const plabel=_insightsPeriodLabel(pid);
+
+  // Build rich context
+  const ctx=_buildInsightsPrompt(rows,cols,plabel);
+
+  const systemPrompt=`You are an expert business analytics consultant for BikeDekho's digital marketing P&L.
+You are analysing internal AOP (Annual Operating Plan) tracker data for FY27 across OEM (bike brand) accounts.
+
+Context:
+- Revenue, GM, GPM are in Indian Rupees Lakhs (L). 1L = ₹1,00,000.
+- Leads are absolute counts. CPL = Cost Per Lead in Rs.
+- GPM = GM minus CC (Contact Centre) cost. Negative GPM = loss-making.
+- Ad Types: CPS (Cost Per Sale, retail-linked), Media Leads (CPL model), CC contract (Contact Centre seats).
+- Clients: major Indian bike OEMs (Bajaj/KTM, TVS, Royal Enfield, HMSI, Hero, Harley, Jawa/Yezdi, etc.)
+- Today is May 2026. FY27 = Apr 2026 – Mar 2027.
+
+Response format — use these EXACT section headers in your response:
+## 📊 Executive Snapshot
+## ✅ What's Going Right
+## ⚠️ Areas of Concern
+## 🔍 OEM-by-OEM Observations
+## 📉 Lead & Efficiency Analysis
+## 🔮 FY-End Projections & Recommendations
+
+Rules:
+- Be specific. Use exact numbers from the data. Call out account names, months, and values.
+- Format currency as "X.XX L". Percentages to 1 decimal.
+- Use markdown tables where comparisons are clearer.
+- Be direct and actionable — this is an internal tool for the business team.
+- Flag anything unusual or alarming explicitly.
+- For projections, state assumptions clearly.`;
+
+  try{
+    const resp=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      body:JSON.stringify({model:'claude-3-5-sonnet-20241022',max_tokens:4000,system:systemPrompt,messages:[{role:'user',content:ctx}]})
+    });
+    const data=await resp.json();
+    if(data.content&&data.content[0]){
+      const rendered=_renderInsightsMarkdown(data.content[0].text);
+      _insightsAIResult=rendered;
+      content.innerHTML=rendered;
+    }else if(data.error){
+      const msg=`⚠️ API error: ${data.error.message||JSON.stringify(data.error)}`;
+      content.innerHTML=`<div style="padding:16px;color:#f85149;font-size:12px">${msg}</div>`;
+      if(data.error.type==='authentication_error'){_aiKeyCache=null;localStorage.removeItem('leadbu_ai_key');}
+    }
+  }catch(e){
+    content.innerHTML=`<div style="padding:16px;color:#f85149;font-size:12px">⚠️ Network error: ${e.message}</div>`;
+  }
+  _insightsAIGenerating=false;
+  btn.innerHTML='✦ Regenerate';
+  btn.disabled=false;
+}
+
+function _buildInsightsPrompt(rows,cols,plabel){
+  const lines=[];
+  lines.push(`Analyse my BikeDekho AOP Tracker data for ${plabel}. ${rows.length} accounts match the current filter.\n`);
+
+  // Summary aggregates
+  let totTgt=0,totRev=0,totMktg=0,totGM=0,totGPM=0,totLeads=0,totCC=0,totBilled=0;
+  const oemMap={};
+
+  rows.forEach(({t,a,d})=>{
+    const tgtM=t.rev&&t.rev.monthly?t.rev.monthly:Array(12).fill(0);
+    const tgt =cols.reduce((s,i)=>s+(+tgtM[i]||0),0);
+    const rev =cols.reduce((s,i)=>s+(+d.rev[i]||0),0);
+    const mktg=cols.reduce((s,i)=>s+(+d.mktg_cost[i]||0),0);
+    const gm  =cols.reduce((s,i)=>s+(+d.gm[i]||0),0);
+    const gpm =cols.reduce((s,i)=>s+(+d.gpm[i]||0),0);
+    const leads=cols.reduce((s,i)=>s+(+d.trig_leads[i]||0),0);
+    const cc  =cols.reduce((s,i)=>s+(+d.cc[i]||0),0);
+    const bill=cols.reduce((s,i)=>s+(+(d.billed_rev&&d.billed_rev[i])||0),0);
+    const gLd =cols.reduce((s,i)=>s+(+(a.google_leads&&a.google_leads[i])||0),0);
+    const mLd =cols.reduce((s,i)=>s+(+(a.meta_leads&&a.meta_leads[i])||0),0);
+    const bRet=cols.reduce((s,i)=>s+(+(a.billed_retails&&a.billed_retails[i])||0),0);
+    const ret =cols.reduce((s,i)=>s+(+(a.retails&&a.retails[i])||0),0);
+
+    totTgt+=tgt;totRev+=rev;totMktg+=mktg;totGM+=gm;totGPM+=gpm;totLeads+=leads;totCC+=cc;totBilled+=bill;
+
+    if(!oemMap[t.client])oemMap[t.client]=[];
+    oemMap[t.client].push({t,tgt,rev,mktg,gm,gpm,leads,cc,bill,gLd,mLd,ret,bRet});
+  });
+
+  // Portfolio summary
+  lines.push('## PORTFOLIO SUMMARY');
+  lines.push(`Revenue (Accrued): ${totRev.toFixed(2)}L | Target: ${totTgt.toFixed(2)}L | Achievement: ${totTgt>0?(totRev/totTgt*100).toFixed(1)+'%':'N/A'}`);
+  lines.push(`GM: ${totGM.toFixed(2)}L (${totRev>0?(totGM/totRev*100).toFixed(1):0}%) | GPM: ${totGPM.toFixed(2)}L (${totRev>0?(totGPM/totRev*100).toFixed(1):0}%)`);
+  lines.push(`Mktg Spend: ${totMktg.toFixed(2)}L | CC Cost: ${totCC.toFixed(2)}L | Billed Rev: ${totBilled.toFixed(2)}L`);
+  lines.push(`Total Triggered Leads: ${Math.round(totLeads).toLocaleString()} | Avg CPL: ₹${totLeads>0?Math.round(totMktg*100000/totLeads).toLocaleString():'N/A'}/lead\n`);
+
+  // Per-OEM breakdown
+  lines.push('## PER-OEM BREAKDOWN');
+  Object.entries(oemMap).sort((a,b)=>b[1].reduce((s,r)=>s+r.rev,0)-a[1].reduce((s,r)=>s+r.rev,0)).forEach(([client,recs])=>{
+    lines.push(`\n### ${client}`);
+    recs.forEach(r=>{
+      const gpmPct=r.rev>0?(r.gpm/r.rev*100).toFixed(1):0;
+      const gmPct=r.rev>0?(r.gm/r.rev*100).toFixed(1):0;
+      const achv=r.tgt>0?(r.rev/r.tgt*100).toFixed(1)+'%':'—';
+      const cpl=r.leads>0?Math.round(r.mktg*100000/r.leads):0;
+      const crPct=r.leads>0&&r.ret>0?(r.ret/r.leads*100).toFixed(1)+'%':'—';
+      lines.push(`  [${r.t.ad_type}${r.t.btl?' · '+r.t.btl:''}]`);
+      lines.push(`    Rev: ${r.rev.toFixed(2)}L (Tgt ${r.tgt.toFixed(2)}L, Achv ${achv})`);
+      lines.push(`    GM: ${r.gm.toFixed(2)}L (${gmPct}%) | GPM: ${r.gpm.toFixed(2)}L (${gpmPct}%)`);
+      if(r.leads>0)lines.push(`    Leads: G=${r.gLd} M=${r.mLd} Total=${Math.round(r.leads)} | CPL: ₹${cpl} | Cr%: ${crPct}`);
+      if(r.mktg>0)lines.push(`    Mktg Spend: ${r.mktg.toFixed(2)}L | CC: ${r.cc.toFixed(2)}L`);
+      if(r.bill>0)lines.push(`    Billed Rev: ${r.bill.toFixed(2)}L | Billed Retails: ${r.bRet}`);
+    });
+  });
+
+  // Monthly trend (FY all months)
+  lines.push('\n## MONTHLY REVENUE TREND (Full FY, all filtered accounts)');
+  lines.push('Month,Revenue(L),GM(L),Leads,MktgSpend(L)');
+  const mRev2=Array(12).fill(0),mGM2=Array(12).fill(0),mLd2=Array(12).fill(0),mMk2=Array(12).fill(0);
+  rows.forEach(({d})=>{d.rev.forEach((v,i)=>{mRev2[i]+=v;mGM2[i]+=d.gm[i]||0;mLd2[i]+=d.trig_leads[i]||0;mMk2[i]+=d.mktg_cost[i]||0;});});
+  MONTHS.forEach((m,i)=>{if(mRev2[i]>0||mGM2[i]>0||mLd2[i]>0)lines.push(`${m},${mRev2[i].toFixed(2)},${mGM2[i].toFixed(2)},${Math.round(mLd2[i])},${mMk2[i].toFixed(2)}`);});
+
+  lines.push('\nProvide a comprehensive business intelligence analysis covering all 6 sections requested. Be specific with numbers and names. Give clear, actionable recommendations.');
+  return lines.join('\n');
+}
+
+function _renderInsightsMarkdown(text){
+  // Section colors
+  const sectionColors={
+    '📊 Executive Snapshot':'#6366f1',
+    '✅ What\'s Going Right':'#3fb950',
+    '⚠️ Areas of Concern':'#f85149',
+    '🔍 OEM-by-OEM Observations':'#58a6ff',
+    '📉 Lead & Efficiency Analysis':'#f0a500',
+    '🔮 FY-End Projections & Recommendations':'#a78bfa'
+  };
+
+  const sections=text.split(/^## /m).filter(Boolean);
+  let html='<div style="display:flex;flex-direction:column;gap:16px">';
+  sections.forEach(section=>{
+    const lines=section.split('\n');
+    const title=lines[0].trim();
+    const body=lines.slice(1).join('\n').trim();
+    let accentColor='var(--accent)';
+    Object.entries(sectionColors).forEach(([k,v])=>{if(title.includes(k.slice(2)))accentColor=v;});
+
+    // Process body
+    let processed=body
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+      .replace(/\*\*(.*?)\*\*/g,'<strong style="color:var(--text1)">$1</strong>')
+      .replace(/\*(.*?)\*/g,'<em>$1</em>')
+      .replace(/`([^`]+)`/g,'<code style="background:rgba(255,255,255,.1);padding:1px 5px;border-radius:3px;font-family:monospace;font-size:11px;color:var(--accent)">$1</code>')
+      .replace(/^### (.+)$/gm,'<div style="font-size:12px;font-weight:700;color:'+accentColor+';margin:12px 0 4px;border-left:3px solid '+accentColor+'44;padding-left:8px">$1</div>')
+      .replace(/^- (.+)$/gm,'<div style="display:flex;gap:8px;padding:3px 0"><span style="color:'+accentColor+';flex-shrink:0">•</span><span>$1</span></div>')
+      .replace(/^\d+\. (.+)$/gm,'<div style="display:flex;gap:8px;padding:3px 0"><span style="color:'+accentColor+';flex-shrink:0;font-weight:700;min-width:16px">$&</span></div>')
+      .replace(/^\| .+/gm,row=>{
+        const cells=row.split('|').slice(1,-1).map((c,ci)=>`<td style="padding:5px 10px;border:1px solid var(--border2);${ci===0?'font-weight:600;color:var(--text1)':'text-align:right;color:var(--text2)'}">${c.trim()}</td>`).join('');
+        return`<tr>${cells}</tr>`;
+      })
+      .replace(/(<tr>.*?<\/tr>\n?)+/gs,t=>`<div style="overflow-x:auto;margin:8px 0"><table style="border-collapse:collapse;font-size:11px;width:100%">${t}</table></div>`)
+      .replace(/\n\n/g,'</p><p style="margin:6px 0">')
+      .replace(/\n/g,'<br>');
+
+    html+=`<div style="background:var(--bg3);border:1px solid var(--border2);border-left:3px solid ${accentColor};border-radius:0 10px 10px 0;padding:16px 18px;border-radius:10px;border-left:3px solid ${accentColor}">
+      <div style="font-size:14px;font-weight:700;color:${accentColor};margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid ${accentColor}22">${title}</div>
+      <div style="font-size:12px;color:var(--text2);line-height:1.7"><p style="margin:0">${processed}</p></div>
+    </div>`;
+  });
+  html+='</div>';
+  return html;
+}
 async function submitAIChat(){
   const inp=document.getElementById('ai-chat-input');
   if(!inp)return;
