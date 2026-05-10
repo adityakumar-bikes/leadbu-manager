@@ -208,12 +208,22 @@ async function _authInit(){
       try{ await firebase.auth().signOut(); }catch(e){}
       return;
     }
-    // Force the auth token to be attached to the RTDB connection before any reads
+    // Force token attachment and retry the read — token propagation to RTDB can lag
     await user.getIdToken(true);
-    await new Promise(r => setTimeout(r, 300));
     const uid = user.uid;
     const ref = _userListRef.child(uid);
-    const snap = await ref.once('value');
+    let snap, attempt = 0;
+    while (true) {
+      try {
+        snap = await ref.once('value');
+        break;
+      } catch(e) {
+        if (attempt++ < 4 && e.code === 'PERMISSION_DENIED') {
+          await new Promise(r => setTimeout(r, 400 * attempt));
+          await user.getIdToken(true);
+        } else { throw e; }
+      }
+    }
     let prof = snap.val();
 
     if (!prof){
