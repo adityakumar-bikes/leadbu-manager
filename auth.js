@@ -8,7 +8,8 @@
    ═════════════════════════════════════════════════════════════════ */
 
 const AUTH_ENABLED       = true;                          // ← FLIP TO false TO DISABLE AUTH
-const ALLOWED_DOMAIN     = '@girnarsoft.com';             // domain lock
+const ALLOWED_DOMAIN     = '@girnarsoft.com';             // primary domain
+const ALLOWED_EMAILS     = ['karun.seth@girnarcare.com']; // individual exceptions (any domain)
 const SUPER_ADMIN_EMAIL  = 'aditya.kumar@girnarsoft.com'; // bootstraps as admin on first login
 const ROLE_RANK = {admin:3, editor:2, viewer:1, pending:0};
 
@@ -199,8 +200,10 @@ async function _authInit(){
       _authShowGate('');
       return;
     }
-    // Domain check
-    if (!user.email || !user.email.toLowerCase().endsWith(ALLOWED_DOMAIN)){
+    // Domain check — allow primary domain OR individual whitelisted emails
+    const emailLower = (user.email||'').toLowerCase();
+    const allowed = emailLower.endsWith(ALLOWED_DOMAIN) || ALLOWED_EMAILS.map(e=>e.toLowerCase()).includes(emailLower);
+    if (!user.email || !allowed){
       _authShowGate('<span style="color:#f85149">Only '+ALLOWED_DOMAIN+' accounts are permitted.</span>');
       try{ await firebase.auth().signOut(); }catch(e){}
       return;
