@@ -384,14 +384,16 @@ function renderUsers(){
 
   // ── Header
   const onlineCount = users.filter(isUserOnline).length;
-  let html = `<div style="padding:18px 22px 12px"><div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px"><div><div style="font-size:18px;font-weight:600;color:var(--text1);letter-spacing:-.2px">User Management</div><div style="font-size:12px;color:var(--text3);margin-top:2px">${users.length} user${users.length!==1?'s':''} · <span style="color:#3fb950">●</span> ${onlineCount} online</div></div><div style="display:flex;gap:8px"><button onclick="_authViewRoleAudit()" class="btn btn-dim" style="padding:5px 11px">📜 Role audit log</button></div></div></div>`;
+  const invitedCount = Object.keys(_allPreInvites).length;
+  let html = `<div style="padding:18px 22px 12px"><div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px"><div><div style="font-size:18px;font-weight:600;color:var(--text1);letter-spacing:-.2px">User Management</div><div style="font-size:12px;color:var(--text3);margin-top:2px">${users.length} registered · ${invitedCount} invited · <span style="color:#3fb950">●</span> ${onlineCount} online</div></div><div style="display:flex;gap:8px"><button onclick="_authViewRoleAudit()" class="btn btn-dim" style="padding:5px 11px">📜 Audit log</button></div></div></div>`;
 
   // ── Stats strip
   const counts = {admin:0,editor:0,viewer:0,pending:0,disabled:0};
   users.forEach(u=>{ if(u.disabled) counts.disabled++; else counts[u.role]=(counts[u.role]||0)+1; });
-  html += `<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;padding:0 22px 14px">`;
-  [['admin','Admins','#ee6a3a'],['editor','Editors','#3fb950'],['viewer','Viewers','#7d8590'],['pending','Pending','#f0a500'],['disabled','Disabled','#f85149']].forEach(([k,lbl,c])=>{
-    html += `<div style="background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:11px 14px"><div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">${lbl}</div><div style="font-size:22px;font-weight:600;color:${c};font-family:var(--mono)">${counts[k]||0}</div></div>`;
+  html += `<div style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px;padding:0 22px 14px">`;
+  [['admin','Admins','#ee6a3a'],['editor','Editors','#3fb950'],['viewer','Viewers','#7d8590'],['pending','Pending','#f0a500'],['disabled','Disabled','#f85149'],['_invited','Invited','#58a6ff']].forEach(([k,lbl,c])=>{
+    const val = k==='_invited' ? invitedCount : (counts[k]||0);
+    html += `<div style="background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:11px 14px"><div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">${lbl}</div><div style="font-size:22px;font-weight:600;color:${c};font-family:var(--mono)">${val}</div></div>`;
   });
   html += `</div>`;
 
@@ -442,7 +444,6 @@ function renderUsers(){
       </div>
       <button class="btn btn-pri" onclick="_authPreAddUser()" style="padding:7px 14px;font-size:12px">Add</button>
     </div>
-    <div id="pre-invite-list"></div>
   </div>`;
 
   // ── Pending queue
@@ -456,7 +457,7 @@ function renderUsers(){
     html += `</div>`;
   }
 
-  // ── User table
+  // ── Unified team table (registered + invited)
   html += `<div style="margin:0 22px 22px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;overflow:hidden"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="background:var(--bg3);color:var(--text3);font-size:10px;text-transform:uppercase;letter-spacing:.5px"><th style="text-align:left;padding:10px 14px">User</th><th style="text-align:left;padding:10px 8px">Email</th><th style="text-align:center;padding:10px 8px">Role</th><th style="text-align:center;padding:10px 8px">Status</th><th style="text-align:left;padding:10px 8px">First seen</th><th style="text-align:left;padding:10px 8px">Last login</th><th style="text-align:right;padding:10px 14px">Actions</th></tr></thead><tbody>`;
   users.forEach((u,i)=>{
     const me = AUTH_USER && u.email === AUTH_USER.email.toLowerCase();
@@ -473,7 +474,8 @@ function renderUsers(){
       <td style="padding:9px 14px;text-align:right">${_authActionMenu(u,me)}</td>
     </tr>`;
   });
-  html += `</tbody></table></div>`;
+  // Pre-invited rows injected here by _renderPreInvites()
+  html += `</tbody><tbody id="pre-invited-rows"></tbody></table></div>`;
 
   html += `<div style="padding:0 22px 22px;font-size:11px;color:var(--text3);line-height:1.7;max-width:780px"><b style="color:var(--text2)">Quick rules:</b> Admins manage users + edit data. Editors edit data only. Viewers see everything but cannot change anything. Disabling a user revokes access immediately on their next page load. Force sign-out ends a user's current session next time the page reloads.</div>`;
 
@@ -496,25 +498,45 @@ function _watchPreInvites(){
 }
 
 function _renderPreInvites(){
-  const el = document.getElementById('pre-invite-list');
-  if (!el) return;
+  const tbody = document.getElementById('pre-invited-rows');
+  if (!tbody) return;
   const invites = Object.entries(_allPreInvites);
-  if (!invites.length){ el.innerHTML = ''; return; }
-  const roleColor = {admin:'#ee6a3a', editor:'#3fb950', viewer:'#7d8590'};
+
+  // Update header invited count
+  const hdrEl = document.querySelector('#page-users .hdr-sub, #page-users [data-invited-count]');
+
+  if (!invites.length){ tbody.innerHTML = ''; return; }
+
+  const roleBadgeInv = role => {
+    const c = {admin:'#ee6a3a',editor:'#3fb950',viewer:'#7d8590'}[role]||'#7d8590';
+    return `<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;background:${c}1a;color:${c}">${role}</span>`;
+  };
   const fmtDate = ts => ts ? new Date(ts).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'2-digit'}) : '—';
-  let h = `<div style="margin-top:10px;border-top:1px solid var(--border);padding-top:8px">
-    <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Pending invites — role applied on first login</div>`;
+
+  // Section divider row
+  let h = `<tr><td colspan="7" style="padding:6px 14px;background:var(--bg3);border-top:2px solid #58a6ff33">
+    <span style="font-size:10px;color:#58a6ff;font-weight:600;text-transform:uppercase;letter-spacing:.5px">⏳ Awaiting first login (${invites.length})</span>
+    <span style="font-size:10px;color:var(--text3);margin-left:8px">Role assigned automatically on sign-in</span>
+  </td></tr>`;
+
   invites.forEach(([key, inv])=>{
-    const c = roleColor[inv.role] || '#7d8590';
-    h += `<div style="display:flex;align-items:center;gap:10px;padding:5px 0;border-bottom:1px solid var(--border)">
-      <div style="flex:1;font-size:11px;color:var(--text1);font-family:var(--mono)">${inv.email||key}</div>
-      <span style="padding:2px 7px;border-radius:4px;font-size:10px;font-weight:600;background:${c}1a;color:${c};text-transform:uppercase;letter-spacing:.5px">${inv.role}</span>
-      <span style="font-size:10px;color:var(--text3);white-space:nowrap">Added ${fmtDate(inv.addedAt)}</span>
-      <button class="btn btn-dim" onclick="_authRevokeInvite('${key}')" style="padding:2px 8px;font-size:10px;color:#f85149">Revoke</button>
-    </div>`;
+    const email = inv.email || key.replace(/,/g,'.');
+    const namePart = email.split('@')[0];
+    // Convert "aabhas.gugnani" → "Aabhas Gugnani"
+    const displayName = namePart.split(/[._-]/).map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join(' ');
+    const initial = displayName.charAt(0).toUpperCase();
+    const av = `<div style="width:30px;height:30px;border-radius:50%;background:#58a6ff22;border:1px dashed #58a6ff55;display:flex;align-items:center;justify-content:center;font-size:12px;color:#58a6ff;font-weight:600">${initial}</div>`;
+    h += `<tr style="background:var(--bg);border-top:1px solid var(--border);opacity:.85">
+      <td style="padding:9px 14px"><div style="display:flex;align-items:center;gap:9px">${av}<div><div style="color:var(--text2);font-weight:500">${displayName}</div><div style="font-size:10px;color:var(--text3)">Never signed in</div></div></div></td>
+      <td style="padding:9px 8px;color:var(--text3);font-family:var(--mono);font-size:11px">${email}</td>
+      <td style="padding:9px 8px;text-align:center">${roleBadgeInv(inv.role)}</td>
+      <td style="padding:9px 8px;text-align:center"><span style="font-size:11px;color:#58a6ff">Invited</span></td>
+      <td style="padding:9px 8px;color:var(--text3);font-size:11px;white-space:nowrap">${fmtDate(inv.addedAt)}</td>
+      <td style="padding:9px 8px;color:var(--text3);font-size:11px">—</td>
+      <td style="padding:9px 14px;text-align:right"><button class="btn btn-dim" onclick="_authRevokeInvite('${key}')" style="padding:3px 9px;font-size:10px;color:#f85149">Revoke</button></td>
+    </tr>`;
   });
-  h += `</div>`;
-  el.innerHTML = h;
+  tbody.innerHTML = h;
 }
 
 async function _authPreAddUser(){
