@@ -211,8 +211,13 @@ async function _authInit(){
 
     if (!prof){
       // First sign-in: check for a pre-invite, then bootstrap
-      const preSnap = await _fbDb.ref('preInvited/'+_emailKey(user.email)).once('value');
-      const preInvite = preSnap.val();
+      let preInvite = null;
+      try {
+        const preSnap = await _fbDb.ref('preInvited/'+_emailKey(user.email)).once('value');
+        preInvite = preSnap.val();
+      } catch(e) {
+        console.warn('[auth] Could not read preInvited:', e.code || e.message);
+      }
       const isSuper = (user.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase());
       const initialRole = isSuper ? 'admin' : (preInvite && preInvite.role ? preInvite.role : 'viewer');
       prof = {
