@@ -9,7 +9,7 @@
 
 const AUTH_ENABLED       = true;                          // ← FLIP TO false TO DISABLE AUTH
 const ALLOWED_DOMAIN     = '@girnarsoft.com';             // primary domain
-const ALLOWED_EMAILS     = ['karun.seth@girnarcare.com']; // individual exceptions (any domain)
+const ALLOWED_EMAILS     = ['karun.seth@girnarcare.com', 'monty.aditya@gmail.com']; // individual exceptions (any domain)
 const SUPER_ADMIN_EMAIL  = 'aditya.kumar@girnarsoft.com'; // bootstraps as admin on first login
 const ROLE_RANK = {admin:3, editor:2, viewer:1, pending:0};
 
