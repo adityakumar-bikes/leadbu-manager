@@ -256,6 +256,8 @@ async function _authInit(){
         photoURL:  user.photoURL || prof.photoURL || '',
         displayName: user.displayName || prof.displayName || ''
       });
+      // Log every login to the audit trail
+      _roleAuditRef.push({ts:firebase.database.ServerValue.TIMESTAMP, actor:user.email, target:user.email, action:'login', role:prof.role});
     }
     AUTH_PROFILE = Object.assign({uid}, prof);
 
@@ -586,7 +588,7 @@ async function _authViewRoleAudit(){
     html += '<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="background:var(--bg2);color:var(--text3);font-size:10px;text-transform:uppercase;letter-spacing:.5px"><th style="text-align:left;padding:9px 14px">When</th><th style="text-align:left;padding:9px 8px">Actor</th><th style="text-align:left;padding:9px 8px">Target</th><th style="text-align:left;padding:9px 8px">Action</th><th style="text-align:left;padding:9px 14px">Change</th></tr></thead><tbody>';
     entries.forEach((e,i)=>{
       const bg = i%2 ? 'var(--bg2)' : 'var(--bg)';
-      const actC = {role_change:'#58a6ff',create:'#3fb950',disable:'#f85149',enable:'#3fb950',force_signout:'#f0a500'}[e.action]||'var(--text2)';
+      const actC = {login:'#7d8590',role_change:'#58a6ff',create:'#3fb950',disable:'#f85149',enable:'#3fb950',force_signout:'#f0a500'}[e.action]||'var(--text2)';
       html += `<tr style="background:${bg};border-top:1px solid var(--border)"><td style="padding:8px 14px;color:var(--text2);font-size:11px;white-space:nowrap">${fmtDate(e.ts)}</td><td style="padding:8px 8px;color:var(--text2);font-family:var(--mono);font-size:11px">${e.actor||'—'}</td><td style="padding:8px 8px;color:var(--text2);font-family:var(--mono);font-size:11px">${e.target||'—'}</td><td style="padding:8px 8px;color:${actC};font-weight:500">${e.action||'—'}</td><td style="padding:8px 14px;color:var(--text3)">${e.oldRole||''}${e.oldRole&&e.newRole?' → ':''}<b style="color:var(--text2)">${e.newRole||''}</b></td></tr>`;
     });
     html += '</tbody></table>';
