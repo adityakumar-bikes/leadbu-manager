@@ -552,7 +552,7 @@ canvas{max-height:260px}
       <div class="brand-mark">🏍️</div>
       <div class="brand-text">
         <div class="t1">Bike AOP Tracker</div>
-        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.2.7</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 10/05/2026 09:37</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
+        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.2.7</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 10/05/2026 09:44</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
       </div>
     </div>
     <div class="hdr-right">
@@ -840,7 +840,7 @@ function oemBadge(client){
 }
 
 const ACT_KEY='leadbu_actuals_fy27_v2';
-const DEPLOY_TIME='2026-05-10T09:37:49Z'; // replaced with ISO timestamp at deploy time
+const DEPLOY_TIME='2026-05-10T09:44:59Z'; // replaced with ISO timestamp at deploy time
 let ACTUALS=TARGETS.map(()=>newActualRec()); // populated by Firebase onValue
 
 function newActualRec(){
@@ -1695,7 +1695,7 @@ function updateLastSaved(isoStr){
 }
 function showDeployTime(){
   const el=document.getElementById('hdr-deployed');
-  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-05-10T09:37:49Z')return;
+  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-05-10T09:44:59Z')return;
   try{
     const d=new Date(DEPLOY_TIME);
     const pad=n=>String(n).padStart(2,'0');
@@ -5474,6 +5474,7 @@ _fbRef.on('value', snapshot=>{
   setPage(PAGE);
   _loadAuditForChips(); // fetch audit once for cross-device inline chips
   try{_fbDb.ref('meta/lastSaved').once('value',s=>{if(s.val())updateLastSaved(s.val());});}catch(e){}
+  _startVersionWatch(); // nudge stale clients when a new deploy is live
   registerPresence(); // announce this user as active
   // Hide loading overlay on first successful load
   const ov=document.getElementById('fb-loading');
@@ -5489,6 +5490,38 @@ _fbRef.on('value', snapshot=>{
   } else { initUserLabel(); setPage(PAGE); }
 });
 } // end _fbStartSync
+
+// ── Version watcher — nudge users to hard-refresh when a new deploy is live ─
+function _startVersionWatch(){
+  if(!_fbDb || !DEPLOY_TIME || DEPLOY_TIME==='2026-05-10T09:44:59Z') return;
+  _fbDb.ref('meta/deployVersion').on('value', snap=>{
+    const liveTs = snap.val();
+    if(!liveTs) return;
+    // liveTs is the ISO timestamp written by the deploy script
+    // DEPLOY_TIME is this page's own stamp — if live is newer, we're stale
+    if(new Date(liveTs) > new Date(DEPLOY_TIME)){
+      _showVersionBanner(liveTs);
+    }
+  });
+}
+
+function _showVersionBanner(liveTs){
+  if(document.getElementById('version-nudge')) return; // already shown
+  const fmt = ts => { try{ const d=new Date(ts); return d.toLocaleDateString('en-IN',{day:'2-digit',month:'short'})+' '+d.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true}); }catch(e){return ts;} };
+  const banner = document.createElement('div');
+  banner.id = 'version-nudge';
+  banner.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:9999;background:linear-gradient(90deg,#1a1a2e,#16213e);border-top:2px solid var(--accent);padding:12px 20px;display:flex;align-items:center;gap:14px;box-shadow:0 -4px 24px rgba(0,0,0,.5);font-family:var(--sans,sans-serif)';
+  banner.innerHTML = `
+    <div style="width:34px;height:34px;border-radius:8px;background:var(--accent)22;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">🔄</div>
+    <div style="flex:1;min-width:0">
+      <div style="font-size:13px;font-weight:600;color:#e2e8f0">New version deployed</div>
+      <div style="font-size:11px;color:#94a3b8;margin-top:1px">Deployed at ${fmt(liveTs)} — your page is out of date. Hard refresh to get the latest.</div>
+    </div>
+    <button onclick="location.reload()" style="flex-shrink:0;padding:8px 18px;border-radius:7px;border:none;cursor:pointer;background:var(--accent);color:#fff;font-size:12px;font-weight:700;white-space:nowrap">↻ Refresh Now</button>
+    <button onclick="document.getElementById('version-nudge').remove()" style="flex-shrink:0;padding:8px 10px;border-radius:7px;border:none;cursor:pointer;background:rgba(255,255,255,.08);color:#94a3b8;font-size:12px" title="Dismiss">✕</button>
+  `;
+  document.body.appendChild(banner);
+}
 
 // Defer the auth check to window.load — by then auth.js will have parsed and defined AUTH_ENABLED.
 // If auth is enabled, auth.js calls _fbStartSync after the user signs in.
