@@ -12,6 +12,9 @@ const ALLOWED_DOMAIN     = '@girnarsoft.com';             // domain lock
 const SUPER_ADMIN_EMAIL  = 'aditya.kumar@girnarsoft.com'; // bootstraps as admin on first login
 const ROLE_RANK = {admin:3, editor:2, viewer:1, pending:0};
 
+// Firebase keys can't contain dots — sanitize email for use as a key
+function _emailKey(email){ return email.toLowerCase().replace(/\./g,','); }
+
 let AUTH_USER     = null;   // firebase.User
 let AUTH_PROFILE  = null;   // {uid, role, email, displayName, photoURL, disabled, ...}
 let _authReady    = false;
@@ -207,12 +210,11 @@ async function _authInit(){
     let prof = snap.val();
 
     if (!prof){
-      // First sign-in: bootstrap
+      // First sign-in: check for a pre-invite, then bootstrap
+      const preSnap = await _fbDb.ref('preInvited/'+_emailKey(user.email)).once('value');
+      const preInvite = preSnap.val();
       const isSuper = (user.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase());
-      let hasAdmin=false;
-      const allSnap = await _userListRef.once('value');
-      allSnap.forEach(s=>{ const v=s.val(); if(v && v.role==='admin' && !v.disabled) hasAdmin=true; });
-      const initialRole = isSuper ? 'admin' : (hasAdmin ? 'viewer' : 'viewer');
+      const initialRole = isSuper ? 'admin' : (preInvite && preInvite.role ? preInvite.role : 'viewer');
       prof = {
         email: user.email.toLowerCase(),
         displayName: user.displayName || '',
@@ -223,7 +225,9 @@ async function _authInit(){
         lastLogin: firebase.database.ServerValue.TIMESTAMP
       };
       await ref.set(prof);
-      _roleAuditRef.push({ts:firebase.database.ServerValue.TIMESTAMP, actor:'SYSTEM', target:user.email, action:'create', oldRole:null, newRole:initialRole});
+      // Consume the pre-invite so it doesn't linger
+      if (preInvite) await _fbDb.ref('preInvited/'+_emailKey(user.email)).remove();
+      _roleAuditRef.push({ts:firebase.database.ServerValue.TIMESTAMP, actor: preInvite ? preInvite.addedBy : 'SYSTEM', target:user.email, action:'create', oldRole:null, newRole:initialRole});
     } else {
       await ref.update({
         lastLogin: firebase.database.ServerValue.TIMESTAMP,
@@ -359,6 +363,29 @@ function renderUsers(){
   });
   html += `</div>`;
 
+  // ── Pre-add user form
+  html += `<div style="margin:0 22px 14px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:14px">
+    <div style="font-size:12px;font-weight:600;color:var(--text1);margin-bottom:4px">➕ Pre-add User</div>
+    <div style="font-size:11px;color:var(--text3);margin-bottom:10px;line-height:1.55">Add a teammate before they sign in — their role is applied automatically on first login.</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+      <div style="flex:1;min-width:180px">
+        <div style="font-size:10px;color:var(--text3);margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px">Email</div>
+        <input id="pre-add-email" type="email" placeholder="name@girnarsoft.com"
+          style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border2);border-radius:6px;padding:7px 10px;color:var(--text1);font-size:12px;font-family:inherit;outline:none">
+      </div>
+      <div>
+        <div style="font-size:10px;color:var(--text3);margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px">Role</div>
+        <select id="pre-add-role" style="background:var(--bg);border:1px solid var(--border2);border-radius:6px;padding:7px 10px;color:var(--text1);font-size:12px;font-family:inherit;outline:none">
+          <option value="viewer">Viewer</option>
+          <option value="editor">Editor</option>
+          <option value="admin">Admin</option>
+        </select>
+      </div>
+      <button class="btn btn-pri" onclick="_authPreAddUser()" style="padding:7px 14px;font-size:12px">Add</button>
+    </div>
+    <div id="pre-invite-list"></div>
+  </div>`;
+
   // ── Pending queue
   const pendings = users.filter(u=>u.role==='pending' && !u.disabled);
   if (pendings.length){
@@ -392,6 +419,73 @@ function renderUsers(){
   html += `<div style="padding:0 22px 22px;font-size:11px;color:var(--text3);line-height:1.7;max-width:780px"><b style="color:var(--text2)">Quick rules:</b> Admins manage users + edit data. Editors edit data only. Viewers see everything but cannot change anything. Disabling a user revokes access immediately on their next page load. Force sign-out ends a user's current session next time the page reloads.</div>`;
 
   el.innerHTML = html;
+  _watchPreInvites();   // start/keep live listener
+  _renderPreInvites();  // paint from cached data immediately
+}
+
+/* ─── Pre-invite management ──────────────────────────────────────── */
+let _allPreInvites = {};
+let _preInvitesListening = false;
+
+function _watchPreInvites(){
+  if (_preInvitesListening || !_fbDb) return;
+  _preInvitesListening = true;
+  _fbDb.ref('preInvited').on('value', snap=>{
+    _allPreInvites = snap.val() || {};
+    _renderPreInvites();
+  });
+}
+
+function _renderPreInvites(){
+  const el = document.getElementById('pre-invite-list');
+  if (!el) return;
+  const invites = Object.entries(_allPreInvites);
+  if (!invites.length){ el.innerHTML = ''; return; }
+  const roleColor = {admin:'#ee6a3a', editor:'#3fb950', viewer:'#7d8590'};
+  const fmtDate = ts => ts ? new Date(ts).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'2-digit'}) : '—';
+  let h = `<div style="margin-top:10px;border-top:1px solid var(--border);padding-top:8px">
+    <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Pending invites — role applied on first login</div>`;
+  invites.forEach(([key, inv])=>{
+    const c = roleColor[inv.role] || '#7d8590';
+    h += `<div style="display:flex;align-items:center;gap:10px;padding:5px 0;border-bottom:1px solid var(--border)">
+      <div style="flex:1;font-size:11px;color:var(--text1);font-family:var(--mono)">${inv.email||key}</div>
+      <span style="padding:2px 7px;border-radius:4px;font-size:10px;font-weight:600;background:${c}1a;color:${c};text-transform:uppercase;letter-spacing:.5px">${inv.role}</span>
+      <span style="font-size:10px;color:var(--text3);white-space:nowrap">Added ${fmtDate(inv.addedAt)}</span>
+      <button class="btn btn-dim" onclick="_authRevokeInvite('${key}')" style="padding:2px 8px;font-size:10px;color:#f85149">Revoke</button>
+    </div>`;
+  });
+  h += `</div>`;
+  el.innerHTML = h;
+}
+
+async function _authPreAddUser(){
+  if (!_authIsAdmin()) return;
+  const emailEl = document.getElementById('pre-add-email');
+  const roleEl  = document.getElementById('pre-add-role');
+  const email   = (emailEl ? emailEl.value : '').trim().toLowerCase();
+  const role    = roleEl ? roleEl.value : 'viewer';
+  if (!email){ alert('Enter an email address.'); return; }
+  if (!email.endsWith(ALLOWED_DOMAIN)){ alert('Only '+ALLOWED_DOMAIN+' addresses are permitted.'); return; }
+  // Don't pre-add someone who's already registered
+  if (Object.values(_allUsers).some(u=>u && (u.email||'').toLowerCase()===email)){
+    alert(email+' is already a registered user.\nChange their role directly from the table.'); return;
+  }
+  if (_allPreInvites[_emailKey(email)]){
+    if (!confirm(email+' already has a pending invite. Overwrite with '+role+'?')) return;
+  }
+  await _fbDb.ref('preInvited/'+_emailKey(email)).set({
+    email, role,
+    addedBy: AUTH_USER ? AUTH_USER.email : 'admin',
+    addedAt: firebase.database.ServerValue.TIMESTAMP
+  });
+  if (emailEl) emailEl.value = '';
+}
+
+async function _authRevokeInvite(key){
+  if (!_authIsAdmin()) return;
+  const inv = _allPreInvites[key];
+  if (!confirm('Revoke pre-invite for '+(inv?inv.email:key)+'?')) return;
+  await _fbDb.ref('preInvited/'+key).remove();
 }
 
 function _authActionMenu(u, me){
