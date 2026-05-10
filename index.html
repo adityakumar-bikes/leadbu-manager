@@ -551,7 +551,7 @@ canvas{max-height:260px}
       <div class="brand-mark">🏍️</div>
       <div class="brand-text">
         <div class="t1">Bike AOP Tracker</div>
-        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.2.5</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 10/05/2026 06:53</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
+        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.2.6</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 10/05/2026 06:57</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
       </div>
     </div>
     <div class="hdr-right">
@@ -830,7 +830,7 @@ function oemBadge(client){
 }
 
 const ACT_KEY='leadbu_actuals_fy27_v2';
-const DEPLOY_TIME='2026-05-10T06:53:32Z'; // replaced with ISO timestamp at deploy time
+const DEPLOY_TIME='2026-05-10T06:57:57Z'; // replaced with ISO timestamp at deploy time
 let ACTUALS=TARGETS.map(()=>newActualRec()); // populated by Firebase onValue
 
 function newActualRec(){
@@ -944,6 +944,9 @@ let _fbLocalUpdate=false; // flag to suppress echo from our own write
 function getCurrentUser(){
   return localStorage.getItem('leadbu_user')||'Unknown';
 }
+function isAdmin(){
+  return getCurrentUser().toLowerCase().includes('aditya');
+}
 function promptUserName(){
   const cur=getCurrentUser();
   const name=window.prompt('Enter your name (shown in audit log):',cur==='Unknown'?'':cur);
@@ -951,11 +954,34 @@ function promptUserName(){
     localStorage.setItem('leadbu_user',name.trim());
     document.getElementById('user-label').textContent=name.trim();
     registerPresence();
+    _updateAdminUI();
   }
 }
 function initUserLabel(){
   const n=localStorage.getItem('leadbu_user');
   if(n&&n.trim()) document.getElementById('user-label').textContent=n;
+  _updateAdminUI();
+}
+function _updateAdminUI(){
+  // 🔑 Key button — admin only
+  const keyBtn=document.getElementById('ai-key-btn');
+  if(keyBtn) keyBtn.style.display=isAdmin()?'':'none';
+  // AI status pill in chat header
+  _refreshAIStatusPill();
+}
+async function _refreshAIStatusPill(){
+  const pill=document.getElementById('ai-status-pill');
+  if(!pill)return;
+  const key=await _loadAIKey();
+  if(key){
+    const provider=_aiProvider(key);
+    const label=provider==='openai'?'GPT-4o':'Claude';
+    pill.innerHTML=`<span style="color:#3fb950;font-size:9px">●</span> AI Ready · ${label}`;
+    pill.style.color='var(--text3)';
+  }else{
+    pill.innerHTML=isAdmin()?`<span style="color:#f0a500;font-size:9px">●</span> No key set — click 🔑 to add`:`<span style="color:#f85149;font-size:9px">●</span> AI not configured`;
+    pill.style.color='var(--text3)';
+  }
 }
 function requireName(){
   const n=localStorage.getItem('leadbu_user');
@@ -1657,7 +1683,7 @@ function updateLastSaved(isoStr){
 }
 function showDeployTime(){
   const el=document.getElementById('hdr-deployed');
-  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-05-10T06:53:32Z')return;
+  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-05-10T06:57:57Z')return;
   try{
     const d=new Date(DEPLOY_TIME);
     const pad=n=>String(n).padStart(2,'0');
@@ -7183,6 +7209,7 @@ async function callAI(systemPrompt, messages, maxTokens=2000){
 
 // ── Key Management UI ─────────────────────────────────────────────────────
 async function toggleAIKeyMgmt(){
+  if(!isAdmin()){alert('🔒 Only Aditya (admin) can manage the shared AI key.');return;}
   const panel=document.getElementById('ai-key-mgmt');
   if(!panel) return;
   const isOpen=panel.style.display!=='none';
@@ -7209,7 +7236,8 @@ async function saveAIKeyFromUI(){
   const ok=await saveAIKeyGlobal(key);
   if(ok){
     if(inp)inp.value='';
-    if(status)status.innerHTML='<span style="color:#34d399">✅ Saved! All users can now generate ChatGPT insights.</span>';
+    if(status)status.innerHTML='<span style="color:#34d399">✅ Saved! All users will get AI insights automatically.</span>';
+    _refreshAIStatusPill();
     setTimeout(()=>{const p=document.getElementById('ai-key-mgmt');if(p)p.style.display='none';},2000);
   }
 }
@@ -7338,7 +7366,7 @@ async function sendChatMessage(userMsg){
   if(_chatThinking||!userMsg.trim())return;
   const apiKey=await _loadAIKey();
   if(!apiKey){
-    _chatHistory.push({role:'assistant',content:'⚠️ No API key configured yet. Ask your admin to click 🔑 Key and paste an Anthropic or OpenAI key — it only needs to be done once for everyone.'});
+    _chatHistory.push({role:'assistant',content:isAdmin()?'⚠️ No AI key set yet. Click the 🔑 Key button above and paste an Anthropic (sk-ant-…) or OpenAI (sk-proj-…) key. It will be shared with your whole team automatically.':'⚠️ AI is not configured yet. Contact Aditya (admin) to enable it — once set, it works for everyone.'});
     renderChat();
     return;
   }
@@ -7369,7 +7397,7 @@ function toggleAIChat(){
   const btn=document.getElementById('ai-chat-fab');
   if(panel)panel.style.right=_chatOpen?'0':'-440px';
   if(btn)btn.style.transform=_chatOpen?'scale(0.9)':'scale(1)';
-  if(_chatOpen){renderChat();setTimeout(()=>{const inp=document.getElementById('ai-chat-input');if(inp)inp.focus();},280);}
+  if(_chatOpen){_updateAdminUI();renderChat();setTimeout(()=>{const inp=document.getElementById('ai-chat-input');if(inp)inp.focus();},280);}
 }
 function clearChat(){_chatHistory=[];renderChat();}
 function resetAIKey(){toggleAIKeyMgmt();} // legacy — now opens key mgmt panel
@@ -8005,20 +8033,24 @@ async function submitAIChat(){
         <span style="background:linear-gradient(135deg,#6366f1,#8b5cf6);-webkit-background-clip:text;-webkit-text-fill-color:transparent">✨</span>
         AI Analytics Assistant
       </div>
-      <div style="font-size:9.5px;color:var(--text3);margin-top:2px">Powered by Claude · Ask about any KPI, CPL, P&amp;L across all OEMs</div>
+      <div id="ai-status-pill" style="font-size:9.5px;color:var(--text3);margin-top:3px">Checking AI status…</div>
     </div>
     <div style="display:flex;gap:6px;align-items:center">
       <button onclick="clearChat()" title="Clear conversation" style="font-size:10px;padding:3px 9px;background:var(--bg2);border:1px solid var(--border2);border-radius:5px;color:var(--text2);cursor:pointer">Clear</button>
-      <button onclick="toggleAIKeyMgmt()" title="Manage shared API key (admin)" style="font-size:10px;padding:3px 9px;background:var(--bg2);border:1px solid var(--border2);border-radius:5px;color:var(--text2);cursor:pointer">🔑 Key</button>
+      <button id="ai-key-btn" onclick="toggleAIKeyMgmt()" title="Manage shared AI key (admin only)" style="font-size:10px;padding:3px 9px;background:var(--bg2);border:1px solid var(--border2);border-radius:5px;color:var(--text2);cursor:pointer;display:none">🔑 Key</button>
       <button onclick="toggleAIChat()" style="font-size:13px;padding:3px 9px;background:var(--bg2);border:1px solid var(--border2);border-radius:5px;color:var(--text2);cursor:pointer;font-weight:600">✕</button>
     </div>
   </div>
 
-  <!-- Key Management Panel (admin only, hidden by default) -->
+  <!-- Key Management Panel — admin only, hidden by default -->
   <div id="ai-key-mgmt" style="display:none;padding:13px 16px;background:var(--bg3);border-bottom:2px solid var(--border2);flex-shrink:0">
-    <div style="font-size:11px;font-weight:700;color:var(--text1);margin-bottom:5px;display:flex;align-items:center;gap:6px">🔑 AI Key <span style="font-weight:400;color:var(--text3);font-size:10px">— paste Anthropic or OpenAI — set once for all users</span></div>
-    <div style="font-size:9.5px;color:var(--text3);margin-bottom:7px;line-height:1.5">
-      <span style="color:#a78bfa">Anthropic</span> key → console.anthropic.com &nbsp;|&nbsp; <span style="color:#3fb950">OpenAI</span> key → platform.openai.com/api-keys
+    <div style="font-size:11px;font-weight:700;color:var(--text1);margin-bottom:5px;display:flex;align-items:center;gap:6px">
+      🔑 AI Key
+      <span style="font-weight:400;color:var(--text3);font-size:10px">— paste either key below · saved to shared DB once, all users get it automatically</span>
+    </div>
+    <div style="display:flex;gap:12px;margin-bottom:9px;font-size:10px">
+      <span style="background:#a78bfa22;color:#a78bfa;padding:3px 9px;border-radius:5px">Anthropic · console.anthropic.com · starts with <code>sk-ant-</code></span>
+      <span style="background:#3fb95022;color:#3fb950;padding:3px 9px;border-radius:5px">OpenAI · platform.openai.com/api-keys · starts with <code>sk-proj-</code></span>
     </div>
     <div id="ai-key-status" style="font-size:10px;color:var(--text3);margin-bottom:9px;min-height:14px">Checking…</div>
     <div style="display:flex;gap:6px;align-items:center">
@@ -8029,7 +8061,7 @@ async function submitAIChat(){
         style="padding:7px 13px;font-size:11px;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;border:none;border-radius:5px;cursor:pointer;font-weight:700;white-space:nowrap">Save for All</button>
     </div>
     <div style="display:flex;justify-content:space-between;align-items:center;margin-top:7px">
-      <span style="font-size:9px;color:var(--text3)">Key is obfuscated in shared DB — provider auto-detected from key prefix</span>
+      <span style="font-size:9px;color:var(--text3)">Key is obfuscated in Firebase · provider auto-detected from prefix · all users read it on load</span>
       <button onclick="clearAIKeyFromUI()" style="font-size:9px;padding:2px 8px;background:transparent;border:1px solid var(--border2);border-radius:4px;color:var(--text3);cursor:pointer">Remove Key</button>
     </div>
   </div>
