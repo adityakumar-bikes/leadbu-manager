@@ -106,7 +106,7 @@ function _authSignIn(){
     return;
   }
   const provider=new firebase.auth.GoogleAuthProvider();
-  provider.setCustomParameters({hd:'girnarsoft.com', prompt:'select_account'});
+  provider.setCustomParameters({prompt:'select_account'});
   const btn=document.getElementById('auth-google-btn'); if(btn) btn.disabled=true;
   firebase.auth().signInWithPopup(provider).catch(err=>{
     if(btn) btn.disabled=false;
