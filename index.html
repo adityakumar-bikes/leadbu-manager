@@ -552,7 +552,7 @@ canvas{max-height:260px}
       <div class="brand-mark">🏍️</div>
       <div class="brand-text">
         <div class="t1">Bike AOP Tracker</div>
-        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.2.7</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 10/05/2026 09:29</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
+        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.2.7</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 10/05/2026 09:32</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
       </div>
     </div>
     <div class="hdr-right">
@@ -840,7 +840,7 @@ function oemBadge(client){
 }
 
 const ACT_KEY='leadbu_actuals_fy27_v2';
-const DEPLOY_TIME='2026-05-10T09:29:23Z'; // replaced with ISO timestamp at deploy time
+const DEPLOY_TIME='2026-05-10T09:32:57Z'; // replaced with ISO timestamp at deploy time
 let ACTUALS=TARGETS.map(()=>newActualRec()); // populated by Firebase onValue
 
 function newActualRec(){
@@ -1695,7 +1695,7 @@ function updateLastSaved(isoStr){
 }
 function showDeployTime(){
   const el=document.getElementById('hdr-deployed');
-  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-05-10T09:29:23Z')return;
+  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-05-10T09:32:57Z')return;
   try{
     const d=new Date(DEPLOY_TIME);
     const pad=n=>String(n).padStart(2,'0');
@@ -7563,11 +7563,7 @@ function renderInsights(){
   const revAchv  =totTgt>0?(totRev/totTgt*100):0;
   const avgCPL   =totLeads>0?(totMktg*100000/totLeads):0;
 
-  // ── Projections (FY run-rate from months with data) ──
   const monthsActive=mRev.filter(v=>v>0).length;
-  const projRevFY=monthsActive>0?(mRev.reduce((s,v)=>s+v,0)/monthsActive*12):0;
-  const projGMFY =monthsActive>0?(mGM.reduce((s,v)=>s+v,0)/monthsActive*12):0;
-  const totTgtFY =rows.reduce((s,{t})=>s+(t.rev&&t.rev.fy?t.rev.fy:0),0);
 
   // ── Spotlights ──
   const withRev=acctData.filter(r=>r.rev>0);
@@ -7704,24 +7700,6 @@ function renderInsights(){
       <div style="font-size:10px;color:#f85149;font-weight:700">${fp(r.rev/r.tgt*100)}</div>
     </div>`;
 
-  // ── Projection section ──
-  const projAchv=totTgtFY>0?(projRevFY/totTgtFY*100):0;
-  const projGap=projRevFY-totTgtFY;
-  let projRows='';
-  Object.entries(oemMap).sort((a,b)=>b[1].rev-a[1].rev).forEach(([client,o])=>{
-    const projOEM=monthsActive>0?(o.rev/monthsActive*12):0;
-    const tgtOEM=rows.filter(({t})=>t.client===client).reduce((s,{t})=>s+(t.rev&&t.rev.fy?t.rev.fy:0),0);
-    const projAch=tgtOEM>0?(projOEM/tgtOEM*100):null;
-    const gap=projOEM-tgtOEM;
-    projRows+=`<tr>
-      <td style="padding:6px 10px;font-size:11px;font-weight:600;color:var(--text1);border-bottom:1px solid var(--border2)33">${client}</td>
-      <td style="padding:6px 10px;font-size:11px;text-align:right;color:var(--text2);border-bottom:1px solid var(--border2)33">${tgtOEM>0?fc(tgtOEM):'—'}</td>
-      <td style="padding:6px 10px;font-size:11px;text-align:right;color:var(--text2);border-bottom:1px solid var(--border2)33">${fc(o.rev)}</td>
-      <td style="padding:6px 10px;font-size:11px;text-align:right;font-weight:700;color:var(--accent);border-bottom:1px solid var(--border2)33">${fc(projOEM)}</td>
-      <td style="padding:6px 10px;font-size:11px;text-align:right;border-bottom:1px solid var(--border2)33">${projAch!==null?badge(projAch,80,60):'—'}</td>
-      <td style="padding:6px 10px;font-size:11px;text-align:right;font-weight:600;color:${col(gap)};border-bottom:1px solid var(--border2)33">${tgtOEM>0?((gap>0?'+':'')+gap.toFixed(2)+'L'):'—'}</td>
-    </tr>`;
-  });
 
   // ── Monthly trend mini-chart ──
   let sparkCells='';
@@ -7858,41 +7836,6 @@ function renderInsights(){
     <div style="${card()}">
       <div style="font-size:13px;font-weight:700;color:#f0a500;margin-bottom:12px">📉 Under 50% Target Achievement</div>
       ${underAchievers.length?underAchievers.map(r=>underRow(r)).join(''):'<div style="color:#3fb950;font-size:12px;padding:12px 0">✓ All accounts above 50% target</div>'}
-    </div>
-  </div>
-
-  <!-- Row 3: FY Projections -->
-  <div style="${card('margin-bottom:24px')}">
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
-      <div style="font-size:13px;font-weight:700;color:var(--text1)">🔮 FY27 Run-Rate Projections</div>
-      <div style="font-size:10.5px;color:var(--text3)">Based on average of ${monthsActive} month${monthsActive!==1?'s':''} with data · assumes current pace continues</div>
-      <div style="margin-left:auto;display:flex;gap:16px;font-size:11.5px">
-        <span>FY Target: <strong style="color:var(--text2)">${fc(totTgtFY)}</strong></span>
-        <span>Projected: <strong style="color:var(--accent)">${fc(projRevFY)}</strong></span>
-        <span>Gap vs Target: <strong style="color:${col(projGap)}">${projGap>=0?'+':''}${projGap.toFixed(2)}L</strong></span>
-        <span>Achv: ${badge(projAchv,90,70)}</span>
-      </div>
-    </div>
-    <div style="overflow-x:auto">
-      <table style="width:100%;border-collapse:collapse;font-size:11px">
-        <thead><tr style="background:var(--bg3)">
-          <th style="text-align:left;padding:7px 10px;border-bottom:2px solid var(--border2);color:var(--text2);font-weight:600">OEM</th>
-          <th style="text-align:right;padding:7px 10px;border-bottom:2px solid var(--border2);color:var(--text2);font-weight:600">FY Target</th>
-          <th style="text-align:right;padding:7px 10px;border-bottom:2px solid var(--border2);color:var(--text2);font-weight:600">Accrued So Far</th>
-          <th style="text-align:right;padding:7px 10px;border-bottom:2px solid var(--border2);color:var(--accent);font-weight:600">Projected FY</th>
-          <th style="text-align:right;padding:7px 10px;border-bottom:2px solid var(--border2);color:var(--text2);font-weight:600">Achievement</th>
-          <th style="text-align:right;padding:7px 10px;border-bottom:2px solid var(--border2);color:var(--text2);font-weight:600">Gap vs Target</th>
-        </tr></thead>
-        <tbody>${projRows}</tbody>
-        <tfoot><tr style="background:var(--bg3)">
-          <td style="padding:7px 10px;font-weight:700;color:var(--accent);border-top:2px solid var(--border2)">TOTAL</td>
-          <td style="padding:7px 10px;text-align:right;font-weight:700;color:var(--text2);border-top:2px solid var(--border2)">${fc(totTgtFY)}</td>
-          <td style="padding:7px 10px;text-align:right;font-weight:700;color:var(--text2);border-top:2px solid var(--border2)">${fc(totRev)}</td>
-          <td style="padding:7px 10px;text-align:right;font-weight:700;color:var(--accent);border-top:2px solid var(--border2)">${fc(projRevFY)}</td>
-          <td style="padding:7px 10px;text-align:right;border-top:2px solid var(--border2)">${badge(projAchv,90,70)}</td>
-          <td style="padding:7px 10px;text-align:right;font-weight:700;color:${col(projGap)};border-top:2px solid var(--border2)">${totTgtFY>0?((projGap>=0?'+':'')+projGap.toFixed(2)+'L'):'—'}</td>
-        </tr></tfoot>
-      </table>
     </div>
   </div>
 
