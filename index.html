@@ -989,7 +989,7 @@ async function _refreshAIStatusPill(){
     pill.innerHTML=`<span style="color:#3fb950;font-size:9px">●</span> AI Ready · ${label}`;
     pill.style.color='var(--text3)';
   }else{
-    pill.innerHTML=isAdmin()?`<span style="color:#f0a500;font-size:9px">●</span> No key set — click 🔑 to add`:`<span style="color:#f85149;font-size:9px">●</span> AI not configured`;
+    pill.innerHTML=isAdmin()?`<span style="color:#f0a500;font-size:9px">●</span> No key set — add via Users → AI Key`:`<span style="color:#f85149;font-size:9px">●</span> AI not configured`;
     pill.style.color='var(--text3)';
   }
 }
@@ -7392,7 +7392,7 @@ async function sendChatMessage(userMsg){
   if(_chatThinking||!userMsg.trim())return;
   const apiKey=await _loadAIKey();
   if(!apiKey){
-    _chatHistory.push({role:'assistant',content:isAdmin()?'⚠️ No AI key set yet. Click the 🔑 Key button above and paste an Anthropic (sk-ant-…) or OpenAI (sk-proj-…) key. It will be shared with your whole team automatically.':'⚠️ AI is not configured yet. Contact Aditya (admin) to enable it — once set, it works for everyone.'});
+    _chatHistory.push({role:'assistant',content:isAdmin()?'⚠️ No AI key set yet. Go to the Users tab → AI Key Manager and paste an Anthropic (sk-ant-…) or OpenAI (sk-proj-…) key. It will be shared with your whole team automatically.':'⚠️ AI is not configured yet. Contact Aditya (admin) to enable it — once set, it works for everyone.'});
     renderChat();
     return;
   }
@@ -8063,34 +8063,10 @@ async function submitAIChat(){
     </div>
     <div style="display:flex;gap:6px;align-items:center">
       <button onclick="clearChat()" title="Clear conversation" style="font-size:10px;padding:3px 9px;background:var(--bg2);border:1px solid var(--border2);border-radius:5px;color:var(--text2);cursor:pointer">Clear</button>
-      <button id="ai-key-btn" onclick="toggleAIKeyMgmt()" title="Manage shared AI key (admin only)" style="font-size:10px;padding:3px 9px;background:var(--bg2);border:1px solid var(--border2);border-radius:5px;color:var(--text2);cursor:pointer;display:none">🔑 Key</button>
       <button onclick="toggleAIChat()" style="font-size:13px;padding:3px 9px;background:var(--bg2);border:1px solid var(--border2);border-radius:5px;color:var(--text2);cursor:pointer;font-weight:600">✕</button>
     </div>
   </div>
 
-  <!-- Key Management Panel — admin only, hidden by default -->
-  <div id="ai-key-mgmt" style="display:none;padding:13px 16px;background:var(--bg3);border-bottom:2px solid var(--border2);flex-shrink:0">
-    <div style="font-size:11px;font-weight:700;color:var(--text1);margin-bottom:5px;display:flex;align-items:center;gap:6px">
-      🔑 AI Key
-      <span style="font-weight:400;color:var(--text3);font-size:10px">— paste either key below · saved to shared DB once, all users get it automatically</span>
-    </div>
-    <div style="display:flex;gap:12px;margin-bottom:9px;font-size:10px">
-      <span style="background:#a78bfa22;color:#a78bfa;padding:3px 9px;border-radius:5px">Anthropic · console.anthropic.com · starts with <code>sk-ant-</code></span>
-      <span style="background:#3fb95022;color:#3fb950;padding:3px 9px;border-radius:5px">OpenAI · platform.openai.com/api-keys · starts with <code>sk-proj-</code></span>
-    </div>
-    <div id="ai-key-status" style="font-size:10px;color:var(--text3);margin-bottom:9px;min-height:14px">Checking…</div>
-    <div style="display:flex;gap:6px;align-items:center">
-      <input type="password" id="ai-key-input" placeholder="sk-ant-… or sk-proj-…"
-        style="flex:1;background:var(--bg2);border:1px solid var(--border2);border-radius:5px;padding:7px 10px;font-size:11px;color:var(--text1);font-family:monospace;outline:none"
-        onkeydown="if(event.key==='Enter')saveAIKeyFromUI()">
-      <button onclick="saveAIKeyFromUI()"
-        style="padding:7px 13px;font-size:11px;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;border:none;border-radius:5px;cursor:pointer;font-weight:700;white-space:nowrap">Save for All</button>
-    </div>
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:7px">
-      <span style="font-size:9px;color:var(--text3)">Key is obfuscated in Firebase · provider auto-detected from prefix · all users read it on load</span>
-      <button onclick="clearAIKeyFromUI()" style="font-size:9px;padding:2px 8px;background:transparent;border:1px solid var(--border2);border-radius:4px;color:var(--text3);cursor:pointer">Remove Key</button>
-    </div>
-  </div>
 
   <!-- Messages -->
   <div id="ai-chat-msgs"></div>
