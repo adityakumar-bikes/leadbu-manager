@@ -5403,17 +5403,21 @@ function renderActiveUsers(snapshot){
     </div>`;
 }
 
-// Start listening to presence node
-_fbDb.ref('presence/fy27').on('value', snap=>renderActiveUsers(snap));
-
 // Wire up filters + modal close (non-data setup, safe to do immediately)
 ['f-cat','f-fuel','f-client','f-btl','f-ba','f-zeros'].forEach(id=>document.getElementById(id).addEventListener('change',render));
 document.getElementById('modal').addEventListener('click',e=>{if(e.target===document.getElementById('modal'))closeModal();});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&document.getElementById('modal').classList.contains('show')){e.preventDefault();closeModal();}});
 buildPeriodBar();
 
-// Real-time listener: fires immediately with current data, then on every remote change
+// Real-time Firebase sync — wrapped so auth.js can call it after sign-in
+// when AUTH_ENABLED=true. Called immediately when auth is off.
 let _fbFirstLoad=true;
+let _fbSyncStarted=false;
+function _fbStartSync(){
+  if(_fbSyncStarted) return;
+  _fbSyncStarted=true;
+  // Start listening to presence node
+  _fbDb.ref('presence/fy27').on('value', snap=>renderActiveUsers(snap));
 _fbRef.on('value', snapshot=>{
   const raw = snapshot.val();
   if(_fbLocalUpdate){ _fbLocalUpdate=false; return; } // skip echo of our own write
@@ -5481,6 +5485,10 @@ _fbRef.on('value', snapshot=>{
     setTimeout(()=>{ const o=document.getElementById('fb-loading'); if(o)o.remove(); initUserLabel(); setPage(PAGE); },3000);
   } else { initUserLabel(); setPage(PAGE); }
 });
+} // end _fbStartSync
+
+// Start immediately only when auth is disabled; otherwise auth.js calls _fbStartSync after sign-in
+if(typeof AUTH_ENABLED==='undefined' || !AUTH_ENABLED) _fbStartSync();
 
 // Live-sync indicator now uses #conn-dot / #conn-label in the context strip (see updateConnState).
 
