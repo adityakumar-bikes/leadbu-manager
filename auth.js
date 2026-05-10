@@ -218,7 +218,7 @@ async function _authInit(){
         snap = await ref.once('value');
         break;
       } catch(e) {
-        if (attempt++ < 4 && e.code === 'PERMISSION_DENIED') {
+        if (attempt++ < 4 && (e.code === 'PERMISSION_DENIED' || (e.message||'').includes('Permission denied'))) {
           await new Promise(r => setTimeout(r, 400 * attempt));
           await user.getIdToken(true);
         } else { throw e; }
@@ -394,6 +394,33 @@ function renderUsers(){
     html += `<div style="background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:11px 14px"><div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">${lbl}</div><div style="font-size:22px;font-weight:600;color:${c};font-family:var(--mono)">${counts[k]||0}</div></div>`;
   });
   html += `</div>`;
+
+  // ── AI Key Manager (admin only)
+  html += `<div style="margin:0 22px 14px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:14px">
+    <div style="font-size:12px;font-weight:600;color:var(--text1);margin-bottom:4px">🔑 AI Key Manager</div>
+    <div style="font-size:11px;color:var(--text3);margin-bottom:10px;line-height:1.55">Paste an Anthropic or OpenAI key — saved once to Firebase, shared automatically with all users.</div>
+    <div style="display:flex;gap:8px;margin-bottom:8px;font-size:10px;flex-wrap:wrap">
+      <span style="background:#a78bfa22;color:#a78bfa;padding:3px 9px;border-radius:5px">Anthropic · console.anthropic.com · <code>sk-ant-…</code></span>
+      <span style="background:#3fb95022;color:#3fb950;padding:3px 9px;border-radius:5px">OpenAI · platform.openai.com/api-keys · <code>sk-proj-…</code></span>
+    </div>
+    <div id="ai-key-status" style="font-size:10px;color:var(--text3);margin-bottom:8px;min-height:14px">Checking…</div>
+    <div style="display:flex;gap:6px;align-items:center">
+      <input type="password" id="ai-key-input" placeholder="sk-ant-… or sk-proj-…"
+        style="flex:1;background:var(--bg);border:1px solid var(--border2);border-radius:6px;padding:7px 10px;font-size:12px;color:var(--text1);font-family:var(--mono);outline:none"
+        onkeydown="if(event.key==='Enter')saveAIKeyFromUI()">
+      <button class="btn btn-pri" onclick="saveAIKeyFromUI()" style="padding:7px 14px;font-size:12px;white-space:nowrap">Save for All</button>
+      <button class="btn btn-dim" onclick="clearAIKeyFromUI()" style="padding:7px 10px;font-size:12px;color:#f85149">Remove</button>
+    </div>
+    <div style="font-size:9px;color:var(--text3);margin-top:7px">Key is obfuscated in Firebase · provider auto-detected from prefix · all users load it on sign-in</div>
+  </div>`;
+  // Populate key status after render
+  setTimeout(async ()=>{
+    const st = document.getElementById('ai-key-status'); if(!st) return;
+    if(typeof _loadAIKey!=='function'){ st.textContent='Key functions not available.'; return; }
+    const k = await _loadAIKey().catch(()=>null);
+    if(k){ const p=k.startsWith('sk-ant-')?'Anthropic':'OpenAI'; st.innerHTML=`<span style="color:#3fb950">● Active</span> — ${p} key set (${k.slice(0,8)}…)`; }
+    else { st.innerHTML=`<span style="color:#f0a500">● No key set</span>`; }
+  }, 100);
 
   // ── Pre-add user form
   html += `<div style="margin:0 22px 14px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:14px">
