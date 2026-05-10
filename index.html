@@ -541,6 +541,7 @@ canvas{max-height:260px}
 </style>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
 </head>
 <body>
 
@@ -551,7 +552,7 @@ canvas{max-height:260px}
       <div class="brand-mark">🏍️</div>
       <div class="brand-text">
         <div class="t1">Bike AOP Tracker</div>
-        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.2.6</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 10/05/2026 06:57</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
+        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.2.6</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">__DEPLOYED_LABEL__</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
       </div>
     </div>
     <div class="hdr-right">
@@ -647,6 +648,12 @@ canvas{max-height:260px}
       Insights
       <span class="pn-sub">AI Analysis</span>
       <span class="pn-badge" style="background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff">✦ AI</span>
+    </div>
+    <div class="pnav auth-admin-only" data-p="users" onclick="setPage('users')" style="display:none">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      Users
+      <span class="pn-sub">Access control</span>
+      <span class="pn-badge" id="pn-pending-count" style="background:#f0a500;color:#000;display:none">0</span>
     </div>
   </div>
 </div>
@@ -747,6 +754,9 @@ canvas{max-height:260px}
 <!-- ============= PAGE: INSIGHTS ============= -->
 <div class="page" id="page-insights" style="padding:0"></div>
 
+<!-- ============= PAGE: USERS (auth-managed) ============= -->
+<div class="page" id="page-users" style="padding:0"></div>
+
 <!-- P&L DETAIL MODAL -->
 <div class="modal-overlay" id="modal">
   <div class="modal">
@@ -830,7 +840,7 @@ function oemBadge(client){
 }
 
 const ACT_KEY='leadbu_actuals_fy27_v2';
-const DEPLOY_TIME='2026-05-10T06:57:57Z'; // replaced with ISO timestamp at deploy time
+const DEPLOY_TIME='__DEPLOY_TS__'; // replaced with ISO timestamp at deploy time
 let ACTUALS=TARGETS.map(()=>newActualRec()); // populated by Firebase onValue
 
 function newActualRec(){
@@ -1683,7 +1693,7 @@ function updateLastSaved(isoStr){
 }
 function showDeployTime(){
   const el=document.getElementById('hdr-deployed');
-  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-05-10T06:57:57Z')return;
+  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='__DEPLOY_TS__')return;
   try{
     const d=new Date(DEPLOY_TIME);
     const pad=n=>String(n).padStart(2,'0');
@@ -2040,6 +2050,7 @@ function setPage(p){
   if(p==='overview') renderOverview();
   else if(p==='clients') renderClients();
   else if(p==='insights') renderInsights();
+  else if(p==='users'){ if(typeof renderUsers==='function') renderUsers(); }
   else { buildPeriodBar(); render(); }
 }
 function setView(v){
@@ -8091,5 +8102,6 @@ async function submitAIChat(){
   </div>
 </div>
 
+<script src="auth.js"></script>
 </body>
 </html>
