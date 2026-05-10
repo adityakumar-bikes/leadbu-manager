@@ -5410,12 +5410,13 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&document.getElement
 buildPeriodBar();
 
 // Real-time Firebase sync — wrapped so auth.js can call it after sign-in
-// when AUTH_ENABLED=true. Called immediately when auth is off.
+// auth.js calls this after sign-in. Safe to call multiple times (detaches stale listeners first).
 let _fbFirstLoad=true;
-let _fbSyncStarted=false;
 function _fbStartSync(){
-  if(_fbSyncStarted) return;
-  _fbSyncStarted=true;
+  // Tear down any stale unauthenticated listeners before re-attaching with a fresh auth token
+  try{ _fbRef.off('value'); }catch(e){}
+  try{ _fbDb.ref('presence/fy27').off(); }catch(e){}
+  _fbFirstLoad=true;
   // Start listening to presence node
   _fbDb.ref('presence/fy27').on('value', snap=>renderActiveUsers(snap));
 _fbRef.on('value', snapshot=>{
@@ -5487,8 +5488,12 @@ _fbRef.on('value', snapshot=>{
 });
 } // end _fbStartSync
 
-// Start immediately only when auth is disabled; otherwise auth.js calls _fbStartSync after sign-in
-if(typeof AUTH_ENABLED==='undefined' || !AUTH_ENABLED) _fbStartSync();
+// Defer the auth check to window.load — by then auth.js will have parsed and defined AUTH_ENABLED.
+// If auth is enabled, auth.js calls _fbStartSync after the user signs in.
+// If auth.js is absent or AUTH_ENABLED=false, start sync immediately on load.
+window.addEventListener('load', function(){
+  if(typeof AUTH_ENABLED==='undefined' || !AUTH_ENABLED) _fbStartSync();
+});
 
 // Live-sync indicator now uses #conn-dot / #conn-label in the context strip (see updateConnState).
 
