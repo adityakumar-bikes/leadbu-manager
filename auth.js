@@ -497,7 +497,8 @@ async function _authPreAddUser(){
   const email   = (emailEl ? emailEl.value : '').trim().toLowerCase();
   const role    = roleEl ? roleEl.value : 'viewer';
   if (!email){ alert('Enter an email address.'); return; }
-  if (!email.endsWith(ALLOWED_DOMAIN)){ alert('Only '+ALLOWED_DOMAIN+' addresses are permitted.'); return; }
+  const _allowed = email.endsWith(ALLOWED_DOMAIN) || ALLOWED_EMAILS.map(e=>e.toLowerCase()).includes(email);
+  if (!_allowed){ alert('Only '+ALLOWED_DOMAIN+' addresses or whitelisted emails are permitted.'); return; }
   // Don't pre-add someone who's already registered
   if (Object.values(_allUsers).some(u=>u && (u.email||'').toLowerCase()===email)){
     alert(email+' is already a registered user.\nChange their role directly from the table.'); return;
