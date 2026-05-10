@@ -552,7 +552,7 @@ canvas{max-height:260px}
       <div class="brand-mark">🏍️</div>
       <div class="brand-text">
         <div class="t1">Bike AOP Tracker</div>
-        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.2.7</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 10/05/2026 09:26</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
+        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.2.7</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 10/05/2026 09:29</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
       </div>
     </div>
     <div class="hdr-right">
@@ -840,7 +840,7 @@ function oemBadge(client){
 }
 
 const ACT_KEY='leadbu_actuals_fy27_v2';
-const DEPLOY_TIME='2026-05-10T09:26:22Z'; // replaced with ISO timestamp at deploy time
+const DEPLOY_TIME='2026-05-10T09:29:23Z'; // replaced with ISO timestamp at deploy time
 let ACTUALS=TARGETS.map(()=>newActualRec()); // populated by Firebase onValue
 
 function newActualRec(){
@@ -1695,7 +1695,7 @@ function updateLastSaved(isoStr){
 }
 function showDeployTime(){
   const el=document.getElementById('hdr-deployed');
-  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-05-10T09:26:22Z')return;
+  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-05-10T09:29:23Z')return;
   try{
     const d=new Date(DEPLOY_TIME);
     const pad=n=>String(n).padStart(2,'0');
@@ -7205,40 +7205,60 @@ function _aiProviderLabel(key){
 async function callAI(systemPrompt, messages, maxTokens=2000){
   const apiKey=await _loadAIKey();
   if(!apiKey)return{ok:false,error:'no_key'};
-  const provider=_aiProvider(apiKey);
+  const trimmedKey=apiKey.trim();
+  const provider=_aiProvider(trimmedKey);
+  console.log('[AI] provider:',provider,'| key prefix:',trimmedKey.slice(0,12)+'…');
   try{
     if(provider==='openai'){
       const resp=await fetch('https://api.openai.com/v1/chat/completions',{
         method:'POST',
-        headers:{'Content-Type':'application/json','Authorization':'Bearer '+apiKey},
+        headers:{'Content-Type':'application/json','Authorization':'Bearer '+trimmedKey},
         body:JSON.stringify({model:'gpt-4o-mini',max_tokens:maxTokens,
           messages:[{role:'system',content:systemPrompt},...messages]})
       });
       const data=await resp.json();
+      console.log('[AI] OpenAI raw response:',JSON.stringify(data).slice(0,300));
       if(data.error)return{ok:false,error:data.error.message||JSON.stringify(data.error),authFail:data.error.code==='invalid_api_key'};
       return{ok:true,text:data.choices?.[0]?.message?.content||''};
     }else{
-      // Anthropic — try models in order until one succeeds
-      const _models=['claude-3-7-sonnet-20250219','claude-3-5-sonnet-20241022','claude-3-5-haiku-20241022','claude-3-haiku-20240307'];
-      let lastErr='';
-      for(const _model of _models){
+      // Anthropic — probe available models first, then call
+      let availModels=null;
+      try{
+        const mResp=await fetch('https://api.anthropic.com/v1/models',{
+          headers:{'x-api-key':trimmedKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'}
+        });
+        const mData=await mResp.json();
+        console.log('[AI] /v1/models response:',JSON.stringify(mData).slice(0,400));
+        if(mData.data) availModels=mData.data.map(m=>m.id);
+      }catch(me){console.warn('[AI] models probe failed:',me.message);}
+
+      const _preferred=['claude-3-7-sonnet-20250219','claude-3-5-sonnet-20241022','claude-3-5-haiku-20241022','claude-3-haiku-20240307'];
+      const _models=availModels
+        ? _preferred.filter(m=>availModels.includes(m)).concat(availModels.filter(m=>!_preferred.includes(m)))
+        : _preferred;
+      if(availModels) console.log('[AI] Available models:',availModels.join(', '));
+
+      let lastRaw='';
+      for(const _model of (_models.length?_models:_preferred)){
         const resp=await fetch('https://api.anthropic.com/v1/messages',{
           method:'POST',
-          headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+          headers:{'Content-Type':'application/json','x-api-key':trimmedKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
           body:JSON.stringify({model:_model,max_tokens:maxTokens,system:systemPrompt,messages})
         });
         const data=await resp.json();
+        lastRaw=JSON.stringify(data).slice(0,300);
+        console.log('[AI] model:',_model,'| status:',resp.status,'| raw:',lastRaw);
         if(data.error){
           const errType=data.error.type||'';
           const errMsg=data.error.message||JSON.stringify(data.error);
-          if(errType==='authentication_error')return{ok:false,error:'Auth failed: '+errMsg,authFail:true};
-          if(errType==='not_found_error'||errMsg.startsWith('model:')){lastErr=_model+' not found';continue;}
+          if(errType==='authentication_error')return{ok:false,error:'Auth failed — check API key in Users tab. Detail: '+errMsg,authFail:true};
+          if(errType==='not_found_error'||errMsg.startsWith('model:')){continue;}
           return{ok:false,error:'['+errType+'] '+errMsg};
         }
-        console.log('[AI] Using model:',_model);
+        console.log('[AI] Success with model:',_model);
         return{ok:true,text:data.content?.[0]?.text||''};
       }
-      return{ok:false,error:'No available Anthropic model found. Tried: '+_models.join(', ')+'. Last: '+lastErr};
+      return{ok:false,error:'No working model found. Open DevTools → Console and look for [AI] lines to diagnose. Last response: '+lastRaw};
     }
   }catch(e){
     return{ok:false,error:'Network error: '+e.message};
