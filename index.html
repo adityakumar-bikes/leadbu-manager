@@ -551,7 +551,7 @@ canvas{max-height:260px}
       <div class="brand-mark">🏍️</div>
       <div class="brand-text">
         <div class="t1">Bike AOP Tracker</div>
-        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.2.4</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 09/05/2026 13:18</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
+        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.2.5</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 10/05/2026 06:53</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
       </div>
     </div>
     <div class="hdr-right">
@@ -830,7 +830,7 @@ function oemBadge(client){
 }
 
 const ACT_KEY='leadbu_actuals_fy27_v2';
-const DEPLOY_TIME='2026-05-09T13:18:19Z'; // replaced with ISO timestamp at deploy time
+const DEPLOY_TIME='2026-05-10T06:53:32Z'; // replaced with ISO timestamp at deploy time
 let ACTUALS=TARGETS.map(()=>newActualRec()); // populated by Firebase onValue
 
 function newActualRec(){
@@ -1657,7 +1657,7 @@ function updateLastSaved(isoStr){
 }
 function showDeployTime(){
   const el=document.getElementById('hdr-deployed');
-  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-05-09T13:18:19Z')return;
+  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-05-10T06:53:32Z')return;
   try{
     const d=new Date(DEPLOY_TIME);
     const pad=n=>String(n).padStart(2,'0');
@@ -7137,6 +7137,50 @@ async function clearAIKeyGlobal(){
   if(_aiKeyRef) await _aiKeyRef.remove();
 }
 
+// ── Provider auto-detection ───────────────────────────────────────────────
+function _aiProvider(key){
+  if(!key)return null;
+  if(key.startsWith('sk-ant-'))return'anthropic';
+  if(key.startsWith('sk-'))return'openai';
+  return'anthropic'; // fallback
+}
+function _aiProviderLabel(key){
+  const p=_aiProvider(key);
+  return p==='openai'?'OpenAI (ChatGPT)':p==='anthropic'?'Anthropic (Claude)':'Unknown';
+}
+
+// ── Unified AI call (auto-routes based on key prefix) ────────────────────
+async function callAI(systemPrompt, messages, maxTokens=2000){
+  const apiKey=await _loadAIKey();
+  if(!apiKey)return{ok:false,error:'no_key'};
+  const provider=_aiProvider(apiKey);
+  try{
+    if(provider==='openai'){
+      const resp=await fetch('https://api.openai.com/v1/chat/completions',{
+        method:'POST',
+        headers:{'Content-Type':'application/json','Authorization':'Bearer '+apiKey},
+        body:JSON.stringify({model:'gpt-4o-mini',max_tokens:maxTokens,
+          messages:[{role:'system',content:systemPrompt},...messages]})
+      });
+      const data=await resp.json();
+      if(data.error)return{ok:false,error:data.error.message||JSON.stringify(data.error),authFail:data.error.code==='invalid_api_key'};
+      return{ok:true,text:data.choices?.[0]?.message?.content||''};
+    }else{
+      // Anthropic
+      const resp=await fetch('https://api.anthropic.com/v1/messages',{
+        method:'POST',
+        headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+        body:JSON.stringify({model:'claude-3-5-sonnet-20241022',max_tokens:maxTokens,system:systemPrompt,messages})
+      });
+      const data=await resp.json();
+      if(data.error)return{ok:false,error:data.error.message||JSON.stringify(data.error),authFail:data.error.type==='authentication_error'};
+      return{ok:true,text:data.content?.[0]?.text||''};
+    }
+  }catch(e){
+    return{ok:false,error:'Network error: '+e.message};
+  }
+}
+
 // ── Key Management UI ─────────────────────────────────────────────────────
 async function toggleAIKeyMgmt(){
   const panel=document.getElementById('ai-key-mgmt');
@@ -7148,10 +7192,11 @@ async function toggleAIKeyMgmt(){
   if(status){
     status.textContent='Checking…';
     const key=await _loadAIKey();
-    const masked=key?'sk-ant-…'+key.slice(-6):'not set';
+    const masked=key?key.slice(0,10)+'…'+key.slice(-4):'not set';
+    const provider=_aiProviderLabel(key);
     status.innerHTML=key
-      ?'<span style="color:#34d399">✅ Key active</span> — <span style="color:var(--text3);font-family:monospace">'+masked+'</span> — shared with all users'
-      :'<span style="color:#f87171">⚠ No key configured</span> — enter one below to enable AI for everyone';
+      ?`<span style="color:#34d399">✅ ${provider} key active</span> — <span style="color:var(--text3);font-family:monospace">${masked}</span> — shared with all users`
+      :'<span style="color:#f87171">⚠ No AI key configured</span> — paste an Anthropic or OpenAI key below';
   }
 }
 
@@ -7164,14 +7209,14 @@ async function saveAIKeyFromUI(){
   const ok=await saveAIKeyGlobal(key);
   if(ok){
     if(inp)inp.value='';
-    if(status)status.innerHTML='<span style="color:#34d399">✅ Saved! All users can now use AI without entering a key.</span>';
+    if(status)status.innerHTML='<span style="color:#34d399">✅ Saved! All users can now generate ChatGPT insights.</span>';
     setTimeout(()=>{const p=document.getElementById('ai-key-mgmt');if(p)p.style.display='none';},2000);
   }
 }
 
 async function clearAIKeyFromUI(){
   const status=document.getElementById('ai-key-status');
-  if(!confirm('Remove the shared API key? All users will lose AI access until a new key is set.')) return;
+  if(!confirm('Remove the shared AI key? All users will lose AI insights until a new key is set.')) return;
   if(status)status.textContent='Clearing…';
   await clearAIKeyGlobal();
   if(status)status.innerHTML='<span style="color:#f87171">Key removed.</span> Enter a new key to re-enable AI.';
@@ -7293,7 +7338,7 @@ async function sendChatMessage(userMsg){
   if(_chatThinking||!userMsg.trim())return;
   const apiKey=await _loadAIKey();
   if(!apiKey){
-    _chatHistory.push({role:'assistant',content:'⚠️ No API key configured yet. Ask your admin to click 🔑 and set a shared key — it only needs to be done once for everyone.'});
+    _chatHistory.push({role:'assistant',content:'⚠️ No API key configured yet. Ask your admin to click 🔑 Key and paste an Anthropic or OpenAI key — it only needs to be done once for everyone.'});
     renderChat();
     return;
   }
@@ -7307,21 +7352,12 @@ If data is 0 or absent for a month, say "no data entered". Today = May 2026.
 
 LIVE TRACKER DATA:
 ${buildTrackerContext()}`;
-  try{
-    const resp=await fetch('https://api.anthropic.com/v1/messages',{
-      method:'POST',
-      headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-      body:JSON.stringify({model:'claude-3-5-haiku-20241022',max_tokens:1500,system:systemPrompt,messages:_chatHistory})
-    });
-    const data=await resp.json();
-    if(data.content&&data.content[0]){
-      _chatHistory.push({role:'assistant',content:data.content[0].text});
-    } else if(data.error){
-      _chatHistory.push({role:'assistant',content:`⚠ API error: ${data.error.message||JSON.stringify(data.error)}`});
-      if(data.error.type==='authentication_error'){_aiKeyCache=null;localStorage.removeItem('leadbu_ai_key');}
-    }
-  }catch(e){
-    _chatHistory.push({role:'assistant',content:`⚠ Network error: ${e.message}`});
+  const result=await callAI(systemPrompt,_chatHistory,1500);
+  if(result.ok){
+    _chatHistory.push({role:'assistant',content:result.text});
+  }else{
+    _chatHistory.push({role:'assistant',content:`⚠ API error: ${result.error}`});
+    if(result.authFail){_aiKeyCache=null;localStorage.removeItem('leadbu_ai_key');}
   }
   _chatThinking=false;
   renderChat();
@@ -7344,6 +7380,7 @@ function resetAIKey(){toggleAIKeyMgmt();} // legacy — now opens key mgmt panel
 let INSIGHTS_PERIOD='fy';
 let _insightsAIResult=null;
 let _insightsAIGenerating=false;
+const OPENAI_INSIGHTS_MODEL='gpt-5';
 
 function _insightsPeriodCols(pid){
   if(pid==='fy')return Array.from({length:12},(_,i)=>i);
@@ -7354,6 +7391,19 @@ function _insightsPeriodLabel(pid){
   if(pid==='fy')return'Full Year FY27';
   if(pid.startsWith('q'))return['Q1 Apr–Jun','Q2 Jul–Sep','Q3 Oct–Dec','Q4 Jan–Mar'][+pid[1]];
   return MONTHS[+pid.slice(1)]+" '27";
+}
+
+function _extractOpenAIText(data){
+  if(data&&data.output_text)return data.output_text;
+  if(!data||!Array.isArray(data.output))return '';
+  return data.output.flatMap(item=>{
+    if(!item||!Array.isArray(item.content))return [];
+    return item.content.map(part=>{
+      if(!part)return '';
+      if(part.type==='output_text'||part.type==='text')return part.text||'';
+      return part.text||part.content||'';
+    });
+  }).join('\n').trim();
 }
 
 function renderInsights(){
@@ -7555,7 +7605,7 @@ function renderInsights(){
       <div style="width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#6366f1,#8b5cf6);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">✦</div>
       <div>
         <div style="font-size:14px;font-weight:700;color:var(--text1)">AI Deep-Dive Insights</div>
-        <div style="font-size:11px;color:var(--text3)">Claude analyzes every metric — performance, efficiency, risks and FY projections</div>
+        <div style="font-size:11px;color:var(--text3)">ChatGPT analyzes every metric — performance, efficiency, risks and FY projections</div>
       </div>
       <button id="insights-gen-btn" onclick="generateAIInsights()" style="margin-left:auto;padding:8px 18px;border-radius:8px;border:none;cursor:pointer;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;gap:6px;white-space:nowrap">✦ Generate Insights</button>
     </div>
@@ -7705,17 +7755,25 @@ async function generateAIInsights(){
 
   const apiKey=await _loadAIKey();
   if(!apiKey){
-    content.innerHTML=`<div style="padding:16px;color:#f85149;font-size:12px">⚠️ No API key configured. Ask your admin to set a shared key via the 🔑 button in the header.</div>`;
+    content.innerHTML=`<div style="padding:20px;color:#f85149;font-size:12px;text-align:center">
+      ⚠️ No AI key configured.<br><br>
+      Click <strong>🔑 Key</strong> in the top-right of the AI chat panel and paste either:<br>
+      <span style="color:#58a6ff">• An Anthropic key</span> — starts with <code>sk-ant-</code> (get it at console.anthropic.com)<br>
+      <span style="color:#3fb950">• An OpenAI key</span> — starts with <code>sk-proj-</code> (get it at platform.openai.com)<br><br>
+      The key is shared with your whole team once set.
+    </div>`;
     return;
   }
 
+  const providerLabel=_aiProviderLabel(apiKey);
   _insightsAIGenerating=true;
   btn.innerHTML='<span style="animation:pulse 1s infinite">✦</span> Analyzing…';
   btn.disabled=true;
   content.innerHTML=`<div style="display:flex;flex-direction:column;gap:16px;padding:16px">
+    <div style="font-size:10px;color:var(--text3);margin-bottom:4px">Using ${providerLabel}</div>
     ${['Scanning revenue metrics…','Analysing lead quality…','Checking margin health…','Computing projections…','Synthesising findings…'].map((s,i)=>`
-      <div style="display:flex;align-items:center;gap:10px;animation:fadeIn .4s ${i*0.2}s both">
-        <div style="width:24px;height:24px;border-radius:50%;border:2px solid var(--accent);border-top-color:transparent;animation:spin 1s linear infinite;flex-shrink:0"></div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="width:22px;height:22px;border-radius:50%;border:2px solid var(--accent);border-top-color:transparent;animation:spin 1s linear infinite;flex-shrink:0"></div>
         <div style="font-size:12px;color:var(--text3)">${s}</div>
       </div>`).join('')}
   </div>`;
@@ -7724,8 +7782,6 @@ async function generateAIInsights(){
   const pid=INSIGHTS_PERIOD;
   const cols=_insightsPeriodCols(pid);
   const plabel=_insightsPeriodLabel(pid);
-
-  // Build rich context
   const ctx=_buildInsightsPrompt(rows,cols,plabel);
 
   const systemPrompt=`You are an expert business analytics consultant for BikeDekho's digital marketing P&L.
@@ -7739,7 +7795,7 @@ Context:
 - Clients: major Indian bike OEMs (Bajaj/KTM, TVS, Royal Enfield, HMSI, Hero, Harley, Jawa/Yezdi, etc.)
 - Today is May 2026. FY27 = Apr 2026 – Mar 2027.
 
-Response format — use these EXACT section headers in your response:
+Response format — use these EXACT section headers:
 ## 📊 Executive Snapshot
 ## ✅ What's Going Right
 ## ⚠️ Areas of Concern
@@ -7747,32 +7803,16 @@ Response format — use these EXACT section headers in your response:
 ## 📉 Lead & Efficiency Analysis
 ## 🔮 FY-End Projections & Recommendations
 
-Rules:
-- Be specific. Use exact numbers from the data. Call out account names, months, and values.
-- Format currency as "X.XX L". Percentages to 1 decimal.
-- Use markdown tables where comparisons are clearer.
-- Be direct and actionable — this is an internal tool for the business team.
-- Flag anything unusual or alarming explicitly.
-- For projections, state assumptions clearly.`;
+Rules: Be specific with exact numbers. Format currency as "X.XX L". Use markdown tables for comparisons. Be direct and actionable. Flag alarming trends explicitly.`;
 
-  try{
-    const resp=await fetch('https://api.anthropic.com/v1/messages',{
-      method:'POST',
-      headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-      body:JSON.stringify({model:'claude-3-5-sonnet-20241022',max_tokens:4000,system:systemPrompt,messages:[{role:'user',content:ctx}]})
-    });
-    const data=await resp.json();
-    if(data.content&&data.content[0]){
-      const rendered=_renderInsightsMarkdown(data.content[0].text);
-      _insightsAIResult=rendered;
-      content.innerHTML=rendered;
-    }else if(data.error){
-      const msg=`⚠️ API error: ${data.error.message||JSON.stringify(data.error)}`;
-      content.innerHTML=`<div style="padding:16px;color:#f85149;font-size:12px">${msg}</div>`;
-      if(data.error.type==='authentication_error'){_aiKeyCache=null;localStorage.removeItem('leadbu_ai_key');}
-    }
-  }catch(e){
-    content.innerHTML=`<div style="padding:16px;color:#f85149;font-size:12px">⚠️ Network error: ${e.message}</div>`;
+  const result=await callAI(systemPrompt,[{role:'user',content:ctx}],4000);
+  if(result.ok&&result.text){
+    const rendered=_renderInsightsMarkdown(result.text);
+    _insightsAIResult=rendered;
+    content.innerHTML=rendered;
+  }else{
+    content.innerHTML=`<div style="padding:16px;color:#f85149;font-size:12px">⚠️ ${result.error||'No response returned. Try regenerating.'}</div>`;
+    if(result.authFail){_aiKeyCache=null;localStorage.removeItem('leadbu_ai_key');}
   }
   _insightsAIGenerating=false;
   btn.innerHTML='✦ Regenerate';
@@ -7976,17 +8016,20 @@ async function submitAIChat(){
 
   <!-- Key Management Panel (admin only, hidden by default) -->
   <div id="ai-key-mgmt" style="display:none;padding:13px 16px;background:var(--bg3);border-bottom:2px solid var(--border2);flex-shrink:0">
-    <div style="font-size:11px;font-weight:700;color:var(--text1);margin-bottom:7px;display:flex;align-items:center;gap:6px">🔑 Shared API Key<span style="font-weight:400;color:var(--text3);font-size:10px">— set once, works for everyone</span></div>
+    <div style="font-size:11px;font-weight:700;color:var(--text1);margin-bottom:5px;display:flex;align-items:center;gap:6px">🔑 AI Key <span style="font-weight:400;color:var(--text3);font-size:10px">— paste Anthropic or OpenAI — set once for all users</span></div>
+    <div style="font-size:9.5px;color:var(--text3);margin-bottom:7px;line-height:1.5">
+      <span style="color:#a78bfa">Anthropic</span> key → console.anthropic.com &nbsp;|&nbsp; <span style="color:#3fb950">OpenAI</span> key → platform.openai.com/api-keys
+    </div>
     <div id="ai-key-status" style="font-size:10px;color:var(--text3);margin-bottom:9px;min-height:14px">Checking…</div>
     <div style="display:flex;gap:6px;align-items:center">
-      <input type="password" id="ai-key-input" placeholder="sk-ant-api03-…"
+      <input type="password" id="ai-key-input" placeholder="sk-ant-… or sk-proj-…"
         style="flex:1;background:var(--bg2);border:1px solid var(--border2);border-radius:5px;padding:7px 10px;font-size:11px;color:var(--text1);font-family:monospace;outline:none"
         onkeydown="if(event.key==='Enter')saveAIKeyFromUI()">
       <button onclick="saveAIKeyFromUI()"
         style="padding:7px 13px;font-size:11px;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;border:none;border-radius:5px;cursor:pointer;font-weight:700;white-space:nowrap">Save for All</button>
     </div>
     <div style="display:flex;justify-content:space-between;align-items:center;margin-top:7px">
-      <span style="font-size:9px;color:var(--text3)">Key is obfuscated and stored in shared DB — all users get it automatically</span>
+      <span style="font-size:9px;color:var(--text3)">Key is obfuscated in shared DB — provider auto-detected from key prefix</span>
       <button onclick="clearAIKeyFromUI()" style="font-size:9px;padding:2px 8px;background:transparent;border:1px solid var(--border2);border-radius:4px;color:var(--text3);cursor:pointer">Remove Key</button>
     </div>
   </div>
