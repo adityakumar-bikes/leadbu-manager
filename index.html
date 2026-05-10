@@ -552,7 +552,7 @@ canvas{max-height:260px}
       <div class="brand-mark">🏍️</div>
       <div class="brand-text">
         <div class="t1">Bike AOP Tracker</div>
-        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.2.7</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 10/05/2026 09:06</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
+        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.2.7</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 10/05/2026 09:17</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
       </div>
     </div>
     <div class="hdr-right">
@@ -840,7 +840,7 @@ function oemBadge(client){
 }
 
 const ACT_KEY='leadbu_actuals_fy27_v2';
-const DEPLOY_TIME='__DEPLOY_TS__'; // replaced with ISO timestamp at deploy time
+const DEPLOY_TIME='2026-05-10T09:17:08Z'; // replaced with ISO timestamp at deploy time
 let ACTUALS=TARGETS.map(()=>newActualRec()); // populated by Firebase onValue
 
 function newActualRec(){
@@ -1695,7 +1695,7 @@ function updateLastSaved(isoStr){
 }
 function showDeployTime(){
   const el=document.getElementById('hdr-deployed');
-  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='__DEPLOY_TS__')return;
+  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-05-10T09:17:08Z')return;
   try{
     const d=new Date(DEPLOY_TIME);
     const pad=n=>String(n).padStart(2,'0');
@@ -7475,6 +7475,8 @@ function renderInsights(){
   const adTypeMap={};
   const acctData=[];
 
+  let totRetails=0,totBilledRet=0,totGLeads=0,totMLeads=0;
+
   // Track monthly totals for trend/projection
   const mRev=Array(12).fill(0),mGM=Array(12).fill(0),mLeads=Array(12).fill(0),mMktg=Array(12).fill(0);
 
@@ -7488,24 +7490,40 @@ function renderInsights(){
     const leads=cols.reduce((s,i)=>s+(+d.trig_leads[i]||0),0);
     const cc  =cols.reduce((s,i)=>s+(+d.cc[i]||0),0);
     const bill=cols.reduce((s,i)=>s+(+(d.billed_rev&&d.billed_rev[i])||0),0);
+    const ret  =cols.reduce((s,i)=>s+(+(a.retails&&a.retails[i])||0),0);
+    const bRet =cols.reduce((s,i)=>s+(+(a.billed_retails&&a.billed_retails[i])||0),0);
+    const gLd  =cols.reduce((s,i)=>s+(+(a.google_leads&&a.google_leads[i])||0),0);
+    const mLd  =cols.reduce((s,i)=>s+(+(a.meta_leads&&a.meta_leads[i])||0),0);
+    const orgLd=cols.reduce((s,i)=>s+(+(a.organic_leads&&a.organic_leads[i])||0),0);
+    const gMk  =cols.reduce((s,i)=>s+(+(d.google_mktg&&d.google_mktg[i])||0),0);
+    const mMk  =cols.reduce((s,i)=>s+(+(d.meta_mktg&&d.meta_mktg[i])||0),0);
+    const gAbsR=cols.reduce((s,i)=>s+(+(a.google_abs_retails&&a.google_abs_retails[i])||0),0);
+    const mAbsR=cols.reduce((s,i)=>s+(+(a.meta_abs_retails&&a.meta_abs_retails[i])||0),0);
     const gpmPct=rev>0?(gpm/rev*100):0;
     const gmPct =rev>0?(gm/rev*100):0;
     const cpl   =leads>0?(mktg*100000/leads):0;
+    const gCPL  =gLd>0?(gMk*100000/gLd):0;
+    const mCPL  =mLd>0?(mMk*100000/mLd):0;
+    const crPct =leads>0&&ret>0?(ret/leads*100):0;
+    const billedCr=leads>0&&bRet>0?(bRet/leads*100):0;
 
     totTgt+=tgt;totRev+=rev;totMktg+=mktg;totGM+=gm;totGPM+=gpm;
     totLeads+=leads;totCC+=cc;totBilled+=bill;
+    totRetails+=ret; totBilledRet+=bRet; totGLeads+=gLd; totMLeads+=mLd;
 
     d.rev.forEach((v,i)=>{mRev[i]+=v;mGM[i]+=d.gm[i]||0;mLeads[i]+=d.trig_leads[i]||0;mMktg[i]+=d.mktg_cost[i]||0;});
 
-    if(!oemMap[t.client])oemMap[t.client]={tgt:0,rev:0,mktg:0,gm:0,gpm:0,leads:0,accts:0,adTypes:new Set()};
+    if(!oemMap[t.client])oemMap[t.client]={tgt:0,rev:0,mktg:0,gm:0,gpm:0,leads:0,accts:0,adTypes:new Set(),ret:0,bRet:0};
     const o=oemMap[t.client];
     o.tgt+=tgt;o.rev+=rev;o.mktg+=mktg;o.gm+=gm;o.gpm+=gpm;o.leads+=leads;o.accts++;o.adTypes.add(t.ad_type);
+    o.ret+=ret; o.bRet+=bRet;
 
-    if(!adTypeMap[t.ad_type])adTypeMap[t.ad_type]={rev:0,gm:0,gpm:0,mktg:0,leads:0,accts:0};
+    if(!adTypeMap[t.ad_type])adTypeMap[t.ad_type]={rev:0,gm:0,gpm:0,mktg:0,leads:0,accts:0,ret:0,leads_g:0,leads_m:0};
     const at=adTypeMap[t.ad_type];
     at.rev+=rev;at.gm+=gm;at.gpm+=gpm;at.mktg+=mktg;at.leads+=leads;at.accts++;
+    at.ret+=ret; at.leads_g+=gLd; at.leads_m+=mLd;
 
-    acctData.push({t,rev,tgt,gm,gpm,gpmPct,gmPct,mktg,leads,cc,bill,cpl});
+    acctData.push({t,rev,tgt,gm,gpm,gpmPct,gmPct,mktg,leads,cc,bill,cpl,ret,bRet,gLd,mLd,orgLd,gMk,mMk,gAbsR,mAbsR,gCPL,mCPL,crPct,billedCr});
   });
 
   const avgGPMpct=totRev>0?(totGPM/totRev*100):0;
@@ -7602,8 +7620,41 @@ function renderInsights(){
       <div style="margin-left:auto;text-align:right">
         <div style="font-size:13px;font-weight:700;color:var(--text1)">${fc(m.rev)}</div>
         <div style="font-size:10px;color:var(--text3)">GM ${fp(gmPct)} · GPM ${fp(gpmPct)}</div>
+        <div style="font-size:10px;color:var(--text3)">CR% ${m.leads>0&&m.ret>0?fp(m.ret/m.leads*100):'—'} · Leads G:${Math.round(m.leads_g)} M:${Math.round(m.leads_m)}</div>
       </div>
     </div>`;
+  });
+
+  // ── Lead → Retail Funnel table ──
+  const funnelRows=acctData
+    .filter(r=>r.leads>0||r.ret>0)
+    .sort((a,b)=>{
+      if(b.ret>0&&a.ret===0)return 1;
+      if(a.ret>0&&b.ret===0)return -1;
+      return b.crPct-a.crPct;
+    });
+  const crColor=(v)=>v>=5?'#3fb950':v>=2?'#f0a500':'#f85149';
+  let funnelTableRows='';
+  funnelRows.forEach(r=>{
+    const crV=r.leads>0&&r.ret>0?(r.ret/r.leads*100):0;
+    const bCrV=r.leads>0&&r.bRet>0?(r.bRet/r.leads*100):0;
+    const crDisp=crV>0?`<span style="color:${crColor(crV)};font-weight:700">${crV.toFixed(1)}%</span>`:'—';
+    const bCrDisp=bCrV>0?`${bCrV.toFixed(1)}%`:'—';
+    funnelTableRows+=`<tr>
+      <td style="padding:5px 8px;font-size:11px;font-weight:600;color:var(--text1);border-bottom:1px solid var(--border2)33;white-space:nowrap">${r.t.client}</td>
+      <td style="padding:5px 8px;font-size:10px;color:var(--text3);border-bottom:1px solid var(--border2)33;white-space:nowrap">${r.t.ad_type}${r.t.btl?' · '+r.t.btl:''}</td>
+      <td style="padding:5px 8px;font-size:11px;text-align:right;color:var(--text2);border-bottom:1px solid var(--border2)33">${r.leads>0?Math.round(r.leads):'—'}</td>
+      <td style="padding:5px 8px;font-size:11px;text-align:right;color:#4285F4;border-bottom:1px solid var(--border2)33">${r.gLd>0?Math.round(r.gLd):'—'}</td>
+      <td style="padding:5px 8px;font-size:11px;text-align:right;color:#1877F2;border-bottom:1px solid var(--border2)33">${r.mLd>0?Math.round(r.mLd):'—'}</td>
+      <td style="padding:5px 8px;font-size:11px;text-align:right;color:var(--text3);border-bottom:1px solid var(--border2)33">${r.orgLd>0?Math.round(r.orgLd):'—'}</td>
+      <td style="padding:5px 8px;font-size:11px;text-align:right;color:var(--text2);border-bottom:1px solid var(--border2)33">${r.ret>0?Math.round(r.ret):'—'}</td>
+      <td style="padding:5px 8px;text-align:right;border-bottom:1px solid var(--border2)33">${crDisp}</td>
+      <td style="padding:5px 8px;font-size:11px;text-align:right;color:#3fb950;border-bottom:1px solid var(--border2)33">${r.bRet>0?Math.round(r.bRet):'—'}</td>
+      <td style="padding:5px 8px;font-size:11px;text-align:right;color:var(--text3);border-bottom:1px solid var(--border2)33">${bCrDisp}</td>
+      <td style="padding:5px 8px;font-size:11px;text-align:right;color:var(--text2);border-bottom:1px solid var(--border2)33">${r.cpl>0?'₹'+Math.round(r.cpl).toLocaleString('en-IN'):'—'}</td>
+      <td style="padding:5px 8px;font-size:11px;text-align:right;color:#4285F4;border-bottom:1px solid var(--border2)33">${r.gCPL>0?'₹'+Math.round(r.gCPL).toLocaleString('en-IN'):'—'}</td>
+      <td style="padding:5px 8px;font-size:11px;text-align:right;color:#1877F2;border-bottom:1px solid var(--border2)33">${r.mCPL>0?'₹'+Math.round(r.mCPL).toLocaleString('en-IN'):'—'}</td>
+    </tr>`;
   });
 
   // ── Spotlight rows ──
@@ -7698,6 +7749,7 @@ function renderInsights(){
     ${kpiCard('Net GPM',fc(totGPM),`GPM% ${fp(avgGPMpct)}`,avgGPMpct>=20?'#3fb950':avgGPMpct>=0?'#f0a500':'#f85149','📈')}
     ${kpiCard('Total Leads',totLeads>0?Math.round(totLeads).toLocaleString('en-IN'):'—',`Avg CPL ₹${avgCPL>0?Math.round(avgCPL).toLocaleString('en-IN'):'—'}`,'#a78bfa','🎯')}
     ${kpiCard('Billed Revenue',fc(totBilled),`vs Accrued: ${totRev>0?fp((totBilled-totRev)/totRev*100+100):'—'}`,'#3fb950','🧾')}
+    ${kpiCard('Lead→Retail CR%',totLeads>0&&totRetails>0?fp(totRetails/totLeads*100):'—',`${Math.round(totRetails)} retails · ${Math.round(totBilledRet)} billed`,totLeads>0&&totRetails/totLeads>0.03?'#3fb950':totLeads>0&&totRetails/totLeads>0.015?'#f0a500':'#f85149','🔄')}
     ${kpiCard('Active Accounts',rows.length+'',`${Object.keys(oemMap).length} OEMs · ${Object.keys(adTypeMap).length} ad types`,'var(--text2)','🏢')}
   </div>
 
@@ -7728,6 +7780,31 @@ function renderInsights(){
         </div>
       </div>
     </div>
+  </div>
+
+  <!-- Lead → Retail Funnel -->
+  <div style="${card('margin-bottom:16px')}">
+    <div style="font-size:13px;font-weight:700;color:var(--text1);margin-bottom:14px">🔄 Lead → Retail Funnel <span style="font-size:10px;color:var(--text3);font-weight:400">· sorted by CR% desc · accounts with ≥1 lead or retail · green ≥5% · amber ≥2%</span></div>
+    ${funnelTableRows?`<div style="overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse;font-size:11px;min-width:900px">
+        <thead><tr style="background:var(--bg3)">
+          <th style="text-align:left;padding:6px 8px;border-bottom:2px solid var(--border2);color:var(--text2);font-weight:600;white-space:nowrap">OEM</th>
+          <th style="text-align:left;padding:6px 8px;border-bottom:2px solid var(--border2);color:var(--text2);font-weight:600;white-space:nowrap">Ad Type</th>
+          <th style="text-align:right;padding:6px 8px;border-bottom:2px solid var(--border2);color:var(--text2);font-weight:600;white-space:nowrap">Trig Leads</th>
+          <th style="text-align:right;padding:6px 8px;border-bottom:2px solid var(--border2);color:#4285F4;font-weight:600;white-space:nowrap">G Leads</th>
+          <th style="text-align:right;padding:6px 8px;border-bottom:2px solid var(--border2);color:#1877F2;font-weight:600;white-space:nowrap">M Leads</th>
+          <th style="text-align:right;padding:6px 8px;border-bottom:2px solid var(--border2);color:var(--text3);font-weight:600;white-space:nowrap">Organic</th>
+          <th style="text-align:right;padding:6px 8px;border-bottom:2px solid var(--border2);color:var(--text2);font-weight:600;white-space:nowrap">Retails</th>
+          <th style="text-align:right;padding:6px 8px;border-bottom:2px solid var(--border2);color:var(--accent);font-weight:600;white-space:nowrap">CR%</th>
+          <th style="text-align:right;padding:6px 8px;border-bottom:2px solid var(--border2);color:#3fb950;font-weight:600;white-space:nowrap">Billed Ret</th>
+          <th style="text-align:right;padding:6px 8px;border-bottom:2px solid var(--border2);color:#3fb950;font-weight:600;white-space:nowrap">Billed CR%</th>
+          <th style="text-align:right;padding:6px 8px;border-bottom:2px solid var(--border2);color:var(--text2);font-weight:600;white-space:nowrap">Blended CPL</th>
+          <th style="text-align:right;padding:6px 8px;border-bottom:2px solid var(--border2);color:#4285F4;font-weight:600;white-space:nowrap">G-CPL</th>
+          <th style="text-align:right;padding:6px 8px;border-bottom:2px solid var(--border2);color:#1877F2;font-weight:600;white-space:nowrap">M-CPL</th>
+        </tr></thead>
+        <tbody>${funnelTableRows}</tbody>
+      </table>
+    </div>`:'<div style="color:var(--text3);font-size:12px">No lead or retail data for selected period</div>'}
   </div>
 
   <!-- Row 2: Spotlights (3 cards) -->
@@ -7857,7 +7934,13 @@ Response format — use these EXACT section headers:
 ## 📉 Lead & Efficiency Analysis
 ## 🔮 FY-End Projections & Recommendations
 
-Rules: Be specific with exact numbers. Format currency as "X.XX L". Use markdown tables for comparisons. Be direct and actionable. Flag alarming trends explicitly.`;
+Rules: Be specific with exact numbers. Format currency as "X.XX L". Use markdown tables for comparisons. Be direct and actionable. Flag alarming trends explicitly.
+In the Lead & Efficiency Analysis section, specifically cover:
+- CR% (Lead→Retail conversion) breakdown by OEM and AdType with comparisons
+- Google vs Meta CPL and ROAS retails efficiency per account
+- Billed vs Notional retail gaps (revenue leakage signals)
+- Accounts with improving vs declining lead quality based on CR%
+- Organic lead dependency vs paid lead dependency`;
 
   const result=await callAI(systemPrompt,[{role:'user',content:ctx}],4000);
   if(result.ok&&result.text){
@@ -7879,6 +7962,7 @@ function _buildInsightsPrompt(rows,cols,plabel){
 
   // Summary aggregates
   let totTgt=0,totRev=0,totMktg=0,totGM=0,totGPM=0,totLeads=0,totCC=0,totBilled=0;
+  let totRetails=0,totBilledRet=0;
   const oemMap={};
 
   rows.forEach(({t,a,d})=>{
@@ -7897,9 +7981,18 @@ function _buildInsightsPrompt(rows,cols,plabel){
     const ret =cols.reduce((s,i)=>s+(+(a.retails&&a.retails[i])||0),0);
 
     totTgt+=tgt;totRev+=rev;totMktg+=mktg;totGM+=gm;totGPM+=gpm;totLeads+=leads;totCC+=cc;totBilled+=bill;
+    totRetails+=ret; totBilledRet+=bRet;
+
+    const orgLd2=cols.reduce((s,i)=>s+(+(a.organic_leads&&a.organic_leads[i])||0),0);
+    const gMk2  =cols.reduce((s,i)=>s+(+(d.google_mktg&&d.google_mktg[i])||0),0);
+    const mMk2  =cols.reduce((s,i)=>s+(+(d.meta_mktg&&d.meta_mktg[i])||0),0);
+    const gAbsR2=cols.reduce((s,i)=>s+(+(a.google_abs_retails&&a.google_abs_retails[i])||0),0);
+    const mAbsR2=cols.reduce((s,i)=>s+(+(a.meta_abs_retails&&a.meta_abs_retails[i])||0),0);
+    const gCPL2 =gLd>0?(gMk2*100000/gLd):0;
+    const mCPL2 =mLd>0?(mMk2*100000/mLd):0;
 
     if(!oemMap[t.client])oemMap[t.client]=[];
-    oemMap[t.client].push({t,tgt,rev,mktg,gm,gpm,leads,cc,bill,gLd,mLd,ret,bRet});
+    oemMap[t.client].push({t,tgt,rev,mktg,gm,gpm,leads,cc,bill,gLd,mLd,ret,bRet,orgLd:orgLd2,gCPL:gCPL2,mCPL:mCPL2,gAbsR:gAbsR2,mAbsR:mAbsR2});
   });
 
   // Portfolio summary
@@ -7907,7 +8000,8 @@ function _buildInsightsPrompt(rows,cols,plabel){
   lines.push(`Revenue (Accrued): ${totRev.toFixed(2)}L | Target: ${totTgt.toFixed(2)}L | Achievement: ${totTgt>0?(totRev/totTgt*100).toFixed(1)+'%':'N/A'}`);
   lines.push(`GM: ${totGM.toFixed(2)}L (${totRev>0?(totGM/totRev*100).toFixed(1):0}%) | GPM: ${totGPM.toFixed(2)}L (${totRev>0?(totGPM/totRev*100).toFixed(1):0}%)`);
   lines.push(`Mktg Spend: ${totMktg.toFixed(2)}L | CC Cost: ${totCC.toFixed(2)}L | Billed Rev: ${totBilled.toFixed(2)}L`);
-  lines.push(`Total Triggered Leads: ${Math.round(totLeads).toLocaleString()} | Avg CPL: ₹${totLeads>0?Math.round(totMktg*100000/totLeads).toLocaleString():'N/A'}/lead\n`);
+  lines.push(`Total Triggered Leads: ${Math.round(totLeads).toLocaleString()} | Avg CPL: ₹${totLeads>0?Math.round(totMktg*100000/totLeads).toLocaleString():'N/A'}/lead`);
+  lines.push(`Total Retails: ${Math.round(totRetails)} | Billed Retails: ${Math.round(totBilledRet)} | Overall CR%: ${totLeads>0&&totRetails>0?(totRetails/totLeads*100).toFixed(1)+'%':'N/A'} | Billed CR%: ${totLeads>0&&totBilledRet>0?(totBilledRet/totLeads*100).toFixed(1)+'%':'N/A'}\n`);
 
   // Per-OEM breakdown
   lines.push('## PER-OEM BREAKDOWN');
@@ -7922,9 +8016,16 @@ function _buildInsightsPrompt(rows,cols,plabel){
       lines.push(`  [${r.t.ad_type}${r.t.btl?' · '+r.t.btl:''}]`);
       lines.push(`    Rev: ${r.rev.toFixed(2)}L (Tgt ${r.tgt.toFixed(2)}L, Achv ${achv})`);
       lines.push(`    GM: ${r.gm.toFixed(2)}L (${gmPct}%) | GPM: ${r.gpm.toFixed(2)}L (${gpmPct}%)`);
-      if(r.leads>0)lines.push(`    Leads: G=${r.gLd} M=${r.mLd} Total=${Math.round(r.leads)} | CPL: ₹${cpl} | Cr%: ${crPct}`);
+      if(r.leads>0){
+        const gCPLstr=r.gCPL>0?`₹${Math.round(r.gCPL)}`:'—';
+        const mCPLstr=r.mCPL>0?`₹${Math.round(r.mCPL)}`:'—';
+        const billedCrStr=r.leads>0&&r.bRet>0?(r.bRet/r.leads*100).toFixed(1)+'%':'—';
+        lines.push(`    Leads: G=${r.gLd} M=${r.mLd} Organic=${r.orgLd||0} Total=${Math.round(r.leads)} | Blended CPL: ₹${cpl} | G-CPL: ${gCPLstr} | M-CPL: ${mCPLstr}`);
+        lines.push(`    Cr%: ${crPct} | Billed Cr%: ${billedCrStr} | Retails: ${Math.round(r.ret)} | Billed Retails: ${Math.round(r.bRet)}`);
+        if(r.gAbsR>0||r.mAbsR>0)lines.push(`    ROAS Retails: Google=${Math.round(r.gAbsR)} Meta=${Math.round(r.mAbsR)}`);
+      }
       if(r.mktg>0)lines.push(`    Mktg Spend: ${r.mktg.toFixed(2)}L | CC: ${r.cc.toFixed(2)}L`);
-      if(r.bill>0)lines.push(`    Billed Rev: ${r.bill.toFixed(2)}L | Billed Retails: ${r.bRet}`);
+      if(r.bill>0)lines.push(`    Billed Rev: ${r.bill.toFixed(2)}L`);
     });
   });
 
@@ -7936,6 +8037,13 @@ function _buildInsightsPrompt(rows,cols,plabel){
   MONTHS.forEach((m,i)=>{if(mRev2[i]>0||mGM2[i]>0||mLd2[i]>0)lines.push(`${m},${mRev2[i].toFixed(2)},${mGM2[i].toFixed(2)},${Math.round(mLd2[i])},${mMk2[i].toFixed(2)}`);});
 
   lines.push('\nProvide a comprehensive business intelligence analysis covering all 6 sections requested. Be specific with numbers and names. Give clear, actionable recommendations.');
+  lines.push('\nKey areas to specifically analyse:');
+  lines.push('1. CR% (Lead-to-Retail conversion) by OEM and AdType — flag outliers above and below average');
+  lines.push('2. Google vs Meta efficiency: compare G-CPL vs M-CPL, and Google vs Meta ROAS retails per account');
+  lines.push('3. Billed vs Notional retail gap — accounts where billed retails are significantly lower than notional retails (potential revenue leakage)');
+  lines.push('4. Accounts with strong CR% (good lead quality) vs accounts wasting spend on low-quality leads');
+  lines.push('5. Organic lead contribution — flag accounts heavily dependent on paid vs organic');
+  lines.push('6. Blended CPL efficiency across CPS, Media Leads, CC contract ad types');
   return lines.join('\n');
 }
 
