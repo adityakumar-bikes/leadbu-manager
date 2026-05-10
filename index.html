@@ -554,7 +554,7 @@ canvas{max-height:260px}
       <div class="brand-mark">🏍️</div>
       <div class="brand-text">
         <div class="t1">Bike AOP Tracker</div>
-        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.2.7</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 10/05/2026 09:53</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
+        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.2.7</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 10/05/2026 09:57</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
       </div>
     </div>
     <div class="hdr-right">
@@ -842,7 +842,7 @@ function oemBadge(client){
 }
 
 const ACT_KEY='leadbu_actuals_fy27_v2';
-const DEPLOY_TIME='2026-05-10T09:53:11Z'; // replaced with ISO timestamp at deploy time
+const DEPLOY_TIME='2026-05-10T09:57:24Z'; // replaced with ISO timestamp at deploy time
 let ACTUALS=TARGETS.map(()=>newActualRec()); // populated by Firebase onValue
 
 function newActualRec(){
@@ -1697,7 +1697,7 @@ function updateLastSaved(isoStr){
 }
 function showDeployTime(){
   const el=document.getElementById('hdr-deployed');
-  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-05-10T09:53:11Z')return;
+  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-05-10T09:57:24Z')return;
   try{
     const d=new Date(DEPLOY_TIME);
     const pad=n=>String(n).padStart(2,'0');
@@ -5495,7 +5495,7 @@ _fbRef.on('value', snapshot=>{
 
 // ── Version watcher — nudge users to hard-refresh when a new deploy is live ─
 function _startVersionWatch(){
-  if(!_fbDb || !DEPLOY_TIME || DEPLOY_TIME==='2026-05-10T09:53:11Z') return;
+  if(!_fbDb || !DEPLOY_TIME || DEPLOY_TIME==='2026-05-10T09:57:24Z') return;
   _fbDb.ref('meta/deployVersion').on('value', snap=>{
     const liveTs = snap.val();
     if(!liveTs) return;
@@ -7349,8 +7349,14 @@ async function clearAIKeyFromUI(){
 // AI CHAT ASSISTANT
 // ═══════════════════════════════════════════════════════════════════════════
 let _chatOpen=false;
-let _chatHistory=[];
 let _chatThinking=false;
+
+// ── Chat persistence ──────────────────────────────────────────────────────────
+const _CHAT_KEY='leadbu_chat_history';
+const _CHAT_MAX=40; // max messages to persist
+function _saveChatHistory(){try{localStorage.setItem(_CHAT_KEY,JSON.stringify(_chatHistory.slice(-_CHAT_MAX)));}catch(e){}}
+function _loadChatHistory(){try{const s=localStorage.getItem(_CHAT_KEY);return s?JSON.parse(s):[];}catch(e){return[];}}
+let _chatHistory=_loadChatHistory();
 
 function buildTrackerContext(){
   const ALL_BRAND_LABELS={...BAJAJ_BRAND_LABELS,...TVS_BRAND_LABELS,...RE_BRAND_LABELS};
@@ -7480,6 +7486,7 @@ ${buildTrackerContext()}`;
     _chatHistory.push({role:'assistant',content:`⚠ API error: ${result.error}`});
     if(result.authFail){_aiKeyCache=null;localStorage.removeItem('leadbu_ai_key');}
   }
+  _saveChatHistory();
   _chatThinking=false;
   renderChat();
 }
@@ -7492,14 +7499,20 @@ function toggleAIChat(){
   if(btn)btn.style.transform=_chatOpen?'scale(0.9)':'scale(1)';
   if(_chatOpen){_updateAdminUI();renderChat();setTimeout(()=>{const inp=document.getElementById('ai-chat-input');if(inp)inp.focus();},280);}
 }
-function clearChat(){_chatHistory=[];renderChat();}
+function clearChat(){_chatHistory=[];_saveChatHistory();renderChat();}
 function resetAIKey(){toggleAIKeyMgmt();} // legacy — now opens key mgmt panel
 
 // ═══════════════════════════════════════════════════════════════════════════
 // INSIGHTS TAB
 // ═══════════════════════════════════════════════════════════════════════════
-let INSIGHTS_PERIOD='fy';
-let _insightsAIResult=null;
+// ── Insights persistence ──────────────────────────────────────────────────────
+const _INSIGHTS_KEY='leadbu_insights_result';
+function _saveInsights(html,period){try{localStorage.setItem(_INSIGHTS_KEY,JSON.stringify({html,period,ts:Date.now()}));}catch(e){}}
+function _loadInsights(){try{const s=localStorage.getItem(_INSIGHTS_KEY);return s?JSON.parse(s):null;}catch(e){return null;}}
+
+const _savedInsights=_loadInsights();
+let INSIGHTS_PERIOD=(_savedInsights&&_savedInsights.period)||'fy';
+let _insightsAIResult=(_savedInsights&&_savedInsights.html)||null;
 let _insightsAIGenerating=false;
 const OPENAI_INSIGHTS_MODEL='gpt-5';
 
@@ -7884,7 +7897,13 @@ function renderInsights(){
   // Restore AI result if previously generated
   if(_insightsAIResult){
     const ac=document.getElementById('insights-ai-content');
-    if(ac)ac.innerHTML=_insightsAIResult;
+    if(ac){
+      const saved=_loadInsights();
+      const tsLabel=saved&&saved.ts?'Generated '+new Date(saved.ts).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'2-digit'})+' '+new Date(saved.ts).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true}):'';
+      ac.innerHTML=(tsLabel?`<div style="font-size:10px;color:var(--text3);margin-bottom:12px;padding:4px 8px;background:var(--bg3);border-radius:5px;display:inline-block">🕐 ${tsLabel} · <button onclick="localStorage.removeItem('${_INSIGHTS_KEY}');_insightsAIResult=null;renderInsights()" style="background:none;border:none;color:#f85149;cursor:pointer;font-size:10px;padding:0">Clear</button></div><br>`:'')+_insightsAIResult;
+      const genBtn=document.getElementById('insights-gen-btn');
+      if(genBtn)genBtn.innerHTML='✦ Regenerate';
+    }
   }
 }
 
@@ -7956,6 +7975,7 @@ In the Lead & Efficiency Analysis section, specifically cover:
   if(result.ok&&result.text){
     const rendered=_renderInsightsMarkdown(result.text);
     _insightsAIResult=rendered;
+    _saveInsights(rendered, pid);
     content.innerHTML=rendered;
   }else{
     content.innerHTML=`<div style="padding:16px;color:#f85149;font-size:12px">⚠️ ${result.error||'No response returned. Try regenerating.'}</div>`;
