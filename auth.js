@@ -243,7 +243,7 @@ async function _authInit(){
     _authHideGate();
     _authApplyRoleUI();
     _authReady = true;
-    if (typeof registerPresence==='function') registerPresence();
+    if (typeof _fbStartSync==='function') _fbStartSync(); // start Firebase data sync now that user is authed
     if (typeof _updateAdminUI==='function') _updateAdminUI();
 
     // Live profile listener — react to role change / disable / force-signout
@@ -506,4 +506,11 @@ async function _authViewRoleAudit(){
 })();
 
 /* ─── Boot ──────────────────────────────────────────────────────── */
-window.addEventListener('load', ()=> setTimeout(_authInit, 250));
+// Show the login gate IMMEDIATELY at script parse time so Firebase DB
+// never fires an unauthenticated read (which would trigger offline-fallback).
+if (AUTH_ENABLED) {
+  const _earlyGate = () => { _buildAuthGate(); _authShowGate('<span style="opacity:.6">Checking sign-in…</span>'); };
+  if (document.body) _earlyGate();
+  else document.addEventListener('DOMContentLoaded', _earlyGate);
+}
+window.addEventListener('load', _authInit);
