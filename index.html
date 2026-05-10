@@ -552,7 +552,7 @@ canvas{max-height:260px}
       <div class="brand-mark">🏍️</div>
       <div class="brand-text">
         <div class="t1">Bike AOP Tracker</div>
-        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.2.7</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 10/05/2026 09:32</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
+        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.2.7</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 10/05/2026 09:35</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
       </div>
     </div>
     <div class="hdr-right">
@@ -840,7 +840,7 @@ function oemBadge(client){
 }
 
 const ACT_KEY='leadbu_actuals_fy27_v2';
-const DEPLOY_TIME='2026-05-10T09:32:57Z'; // replaced with ISO timestamp at deploy time
+const DEPLOY_TIME='2026-05-10T09:35:58Z'; // replaced with ISO timestamp at deploy time
 let ACTUALS=TARGETS.map(()=>newActualRec()); // populated by Firebase onValue
 
 function newActualRec(){
@@ -1695,7 +1695,7 @@ function updateLastSaved(isoStr){
 }
 function showDeployTime(){
   const el=document.getElementById('hdr-deployed');
-  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-05-10T09:32:57Z')return;
+  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-05-10T09:35:58Z')return;
   try{
     const d=new Date(DEPLOY_TIME);
     const pad=n=>String(n).padStart(2,'0');
@@ -8023,46 +8023,90 @@ function _buildInsightsPrompt(rows,cols,plabel){
 }
 
 function _renderInsightsMarkdown(text){
-  // Section colors
   const sectionColors={
-    '📊 Executive Snapshot':'#6366f1',
-    '✅ What\'s Going Right':'#3fb950',
-    '⚠️ Areas of Concern':'#f85149',
-    '🔍 OEM-by-OEM Observations':'#58a6ff',
-    '📉 Lead & Efficiency Analysis':'#f0a500',
-    '🔮 FY-End Projections & Recommendations':'#a78bfa'
+    'Executive Snapshot':'#6366f1',
+    "What's Going Right":'#3fb950',
+    'Areas of Concern':'#f85149',
+    'OEM-by-OEM Observations':'#58a6ff',
+    'Lead & Efficiency Analysis':'#f0a500',
+    'FY-End Projections':'#a78bfa',
+    'Recommendations':'#a78bfa'
   };
+
+  function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+  function inline(s){
+    return s
+      .replace(/\*\*(.+?)\*\*/g,'<strong style="color:var(--text1)">$1</strong>')
+      .replace(/\*(.+?)\*/g,'<em style="color:var(--text3)">$1</em>')
+      .replace(/`([^`]+)`/g,'<code style="background:rgba(255,255,255,.08);padding:1px 5px;border-radius:3px;font-family:monospace;font-size:10.5px;color:var(--accent)">$1</code>');
+  }
+
+  function renderBlock(lines,accent){
+    const out=[];
+    for(const raw of lines){
+      const l=raw.trimEnd();
+      if(!l){out.push('<div style="height:5px"></div>');continue;}
+      if(l.startsWith('### ')){out.push('<div style="font-size:12px;font-weight:700;color:'+accent+';margin:14px 0 4px;padding-left:8px;border-left:3px solid '+accent+'55">'+inline(esc(l.slice(4)))+'</div>');continue;}
+      if(/^[-*] /.test(l)){out.push('<div style="display:flex;gap:8px;padding:2px 0 2px 4px"><span style="color:'+accent+';flex-shrink:0;margin-top:1px">•</span><span style="color:var(--text2)">'+inline(esc(l.slice(2)))+'</span></div>');continue;}
+      const nm=l.match(/^(\d+)\. (.+)/);
+      if(nm){out.push('<div style="display:flex;gap:8px;padding:2px 0 2px 4px"><span style="color:'+accent+';flex-shrink:0;font-weight:700;min-width:18px">'+nm[1]+'.</span><span style="color:var(--text2)">'+inline(esc(nm[2]))+'</span></div>');continue;}
+      out.push('<div style="color:var(--text2);padding:1px 0">'+inline(esc(l))+'</div>');
+    }
+    return out.join('');
+  }
+
+  function renderTable(lines){
+    const rows=[];
+    for(const raw of lines){
+      if(/^\|[\s\-:|]+\|/.test(raw)) continue; // skip separator rows
+      const cells=raw.split('|').slice(1,-1).map(c=>c.trim());
+      if(cells.length) rows.push(cells);
+    }
+    if(!rows.length) return '';
+    const isNum=v=>/^[₹0-9+\-%.L,\s—~≈()↑↓]+$/.test(v);
+    let t='<div style="overflow-x:auto;margin:10px 0"><table style="border-collapse:collapse;font-size:11px">';
+    rows.forEach((cells,ri)=>{
+      t+='<tr>';
+      cells.forEach((c,ci)=>{
+        const num=ci>0&&isNum(c);
+        const hdr=ri===0;
+        const st='padding:5px 12px;border:1px solid var(--border2);text-align:'+(num?'right':'left')+';'
+          +(hdr?'font-weight:700;color:var(--text1);background:var(--bg2)'
+               :(ci===0?'font-weight:600;color:var(--text1)':'color:var(--text2)'));
+        t+='<td style="'+st+'">'+inline(esc(c))+'</td>';
+      });
+      t+='</tr>';
+    });
+    t+='</table></div>';
+    return t;
+  }
 
   const sections=text.split(/^## /m).filter(Boolean);
   let html='<div style="display:flex;flex-direction:column;gap:16px">';
   sections.forEach(section=>{
-    const lines=section.split('\n');
-    const title=lines[0].trim();
-    const body=lines.slice(1).join('\n').trim();
+    const sLines=section.split('\n');
+    const title=sLines[0].trim();
+    const bodyLines=sLines.slice(1);
     let accentColor='var(--accent)';
-    Object.entries(sectionColors).forEach(([k,v])=>{if(title.includes(k.slice(2)))accentColor=v;});
-
-    // Process body
-    let processed=body
-      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-      .replace(/\*\*(.*?)\*\*/g,'<strong style="color:var(--text1)">$1</strong>')
-      .replace(/\*(.*?)\*/g,'<em>$1</em>')
-      .replace(/`([^`]+)`/g,'<code style="background:rgba(255,255,255,.1);padding:1px 5px;border-radius:3px;font-family:monospace;font-size:11px;color:var(--accent)">$1</code>')
-      .replace(/^### (.+)$/gm,'<div style="font-size:12px;font-weight:700;color:'+accentColor+';margin:12px 0 4px;border-left:3px solid '+accentColor+'44;padding-left:8px">$1</div>')
-      .replace(/^- (.+)$/gm,'<div style="display:flex;gap:8px;padding:3px 0"><span style="color:'+accentColor+';flex-shrink:0">•</span><span>$1</span></div>')
-      .replace(/^\d+\. (.+)$/gm,'<div style="display:flex;gap:8px;padding:3px 0"><span style="color:'+accentColor+';flex-shrink:0;font-weight:700;min-width:16px">$&</span></div>')
-      .replace(/^\| .+/gm,row=>{
-        const cells=row.split('|').slice(1,-1).map((c,ci)=>`<td style="padding:5px 10px;border:1px solid var(--border2);${ci===0?'font-weight:600;color:var(--text1)':'text-align:right;color:var(--text2)'}">${c.trim()}</td>`).join('');
-        return`<tr>${cells}</tr>`;
-      })
-      .replace(/(<tr>.*?<\/tr>\n?)+/gs,t=>`<div style="overflow-x:auto;margin:8px 0"><table style="border-collapse:collapse;font-size:11px;width:100%">${t}</table></div>`)
-      .replace(/\n\n/g,'</p><p style="margin:6px 0">')
-      .replace(/\n/g,'<br>');
-
-    html+=`<div style="background:var(--bg3);border:1px solid var(--border2);border-left:3px solid ${accentColor};border-radius:0 10px 10px 0;padding:16px 18px;border-radius:10px;border-left:3px solid ${accentColor}">
-      <div style="font-size:14px;font-weight:700;color:${accentColor};margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid ${accentColor}22">${title}</div>
-      <div style="font-size:12px;color:var(--text2);line-height:1.7"><p style="margin:0">${processed}</p></div>
-    </div>`;
+    Object.entries(sectionColors).forEach(([k,v])=>{if(title.includes(k))accentColor=v;});
+    let bodyHtml='';
+    let i=0;
+    while(i<bodyLines.length){
+      if(/^\|/.test(bodyLines[i])){
+        const tbl=[];
+        while(i<bodyLines.length&&/^\|/.test(bodyLines[i])) tbl.push(bodyLines[i++]);
+        bodyHtml+=renderTable(tbl);
+      }else{
+        const blk=[];
+        while(i<bodyLines.length&&!/^\|/.test(bodyLines[i])) blk.push(bodyLines[i++]);
+        bodyHtml+=renderBlock(blk,accentColor);
+      }
+    }
+    html+='<div style="background:var(--bg3);border:1px solid var(--border2);border-left:3px solid '+accentColor+';border-radius:10px;padding:16px 18px">'
+      +'<div style="font-size:13px;font-weight:700;color:'+accentColor+';margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid '+accentColor+'22">'+esc(title)+'</div>'
+      +'<div style="font-size:12px;line-height:1.75">'+bodyHtml+'</div>'
+      +'</div>';
   });
   html+='</div>';
   return html;
