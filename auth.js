@@ -380,7 +380,7 @@ function renderUsers(){
     const c = {admin:'#ee6a3a',editor:'#3fb950',viewer:'#7d8590',pending:'#f0a500'}[role]||'#7d8590';
     return `<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;background:${c}1a;color:${c};${disabled?'opacity:.4;text-decoration:line-through':''}">${role}</span>`;
   };
-  const isUserOnline = u => onlineEmails.has((u.email||'').toLowerCase()) || onlineNames.has((u.displayName||'').toLowerCase());
+  const isUserOnline = u => onlineEmails.has((u.email||'').toLowerCase()) || onlineNames.has((u.displayName||'').toLowerCase()) || onlineNames.has((u.email||'').toLowerCase());
 
   // ── Header
   const onlineCount = users.filter(isUserOnline).length;
