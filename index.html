@@ -994,6 +994,8 @@ async function _refreshAIStatusPill(){
   }
 }
 function requireName(){
+  // When auth is enabled, identity comes from Google — no localStorage name needed
+  if(typeof AUTH_ENABLED!=='undefined' && AUTH_ENABLED && typeof AUTH_USER!=='undefined' && AUTH_USER) return true;
   const n=localStorage.getItem('leadbu_user');
   if(n&&n.trim()) return true;
   let entered='';
