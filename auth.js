@@ -205,6 +205,9 @@ async function _authInit(){
       try{ await firebase.auth().signOut(); }catch(e){}
       return;
     }
+    // Force the auth token to be attached to the RTDB connection before any reads
+    await user.getIdToken(true);
+    await new Promise(r => setTimeout(r, 300));
     const uid = user.uid;
     const ref = _userListRef.child(uid);
     const snap = await ref.once('value');
