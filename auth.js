@@ -191,6 +191,7 @@ async function _authInit(){
   _authShowGate('<span style="opacity:.6">Checking sign-in…</span>');
 
   firebase.auth().onAuthStateChanged(async user=>{
+    try {
     AUTH_USER = user;
     if (!user){
       AUTH_PROFILE = null;
@@ -278,6 +279,14 @@ async function _authInit(){
       if (typeof PAGE !== 'undefined' && PAGE==='users' && !_authIsAdmin()) setPage('overview');
       if (typeof PAGE !== 'undefined' && PAGE==='users') renderUsers();
     });
+    } catch(err) {
+      // Surface any unexpected error in the sign-in gate instead of silently dying
+      console.error('[auth] onAuthStateChanged error:', err);
+      const msg = document.getElementById('auth-gate-msg');
+      if (msg) msg.innerHTML = '<span style="color:#f85149">⚠ Sign-in error: ' + (err.message||err.code||String(err)) + '</span>';
+      const btn = document.getElementById('auth-google-btn');
+      if (btn) btn.disabled = false;
+    }
   });
 }
 
