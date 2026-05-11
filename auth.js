@@ -253,8 +253,10 @@ async function _authInit(){
         snap = await ref.once('value');
         break;
       } catch(e) {
-        if (attempt++ < 4 && (e.code === 'PERMISSION_DENIED' || (e.message||'').includes('Permission denied'))) {
-          await new Promise(r => setTimeout(r, 400 * attempt));
+        const isPermDenied = e.code === 'PERMISSION_DENIED' || (e.message||'').includes('Permission denied');
+        if (attempt++ < 8 && isPermDenied) {
+          // Token hasn't propagated to RTDB yet — wait and force-refresh
+          await new Promise(r => setTimeout(r, Math.min(300 * attempt, 2000)));
           await user.getIdToken(true);
         } else { throw e; }
       }
@@ -333,10 +335,17 @@ async function _authInit(){
       if (typeof PAGE !== 'undefined' && PAGE==='users') renderUsers();
     });
     } catch(err) {
-      // Surface any unexpected error in the sign-in gate instead of silently dying
       console.error('[auth] onAuthStateChanged error:', err);
-      const msg = document.getElementById('auth-gate-msg');
-      if (msg) msg.innerHTML = '<span style="color:#f85149">⚠ Sign-in error: ' + (err.message||err.code||String(err)) + '</span>';
+      const isPermDenied = err.code === 'PERMISSION_DENIED' || (err.message||'').includes('Permission denied');
+      if (isPermDenied) {
+        // Transient token propagation failure — Firebase will re-fire onAuthStateChanged
+        // with a fresh token shortly. Show spinner and wait silently.
+        console.warn('[auth] PERMISSION_DENIED on session restore — waiting for token propagation');
+        _authShowChecking();
+        return;
+      }
+      // Real error — surface it
+      _authShowSignInCard('<span style="color:#f85149">⚠ Sign-in error: ' + (err.message||err.code||String(err)) + '</span>');
       const btn = document.getElementById('auth-google-btn');
       if (btn) btn.disabled = false;
     }
