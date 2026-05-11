@@ -554,7 +554,7 @@ canvas{max-height:260px}
       <div class="brand-mark">🏍️</div>
       <div class="brand-text">
         <div class="t1">Bike AOP Tracker</div>
-        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.2.7</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 10/05/2026 10:03</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
+        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.2.7</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 11/05/2026 14:47</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
       </div>
     </div>
     <div class="hdr-right">
@@ -842,7 +842,7 @@ function oemBadge(client){
 }
 
 const ACT_KEY='leadbu_actuals_fy27_v2';
-const DEPLOY_TIME='2026-05-10T10:03:38Z'; // replaced with ISO timestamp at deploy time
+const DEPLOY_TIME='2026-05-11T14:47:22Z'; // replaced with ISO timestamp at deploy time
 let ACTUALS=TARGETS.map(()=>newActualRec()); // populated by Firebase onValue
 
 function newActualRec(){
@@ -1697,7 +1697,7 @@ function updateLastSaved(isoStr){
 }
 function showDeployTime(){
   const el=document.getElementById('hdr-deployed');
-  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-05-10T10:03:38Z')return;
+  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-05-11T14:47:22Z')return;
   try{
     const d=new Date(DEPLOY_TIME);
     const pad=n=>String(n).padStart(2,'0');
@@ -5495,7 +5495,7 @@ _fbRef.on('value', snapshot=>{
 
 // ── Version watcher — nudge users to hard-refresh when a new deploy is live ─
 function _startVersionWatch(){
-  if(!_fbDb || !DEPLOY_TIME || DEPLOY_TIME==='2026-05-10T10:03:38Z') return;
+  if(!_fbDb || !DEPLOY_TIME || DEPLOY_TIME==='2026-05-11T14:47:22Z') return;
   _fbDb.ref('meta/deployVersion').on('value', snap=>{
     const liveTs = snap.val();
     if(!liveTs) return;
@@ -7547,8 +7547,56 @@ function resetAIKey(){toggleAIKeyMgmt();} // legacy — now opens key mgmt panel
 // ═══════════════════════════════════════════════════════════════════════════
 // ── Insights persistence ──────────────────────────────────────────────────────
 const _INSIGHTS_KEY='leadbu_insights_result';
-function _saveInsights(html,period){try{localStorage.setItem(_INSIGHTS_KEY,JSON.stringify({html,period,ts:Date.now()}));}catch(e){}}
+const _FB_INSIGHTS_PATH='meta/aiInsights';
+let _insightsFBListening=false;
+
+function _saveInsights(html,period){
+  const ts=Date.now();
+  try{localStorage.setItem(_INSIGHTS_KEY,JSON.stringify({html,period,ts}));}catch(e){}
+  // Admin-generated insights are pushed to Firebase so all users see them
+  if(typeof _fbDb!=='undefined'&&_fbDb&&typeof _authIsAdmin==='function'&&_authIsAdmin()){
+    _fbDb.ref(_FB_INSIGHTS_PATH).set({
+      html,period,ts,
+      generatedBy:(typeof AUTH_USER!=='undefined'&&AUTH_USER)?AUTH_USER.email:'admin'
+    }).catch(()=>{});
+  }
+}
 function _loadInsights(){try{const s=localStorage.getItem(_INSIGHTS_KEY);return s?JSON.parse(s):null;}catch(e){return null;}}
+
+// Live listener — non-admins pick up insights published by admin
+function _watchFBInsights(){
+  if(_insightsFBListening||typeof _fbDb==='undefined'||!_fbDb)return;
+  _insightsFBListening=true;
+  _fbDb.ref(_FB_INSIGHTS_PATH).on('value',snap=>{
+    const d=snap.val();
+    if(!d||!d.html)return;
+    const localSaved=_loadInsights();
+    if(!localSaved||(d.ts&&d.ts>(localSaved.ts||0))){
+      _insightsAIResult=d.html;
+      if(d.period)INSIGHTS_PERIOD=d.period;
+      try{localStorage.setItem(_INSIGHTS_KEY,JSON.stringify({html:d.html,period:d.period,ts:d.ts}));}catch(e){}
+    }
+    // Update visible content area without full re-render
+    const ac=document.getElementById('insights-ai-content');
+    if(ac&&d.html){
+      const isAdm=typeof _authIsAdmin==='function'&&_authIsAdmin();
+      const by=d.generatedBy?(d.generatedBy.split('@')[0]):'admin';
+      const tsLabel=d.ts?('Generated '+new Date(d.ts).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'2-digit'})+' '+new Date(d.ts).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true})+' by '+by):'';
+      const clearBtn=isAdm?` · <button onclick="_insightsClear()" style="background:none;border:none;color:#f85149;cursor:pointer;font-size:10px;padding:0">Clear</button>`:'';
+      ac.innerHTML=(tsLabel?`<div style="font-size:10px;color:var(--text3);margin-bottom:12px;padding:4px 8px;background:var(--bg3);border-radius:5px;display:inline-block">🕐 ${tsLabel}${clearBtn}</div><br>`:'')+d.html;
+      const genBtn=document.getElementById('insights-gen-btn');
+      if(genBtn)genBtn.innerHTML='✦ Regenerate';
+    }
+  });
+}
+
+function _insightsClear(){
+  if(typeof _fbDb!=='undefined'&&_fbDb)_fbDb.ref(_FB_INSIGHTS_PATH).remove().catch(()=>{});
+  try{localStorage.removeItem(_INSIGHTS_KEY);}catch(e){}
+  _insightsAIResult=null;
+  _insightsFBListening=false; // allow re-attach after clear
+  renderInsights();
+}
 
 const _savedInsights=_loadInsights();
 let INSIGHTS_PERIOD=(_savedInsights&&_savedInsights.period)||'fy';
@@ -7803,6 +7851,13 @@ function renderInsights(){
   });
 
   // ── AI section ──
+  const _isAdminNow=typeof _authIsAdmin==='function'&&_authIsAdmin();
+  const _genBtnHtml=_isAdminNow
+    ?`<button id="insights-gen-btn" onclick="generateAIInsights()" style="margin-left:auto;padding:8px 18px;border-radius:8px;border:none;cursor:pointer;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;gap:6px;white-space:nowrap">✦ Generate Insights</button>`
+    :'';
+  const _noInsightsPlaceholder=_isAdminNow
+    ?`<div style="text-align:center;padding:32px;color:var(--text3);font-size:12px"><div style="font-size:28px;margin-bottom:10px;opacity:.5">✦</div>Click <strong style="color:var(--text2)">Generate Insights</strong> to get a full AI analysis of your ${plabel} data — what's working, what's not, and where you're headed by FY-end.</div>`
+    :`<div style="text-align:center;padding:32px;color:var(--text3);font-size:12px"><div style="font-size:28px;margin-bottom:10px;opacity:.5">✦</div>AI insights will appear here once an admin generates them.</div>`;
   const aiSection=`<div id="insights-ai-panel" style="${card('margin-top:24px')}">
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
       <div style="width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#6366f1,#8b5cf6);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">✦</div>
@@ -7810,13 +7865,10 @@ function renderInsights(){
         <div style="font-size:14px;font-weight:700;color:var(--text1)">AI Deep-Dive Insights</div>
         <div style="font-size:11px;color:var(--text3)">ChatGPT analyzes every metric — performance, efficiency, risks and FY projections</div>
       </div>
-      <button id="insights-gen-btn" onclick="generateAIInsights()" style="margin-left:auto;padding:8px 18px;border-radius:8px;border:none;cursor:pointer;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;gap:6px;white-space:nowrap">✦ Generate Insights</button>
+      ${_genBtnHtml}
     </div>
     <div id="insights-ai-content">
-      <div style="text-align:center;padding:32px;color:var(--text3);font-size:12px">
-        <div style="font-size:28px;margin-bottom:10px;opacity:.5">✦</div>
-        Click <strong style="color:var(--text2)">Generate Insights</strong> to get a full AI analysis of your ${plabel} data — what's working, what's not, and where you're headed by FY-end.
-      </div>
+      ${_noInsightsPlaceholder}
     </div>
   </div>`;
 
@@ -7934,13 +7986,20 @@ function renderInsights(){
 
   el.innerHTML=html;
 
-  // Restore AI result if previously generated
+  // Start Firebase listener so all users pick up admin-generated insights
+  _watchFBInsights();
+
+  // Restore AI result if previously generated (from localStorage cache)
   if(_insightsAIResult){
     const ac=document.getElementById('insights-ai-content');
     if(ac){
       const saved=_loadInsights();
-      const tsLabel=saved&&saved.ts?'Generated '+new Date(saved.ts).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'2-digit'})+' '+new Date(saved.ts).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true}):'';
-      ac.innerHTML=(tsLabel?`<div style="font-size:10px;color:var(--text3);margin-bottom:12px;padding:4px 8px;background:var(--bg3);border-radius:5px;display:inline-block">🕐 ${tsLabel} · <button onclick="localStorage.removeItem('${_INSIGHTS_KEY}');_insightsAIResult=null;renderInsights()" style="background:none;border:none;color:#f85149;cursor:pointer;font-size:10px;padding:0">Clear</button></div><br>`:'')+_insightsAIResult;
+      const isAdm=typeof _authIsAdmin==='function'&&_authIsAdmin();
+      const byEmail=saved&&saved.generatedBy?saved.generatedBy:'';
+      const by=byEmail?(' by '+byEmail.split('@')[0]):'';
+      const tsLabel=saved&&saved.ts?'Generated '+new Date(saved.ts).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'2-digit'})+' '+new Date(saved.ts).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true})+by:'';
+      const clearBtn=isAdm?` · <button onclick="_insightsClear()" style="background:none;border:none;color:#f85149;cursor:pointer;font-size:10px;padding:0">Clear</button>`:'';
+      ac.innerHTML=(tsLabel?`<div style="font-size:10px;color:var(--text3);margin-bottom:12px;padding:4px 8px;background:var(--bg3);border-radius:5px;display:inline-block">🕐 ${tsLabel}${clearBtn}</div><br>`:'')+_insightsAIResult;
       const genBtn=document.getElementById('insights-gen-btn');
       if(genBtn)genBtn.innerHTML='✦ Regenerate';
     }
@@ -8015,8 +8074,11 @@ In the Lead & Efficiency Analysis section, specifically cover:
   if(result.ok&&result.text){
     const rendered=_renderInsightsMarkdown(result.text);
     _insightsAIResult=rendered;
-    _saveInsights(rendered, pid);
-    content.innerHTML=rendered;
+    _saveInsights(rendered, pid); // saves to localStorage + Firebase (admin pushes to all users)
+    const by=(typeof AUTH_USER!=='undefined'&&AUTH_USER)?(' by '+AUTH_USER.email.split('@')[0]):'';
+    const tsLabel='Generated '+new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'2-digit'})+' '+new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true})+by;
+    const clearBtn=` · <button onclick="_insightsClear()" style="background:none;border:none;color:#f85149;cursor:pointer;font-size:10px;padding:0">Clear</button>`;
+    content.innerHTML=`<div style="font-size:10px;color:var(--text3);margin-bottom:12px;padding:4px 8px;background:var(--bg3);border-radius:5px;display:inline-block">🕐 ${tsLabel}${clearBtn}</div><br>`+rendered;
   }else{
     content.innerHTML=`<div style="padding:16px;color:#f85149;font-size:12px">⚠️ ${result.error||'No response returned. Try regenerating.'}</div>`;
     if(result.authFail){_aiKeyCache=null;localStorage.removeItem('leadbu_ai_key');}
