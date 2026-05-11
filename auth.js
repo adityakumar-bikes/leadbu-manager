@@ -628,6 +628,7 @@ async function _authPreAddUser(){
     addedBy: AUTH_USER ? AUTH_USER.email : 'admin',
     addedAt: firebase.database.ServerValue.TIMESTAMP
   });
+  _roleAuditRef.push({ts:firebase.database.ServerValue.TIMESTAMP, actor:AUTH_USER?AUTH_USER.email:'admin', target:email, action:'pre_add', oldRole:null, newRole:role});
   if (emailEl) emailEl.value = '';
 }
 
@@ -636,6 +637,7 @@ async function _authRevokeInvite(key){
   const inv = _allPreInvites[key];
   if (!confirm('Revoke pre-invite for '+(inv?inv.email:key)+'?')) return;
   await _fbDb.ref('preInvited/'+key).remove();
+  _roleAuditRef.push({ts:firebase.database.ServerValue.TIMESTAMP, actor:AUTH_USER?AUTH_USER.email:'admin', target:inv?inv.email:key.replace(/,/g,'.'), action:'revoke_invite', oldRole:inv?inv.role:null, newRole:null});
 }
 
 function _authActionMenu(u, me){
@@ -762,16 +764,37 @@ async function _authViewRoleAudit(){
     const d = new Date(ts);
     return d.toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
   };
+  const _actLabel={login:'Login',role_change:'Role Changed',create:'Account Created',disable:'Disabled',enable:'Re-enabled',force_signout:'Force Sign-out',pre_add:'Pre-Invited',revoke_invite:'Invite Revoked'};
+  const _actColor={login:'#7d8590',role_change:'#58a6ff',create:'#3fb950',disable:'#f85149',enable:'#3fb950',force_signout:'#f0a500',pre_add:'#a78bfa',revoke_invite:'#f85149'};
   let html = `<div style="background:var(--bg);border-radius:10px;border:1px solid var(--border);max-width:820px;width:92%;max-height:80vh;overflow:auto">
-    <div style="padding:14px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:var(--bg);z-index:1"><div style="font-size:14px;font-weight:600;color:var(--text1)">Role change audit log</div><button onclick="document.getElementById('auth-audit-overlay').remove()" style="background:none;border:none;color:var(--text2);font-size:22px;cursor:pointer;line-height:1">×</button></div>`;
+    <div style="padding:14px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:var(--bg);z-index:1">
+      <div>
+        <div style="font-size:14px;font-weight:600;color:var(--text1)">📜 Admin Action Audit Log</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:2px">${entries.length} entries · newest first</div>
+      </div>
+      <button onclick="document.getElementById('auth-audit-overlay').remove()" style="background:none;border:none;color:var(--text2);font-size:22px;cursor:pointer;line-height:1">×</button>
+    </div>`;
   if (!entries.length){
-    html += '<div style="padding:30px;text-align:center;color:var(--text3)">No role changes recorded yet.</div>';
+    html += '<div style="padding:30px;text-align:center;color:var(--text3)">No admin actions recorded yet.</div>';
   } else {
     html += '<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="background:var(--bg2);color:var(--text3);font-size:10px;text-transform:uppercase;letter-spacing:.5px"><th style="text-align:left;padding:9px 14px">When</th><th style="text-align:left;padding:9px 8px">Actor</th><th style="text-align:left;padding:9px 8px">Target</th><th style="text-align:left;padding:9px 8px">Action</th><th style="text-align:left;padding:9px 14px">Change</th></tr></thead><tbody>';
     entries.forEach((e,i)=>{
       const bg = i%2 ? 'var(--bg2)' : 'var(--bg)';
-      const actC = {login:'#7d8590',role_change:'#58a6ff',create:'#3fb950',disable:'#f85149',enable:'#3fb950',force_signout:'#f0a500'}[e.action]||'var(--text2)';
-      html += `<tr style="background:${bg};border-top:1px solid var(--border)"><td style="padding:8px 14px;color:var(--text2);font-size:11px;white-space:nowrap">${fmtDate(e.ts)}</td><td style="padding:8px 8px;color:var(--text2);font-family:var(--mono);font-size:11px">${e.actor||'—'}</td><td style="padding:8px 8px;color:var(--text2);font-family:var(--mono);font-size:11px">${e.target||'—'}</td><td style="padding:8px 8px;color:${actC};font-weight:500">${e.action||'—'}</td><td style="padding:8px 14px;color:var(--text3)">${e.oldRole||''}${e.oldRole&&e.newRole?' → ':''}<b style="color:var(--text2)">${e.newRole||''}</b></td></tr>`;
+      const actC = _actColor[e.action]||'var(--text2)';
+      const actLbl = _actLabel[e.action]||e.action||'—';
+      let changeTxt = '';
+      if (e.action==='pre_add') changeTxt = `<span style="color:#a78bfa">Invited as <b>${e.newRole||'?'}</b></span>`;
+      else if (e.action==='revoke_invite') changeTxt = `<span style="color:#f85149">Invite revoked${e.oldRole?' (was '+e.oldRole+')':''}</span>`;
+      else if (e.action==='create') changeTxt = `<b style="color:#3fb950">${e.newRole||''}</b>`;
+      else if (e.action==='login') changeTxt = `<span style="color:var(--text3)">${e.role||''}</span>`;
+      else changeTxt = `${e.oldRole||''}${e.oldRole&&e.newRole?' → ':''}<b style="color:var(--text2)">${e.newRole||''}</b>`;
+      html += `<tr style="background:${bg};border-top:1px solid var(--border)">
+        <td style="padding:8px 14px;color:var(--text2);font-size:11px;white-space:nowrap">${fmtDate(e.ts)}</td>
+        <td style="padding:8px 8px;color:var(--text2);font-family:var(--mono);font-size:11px">${e.actor||'—'}</td>
+        <td style="padding:8px 8px;color:var(--text2);font-family:var(--mono);font-size:11px">${e.target||'—'}</td>
+        <td style="padding:8px 8px"><span style="color:${actC};font-weight:500;font-size:11px;padding:2px 7px;background:${actC}18;border-radius:4px">${actLbl}</span></td>
+        <td style="padding:8px 14px;color:var(--text3);font-size:11px">${changeTxt}</td>
+      </tr>`;
     });
     html += '</tbody></table>';
   }
