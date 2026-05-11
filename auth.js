@@ -56,8 +56,13 @@ function _buildAuthGate(){
   const gate = document.createElement('div');
   gate.id = 'auth-gate';
   gate.style.cssText = 'position:fixed;inset:0;z-index:99998;background:radial-gradient(circle at 30% 20%,#1c2128 0%,#0d1117 60%);display:flex;align-items:center;justify-content:center;padding:24px;font-family:-apple-system,Segoe UI,Roboto,sans-serif;color:#e6edf3';
+  // Start with spinner-only — sign-in card revealed only if user is truly logged out
   gate.innerHTML = `
-    <div style="max-width:420px;width:100%;background:#161b22;border:1px solid #30363d;border-radius:14px;padding:34px;box-shadow:0 24px 70px rgba(0,0,0,.55)">
+    <div id="auth-checking" style="text-align:center">
+      <div style="width:44px;height:44px;border:3px solid #30363d;border-top-color:#58a6ff;border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 16px"></div>
+      <div style="font-size:13px;color:#7d8590">Restoring session…</div>
+    </div>
+    <div id="auth-signin-card" style="display:none;max-width:420px;width:100%;background:#161b22;border:1px solid #30363d;border-radius:14px;padding:34px;box-shadow:0 24px 70px rgba(0,0,0,.55)">
       <div style="display:flex;align-items:center;gap:11px;margin-bottom:6px">
         <div style="width:38px;height:38px;border-radius:9px;background:linear-gradient(135deg,#58a6ff,#388bfd);display:flex;align-items:center;justify-content:center;font-size:18px">📊</div>
         <div>
@@ -83,7 +88,36 @@ function _authShowGate(msg){
   const g=document.getElementById('auth-gate');
   g.style.display='flex';
   document.body.style.overflow='hidden';
-  if (msg!=null) document.getElementById('auth-gate-msg').innerHTML=msg;
+  if (msg!=null){
+    const msgEl=document.getElementById('auth-gate-msg');
+    if(msgEl) msgEl.innerHTML=msg;
+  }
+}
+// Show the spinner-only "Restoring session…" state (no sign-in button)
+function _authShowChecking(){
+  _buildAuthGate();
+  const g=document.getElementById('auth-gate');
+  g.style.display='flex';
+  document.body.style.overflow='hidden';
+  const chk=document.getElementById('auth-checking');
+  const card=document.getElementById('auth-signin-card');
+  if(chk) chk.style.display='block';
+  if(card) card.style.display='none';
+}
+// Reveal the full sign-in card (user is definitely not logged in)
+function _authShowSignInCard(msg){
+  _buildAuthGate();
+  const g=document.getElementById('auth-gate');
+  g.style.display='flex';
+  document.body.style.overflow='hidden';
+  const chk=document.getElementById('auth-checking');
+  const card=document.getElementById('auth-signin-card');
+  if(chk) chk.style.display='none';
+  if(card) card.style.display='block';
+  if(msg!=null){
+    const msgEl=document.getElementById('auth-gate-msg');
+    if(msgEl) msgEl.innerHTML=msg;
+  }
 }
 function _authHideGate(){
   const g=document.getElementById('auth-gate');
@@ -189,7 +223,8 @@ async function _authInit(){
   _userListRef  = _fbDb.ref('authUsers');
   _roleAuditRef = _fbDb.ref('roleAudit');
 
-  _authShowGate('<span style="opacity:.6">Checking sign-in…</span>');
+  // Ensure session persists across browser restarts (LOCAL = survives tab/window close)
+  try { await firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL); } catch(e) {}
 
   firebase.auth().onAuthStateChanged(async user=>{
     try {
@@ -197,14 +232,14 @@ async function _authInit(){
     if (!user){
       AUTH_PROFILE = null;
       _authReady = false;
-      _authShowGate('');
+      _authShowSignInCard(''); // no session — show sign-in button
       return;
     }
     // Domain check — allow primary domain OR individual whitelisted emails
     const emailLower = (user.email||'').toLowerCase();
     const allowed = emailLower.endsWith(ALLOWED_DOMAIN) || ALLOWED_EMAILS.map(e=>e.toLowerCase()).includes(emailLower);
     if (!user.email || !allowed){
-      _authShowGate('<span style="color:#f85149">Only '+ALLOWED_DOMAIN+' accounts are permitted.</span>');
+      _authShowSignInCard('<span style="color:#f85149">Only '+ALLOWED_DOMAIN+' accounts are permitted.</span>');
       try{ await firebase.auth().signOut(); }catch(e){}
       return;
     }
@@ -682,10 +717,10 @@ async function _authViewRoleAudit(){
 })();
 
 /* ─── Boot ──────────────────────────────────────────────────────── */
-// Show the login gate IMMEDIATELY at script parse time so Firebase DB
-// never fires an unauthenticated read (which would trigger offline-fallback).
+// Block unauthenticated DB reads immediately — show spinner only (no sign-in button yet).
+// The sign-in card is only revealed if onAuthStateChanged confirms user = null.
 if (AUTH_ENABLED) {
-  const _earlyGate = () => { _buildAuthGate(); _authShowGate('<span style="opacity:.6">Checking sign-in…</span>'); };
+  const _earlyGate = () => _authShowChecking();
   if (document.body) _earlyGate();
   else document.addEventListener('DOMContentLoaded', _earlyGate);
 }
