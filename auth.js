@@ -429,7 +429,7 @@ function renderUsers(){
   // ── Header
   const onlineCount = users.filter(isUserOnline).length;
   const invitedCount = Object.keys(_allPreInvites).length;
-  let html = `<div style="padding:18px 22px 12px"><div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px"><div><div style="font-size:18px;font-weight:600;color:var(--text1);letter-spacing:-.2px">User Management</div><div style="font-size:12px;color:var(--text3);margin-top:2px">${users.length} registered · ${invitedCount} invited · <span style="color:#3fb950">●</span> ${onlineCount} online</div></div><div style="display:flex;gap:8px"><button onclick="_authViewRoleAudit()" class="btn btn-dim" style="padding:5px 11px">📜 Audit log</button></div></div></div>`;
+  let html = `<div style="padding:18px 22px 12px"><div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px"><div><div style="font-size:18px;font-weight:600;color:var(--text1);letter-spacing:-.2px">User Management</div><div style="font-size:12px;color:var(--text3);margin-top:2px">${users.length} registered · ${invitedCount} invited · <span style="color:#3fb950">●</span> ${onlineCount} online</div></div><div style="display:flex;gap:8px"><button onclick="_authViewChatLog()" class="btn btn-dim" style="padding:5px 11px">💬 Chat Log</button><button onclick="_authViewRoleAudit()" class="btn btn-dim" style="padding:5px 11px">📜 Audit log</button></div></div></div>`;
 
   // ── Stats strip
   const counts = {admin:0,editor:0,viewer:0,pending:0,disabled:0};
@@ -681,6 +681,70 @@ async function _authForceSignout(uid){
   await _userListRef.child(uid).update({forceSignoutAt: firebase.database.ServerValue.TIMESTAMP});
   _roleAuditRef.push({ts:firebase.database.ServerValue.TIMESTAMP, actor:AUTH_USER.email, target:u.email, action:'force_signout', oldRole:u.role, newRole:u.role});
   alert(`${u.email} will be signed out on their next page load.`);
+}
+
+async function _authViewChatLog(){
+  if(!_fbDb)return;
+  // Fetch last 30 entries per user, across all users
+  const snap=await _fbDb.ref('chatLogs').once('value');
+  const allLogs=[];
+  snap.forEach(userSnap=>{
+    userSnap.forEach(entry=>{
+      allLogs.push(entry.val());
+    });
+  });
+  allLogs.sort((a,b)=>(b.ts||0)-(a.ts||0));
+  const recent=allLogs.slice(0,150);
+
+  const fmtDate=ts=>{
+    if(!ts)return'—';
+    const d=new Date(ts);
+    return d.toLocaleDateString('en-IN',{day:'2-digit',month:'short'})+' '+
+           d.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
+  };
+  const roleColor={admin:'#ee6a3a',editor:'#3fb950',viewer:'#7d8590',pending:'#f0a500'};
+
+  let html=`<div style="background:var(--bg);border-radius:10px;border:1px solid var(--border);max-width:900px;width:94%;max-height:85vh;overflow:auto">
+    <div style="padding:14px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:var(--bg);z-index:1">
+      <div>
+        <div style="font-size:14px;font-weight:600;color:var(--text1)">💬 AI Chat Log</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:2px">${recent.length} interactions · newest first</div>
+      </div>
+      <button onclick="document.getElementById('auth-chatlog-overlay').remove()" style="background:none;border:none;color:var(--text2);font-size:22px;cursor:pointer;line-height:1">×</button>
+    </div>`;
+
+  if(!recent.length){
+    html+='<div style="padding:30px;text-align:center;color:var(--text3)">No chat interactions logged yet.</div>';
+  } else {
+    recent.forEach((e,i)=>{
+      const bg=i%2?'var(--bg2)':'var(--bg)';
+      const rc=roleColor[e.role]||'#7d8590';
+      html+=`<div style="padding:14px 20px;border-top:1px solid var(--border);background:${bg}">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap">
+          <span style="font-size:11px;color:var(--text2);font-weight:600">${e.name||e.email||'?'}</span>
+          <span style="font-size:10px;color:var(--text3);font-family:monospace">${e.email||''}</span>
+          <span style="font-size:9px;padding:1px 6px;border-radius:4px;background:${rc}22;color:${rc};font-weight:600;text-transform:uppercase">${e.role||'?'}</span>
+          <span style="font-size:10px;color:var(--text3);margin-left:auto">${fmtDate(e.ts)}</span>
+        </div>
+        <div style="display:flex;gap:8px;align-items:flex-start">
+          <span style="font-size:16px;flex-shrink:0;margin-top:1px">💬</span>
+          <div style="background:linear-gradient(135deg,#6366f122,#8b5cf622);border:1px solid #6366f144;border-radius:8px;padding:8px 12px;font-size:12px;color:var(--text1);line-height:1.5;flex:1;word-break:break-word">${(e.question||'').replace(/</g,'&lt;').replace(/\n/g,'<br>')}</div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:flex-start;margin-top:6px">
+          <span style="font-size:16px;flex-shrink:0;margin-top:1px">✨</span>
+          <div style="background:var(--bg3);border:1px solid var(--border2);border-radius:8px;padding:8px 12px;font-size:11px;color:var(--text2);line-height:1.5;flex:1;word-break:break-word;max-height:120px;overflow-y:auto">${(e.answer||'').replace(/</g,'&lt;').replace(/\n/g,'<br>').slice(0,1200)}${(e.answer||'').length>1200?'…':''}</div>
+        </div>
+      </div>`;
+    });
+  }
+  html+='</div>';
+
+  const ov=document.createElement('div');
+  ov.id='auth-chatlog-overlay';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:99996;display:flex;align-items:center;justify-content:center;padding:16px';
+  ov.innerHTML=html;
+  ov.onclick=e=>{if(e.target===ov)ov.remove();};
+  document.body.appendChild(ov);
 }
 
 async function _authViewRoleAudit(){
