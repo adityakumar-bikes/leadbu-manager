@@ -544,7 +544,27 @@ function _watchPreInvites(){
 function _renderPreInvites(){
   const tbody = document.getElementById('pre-invited-rows');
   if (!tbody) return;
-  const invites = Object.entries(_allPreInvites);
+
+  // Build set of already-registered emails — never show them in the "awaiting" section
+  const registeredEmails = new Set(
+    Object.values(_allUsers).map(u => (u.email||'').toLowerCase()).filter(Boolean)
+  );
+
+  // Filter out stale entries (user already signed up) and silently clean Firebase
+  const allInvites = Object.entries(_allPreInvites);
+  const stale = allInvites.filter(([key, inv]) => {
+    const email = (inv.email || key.replace(/,/g,'.')).toLowerCase();
+    return registeredEmails.has(email);
+  });
+  stale.forEach(([key]) => {
+    // Auto-cleanup: remove from Firebase silently
+    if (_fbDb) _fbDb.ref('preInvited/'+key).remove().catch(()=>{});
+  });
+
+  const invites = allInvites.filter(([key, inv]) => {
+    const email = (inv.email || key.replace(/,/g,'.')).toLowerCase();
+    return !registeredEmails.has(email);
+  });
 
   // Update header invited count
   const hdrEl = document.querySelector('#page-users .hdr-sub, #page-users [data-invited-count]');
