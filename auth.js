@@ -168,20 +168,24 @@ function _authApplyRoleUI(){
     el.style.display = _authIsAdmin() ? '' : 'none';
   });
 
-  // Update the user pill in the header
-  const lbl = document.getElementById('user-label');
-  if (lbl && AUTH_USER){
+  // Update the user pill in the header (both ctx-strip and hdr-top versions)
+  if (AUTH_USER){
     const name = AUTH_USER.displayName || AUTH_USER.email.split('@')[0];
     const ico  = AUTH_USER.photoURL
       ? `<img src="${AUTH_USER.photoURL}" style="width:14px;height:14px;border-radius:50%;margin-right:5px;vertical-align:-3px" referrerpolicy="no-referrer">`
       : '';
     const roleColor = {admin:'#ee6a3a',editor:'#3fb950',viewer:'#7d8590',pending:'#f0a500'}[role]||'#7d8590';
-    lbl.innerHTML = ico + name +
+    const labelHTML = ico + name +
       ` <span style="font-size:9px;padding:1px 5px;border-radius:3px;background:${roleColor}33;color:${roleColor};font-weight:600;letter-spacing:.5px;text-transform:uppercase;margin-left:3px">${role}</span>`;
+    const lbl = document.getElementById('user-label');
+    if (lbl) lbl.innerHTML = labelHTML;
+    const lblHdr = document.getElementById('user-label-hdr');
+    if (lblHdr) lblHdr.innerHTML = labelHTML;
   }
-  // Re-target user button click → menu (don't break the existing prompt for AUTH_ENABLED=false)
+  // Re-target user buttons → auth menu
   const ubtn = document.getElementById('user-btn');
   if (ubtn) ubtn.setAttribute('onclick','_authUserMenu(event)');
+  // hdr version always points to auth menu (already set in HTML)
 }
 
 function _authUserMenu(ev){
@@ -779,6 +783,21 @@ async function _authViewRoleAudit(){
   ov.onclick = e => { if (e.target === ov) ov.remove(); };
   document.body.appendChild(ov);
 }
+
+/* ─── Role-based header layout: presence strip moves to top row for non-admin ── */
+(function(){
+  const hdrCss = `
+    /* Admin: show presence in ctx-strip (row 2), hide from hdr-top (row 1) */
+    body[data-role="admin"] #hdr-presence-wrap { display:none !important; }
+    /* Editor / Viewer: show presence in hdr-top (row 1), hide from ctx-strip (row 2) */
+    body[data-role="editor"] #ctx-presence-wrap,
+    body[data-role="viewer"] #ctx-presence-wrap { display:none !important; }
+    body[data-role="editor"] #hdr-presence-wrap,
+    body[data-role="viewer"] #hdr-presence-wrap { display:flex !important; }
+  `;
+  const hs = document.createElement('style'); hs.textContent = hdrCss;
+  document.head.appendChild(hs);
+})();
 
 /* ─── Viewer-mode read-only CSS ─────────────────────────────────── */
 (function(){
