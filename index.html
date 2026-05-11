@@ -554,10 +554,19 @@ canvas{max-height:260px}
       <div class="brand-mark">🏍️</div>
       <div class="brand-text">
         <div class="t1">Bike AOP Tracker</div>
-        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.2.7</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 11/05/2026 15:10</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
+        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.2.7</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 11/05/2026 15:17</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
       </div>
     </div>
     <div class="hdr-right">
+      <!-- Presence strip + user pill in top row — shown for non-admin (ctx-strip is empty for them) -->
+      <div id="hdr-presence-wrap" style="display:none;align-items:center;gap:6px">
+        <div id="active-users-strip-hdr" style="display:none;align-items:center;gap:8px;padding:2px 10px;background:var(--pos-bg);border:1px solid rgba(52,211,153,0.2);border-radius:20px"></div>
+        <button class="btn btn-dim" id="user-btn-hdr" onclick="_authUserMenu(event)" title="Your profile" style="padding:4px 9px">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          <span id="user-label-hdr">—</span>
+        </button>
+        <div class="ctx-sep" style="height:16px;width:1px;background:var(--border2);margin:0 2px"></div>
+      </div>
       <button id="theme-toggle" class="btn btn-dim" onclick="toggleTheme()" title="Toggle light / dark theme" style="padding:6px 9px;min-width:0">
         <svg id="theme-icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
         <svg id="theme-icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;display:none"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
@@ -614,13 +623,15 @@ canvas{max-height:260px}
       <span class="save-ok" id="save-ok"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Saved</span>
     </div>
     <div class="ctx-right">
-      <!-- ── Active users presence strip ── -->
-      <div id="active-users-strip" style="display:none;align-items:center;gap:8px;padding:2px 10px;background:var(--pos-bg);border:1px solid rgba(52,211,153,0.2);border-radius:20px"></div>
-      <div class="ctx-sep"></div>
-      <button class="btn btn-dim" id="user-btn" onclick="promptUserName()" title="Click to change your name" style="padding:4px 9px">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-        <span id="user-label">Set Name</span>
-      </button>
+      <!-- Presence strip + user pill — shown in ctx-strip for admin; non-admin sees these in hdr-right instead -->
+      <div id="ctx-presence-wrap" style="display:flex;align-items:center;gap:6px">
+        <div id="active-users-strip" style="display:none;align-items:center;gap:8px;padding:2px 10px;background:var(--pos-bg);border:1px solid rgba(52,211,153,0.2);border-radius:20px"></div>
+        <div class="ctx-sep"></div>
+        <button class="btn btn-dim" id="user-btn" onclick="promptUserName()" title="Click to change your name" style="padding:4px 9px">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          <span id="user-label">Set Name</span>
+        </button>
+      </div>
       <button class="btn btn-dim" onclick="openAuditV2Preview()" title="View change history" style="padding:4px 9px">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
         Audit
@@ -842,7 +853,7 @@ function oemBadge(client){
 }
 
 const ACT_KEY='leadbu_actuals_fy27_v2';
-const DEPLOY_TIME='2026-05-11T15:10:55Z'; // replaced with ISO timestamp at deploy time
+const DEPLOY_TIME='2026-05-11T15:17:33Z'; // replaced with ISO timestamp at deploy time
 let ACTUALS=TARGETS.map(()=>newActualRec()); // populated by Firebase onValue
 
 function newActualRec(){
@@ -1697,7 +1708,7 @@ function updateLastSaved(isoStr){
 }
 function showDeployTime(){
   const el=document.getElementById('hdr-deployed');
-  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-05-11T15:10:55Z')return;
+  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-05-11T15:17:33Z')return;
   try{
     const d=new Date(DEPLOY_TIME);
     const pad=n=>String(n).padStart(2,'0');
@@ -5369,15 +5380,20 @@ function registerPresence(){
 }
 
 function renderActiveUsers(snapshot){
-  const el = document.getElementById('active-users-strip');
-  if(!el) return;
+  const el    = document.getElementById('active-users-strip');
+  const elHdr = document.getElementById('active-users-strip-hdr');
+  if(!el && !elHdr) return;
   const myName = getCurrentUser();
   const users = [];
   snapshot.forEach(child=>{
     const d = child.val();
     if(d && d.name) users.push(d.name);
   });
-  if(users.length === 0){ el.style.display='none'; return; }
+  if(users.length === 0){
+    if(el)    el.style.display='none';
+    if(elHdr) elHdr.style.display='none';
+    return;
+  }
   // Deduplicate names
   const unique = [...new Set(users)];
   const PALETTE = ['#818cf8','#34d399','#fb923c','#f472b6','#60a5fa','#a78bfa','#fbbf24','#22d3ee'];
@@ -5397,14 +5413,14 @@ function renderActiveUsers(snapshot){
   const label = unique.length===1
     ? `<span style="font-size:11px;color:var(--text2)">${unique[0]}${unique[0]===myName?' <span style=\'color:var(--text3)\'>(you)</span>':''}</span>`
     : `<span style="font-size:11px;color:var(--text2)">${unique.length} editing</span>`;
-  el.style.display='flex';
-  el.innerHTML=`
-    <div style="display:flex;align-items:center;gap:6px">
+  const stripHTML=`<div style="display:flex;align-items:center;gap:6px">
       <span class="ctx-dot" style="background:var(--pos);box-shadow:0 0 8px var(--pos);animation:pulse 2s ease-in-out infinite;flex-shrink:0"></span>
       <span style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;white-space:nowrap">Active Now</span>
       <div style="display:flex;gap:-4px;align-items:center">${avatars}</div>
       ${label}
     </div>`;
+  if(el)   { el.style.display='flex';    el.innerHTML=stripHTML; }
+  if(elHdr){ elHdr.style.display='flex'; elHdr.innerHTML=stripHTML; }
 }
 
 // Wire up filters + modal close (non-data setup, safe to do immediately)
@@ -5498,7 +5514,7 @@ _fbRef.on('value', snapshot=>{
 
 // ── Version watcher — nudge users to hard-refresh when a new deploy is live ─
 function _startVersionWatch(){
-  if(!_fbDb || !DEPLOY_TIME || DEPLOY_TIME==='2026-05-11T15:10:55Z') return;
+  if(!_fbDb || !DEPLOY_TIME || DEPLOY_TIME==='2026-05-11T15:17:33Z') return;
   _fbDb.ref('meta/deployVersion').on('value', snap=>{
     const liveTs = snap.val();
     if(!liveTs) return;
