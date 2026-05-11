@@ -554,7 +554,7 @@ canvas{max-height:260px}
       <div class="brand-mark">🏍️</div>
       <div class="brand-text">
         <div class="t1">Bike AOP Tracker</div>
-        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.2.7</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 11/05/2026 14:54</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
+        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.2.7</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 11/05/2026 15:10</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
       </div>
     </div>
     <div class="hdr-right">
@@ -842,7 +842,7 @@ function oemBadge(client){
 }
 
 const ACT_KEY='leadbu_actuals_fy27_v2';
-const DEPLOY_TIME='2026-05-11T14:54:27Z'; // replaced with ISO timestamp at deploy time
+const DEPLOY_TIME='2026-05-11T15:10:55Z'; // replaced with ISO timestamp at deploy time
 let ACTUALS=TARGETS.map(()=>newActualRec()); // populated by Firebase onValue
 
 function newActualRec(){
@@ -1697,7 +1697,7 @@ function updateLastSaved(isoStr){
 }
 function showDeployTime(){
   const el=document.getElementById('hdr-deployed');
-  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-05-11T14:54:27Z')return;
+  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-05-11T15:10:55Z')return;
   try{
     const d=new Date(DEPLOY_TIME);
     const pad=n=>String(n).padStart(2,'0');
@@ -5498,7 +5498,7 @@ _fbRef.on('value', snapshot=>{
 
 // ── Version watcher — nudge users to hard-refresh when a new deploy is live ─
 function _startVersionWatch(){
-  if(!_fbDb || !DEPLOY_TIME || DEPLOY_TIME==='2026-05-11T14:54:27Z') return;
+  if(!_fbDb || !DEPLOY_TIME || DEPLOY_TIME==='2026-05-11T15:10:55Z') return;
   _fbDb.ref('meta/deployVersion').on('value', snap=>{
     const liveTs = snap.val();
     if(!liveTs) return;
@@ -7361,8 +7361,14 @@ function _saveChatHistory(){try{localStorage.setItem(_CHAT_KEY,JSON.stringify(_c
 function _loadChatHistory(){try{const s=localStorage.getItem(_CHAT_KEY);return s?JSON.parse(s):[];}catch(e){return[];}}
 let _chatHistory=_loadChatHistory();
 
+// Client-scoped brand label lookup — avoids key collisions (e.g. both TVS and RE have 'EV')
+const _CLIENT_BRAND_LABELS={};
+_CLIENT_BRAND_LABELS[BAJAJ_CLIENT]=BAJAJ_BRAND_LABELS;
+_CLIENT_BRAND_LABELS[TVS_CLIENT]=TVS_BRAND_LABELS;
+_CLIENT_BRAND_LABELS[RE_CLIENT]=RE_BRAND_LABELS;
+_CLIENT_BRAND_LABELS[HARLEY_CLIENT]=HARLEY_BRAND_LABELS;
+
 function buildTrackerContext(){
-  const ALL_BRAND_LABELS={...BAJAJ_BRAND_LABELS,...TVS_BRAND_LABELS,...RE_BRAND_LABELS};
   const lines=[];
   lines.push('# BikeDekho AOP Tracker — FY27 Live Data');
   lines.push('Units: Lacs = Indian Rupees Lakhs (1 Lac = 100,000 Rs). Leads are absolute counts.');
@@ -7390,12 +7396,14 @@ function buildTrackerContext(){
       lines.push('(no actuals entered yet)');
     }
     if(a.brands){
+      // Use client-scoped labels to avoid key collisions across OEMs (e.g. TVS.EV ≠ RE.EV)
+      const clientLabels=_CLIENT_BRAND_LABELS[t.client]||{};
       Object.keys(a.brands).forEach(brand=>{
         const br=a.brands[brand]; if(!br)return;
         const bd=deriveActuals(br,t.ad_type);
         const brHas=bd.rev.some(v=>v>0)||(br.google_leads&&br.google_leads.some(v=>v>0))||(br.google_cpl&&br.google_cpl.some(v=>v>0));
         if(!brHas)return;
-        lines.push(`  Brand: ${ALL_BRAND_LABELS[brand]||brand}`);
+        lines.push(`  Brand: ${clientLabels[brand]||brand}`);
         lines.push('  Month,GL,ML,PaidLd,GCPL,MCPL,CAC,DMS,VoC,Retails,CCSts,Rev(L),Mktg(L),GM(L),GPM(L)');
         MONTHS.forEach((m,mi)=>{
           const gl=+(br.google_leads?.[mi]||0),ml=+(br.meta_leads?.[mi]||0);
@@ -7504,6 +7512,22 @@ function renderChat(){
   msgs.scrollTop=msgs.scrollHeight;
 }
 
+// ── Chat interaction logger ───────────────────────────────────────
+function _logChatInteraction(question, answer){
+  if(typeof _fbDb==='undefined'||!_fbDb)return;
+  const uid=(typeof AUTH_USER!=='undefined'&&AUTH_USER)?AUTH_USER.uid:'anon';
+  const email=(typeof AUTH_USER!=='undefined'&&AUTH_USER)?AUTH_USER.email:'unknown';
+  const name=(typeof AUTH_USER!=='undefined'&&AUTH_USER)?AUTH_USER.displayName||email.split('@')[0]:'unknown';
+  const role=(typeof AUTH_PROFILE!=='undefined'&&AUTH_PROFILE)?AUTH_PROFILE.role:'unknown';
+  _fbDb.ref('chatLogs/'+uid).push({
+    ts: firebase.database.ServerValue.TIMESTAMP,
+    email, name, role,
+    question: question.slice(0,2000),           // cap at 2000 chars
+    answer: answer.slice(0,4000),               // cap at 4000 chars
+    page: (typeof PAGE!=='undefined')?PAGE:'—'
+  }).catch(()=>{});
+}
+
 async function sendChatMessage(userMsg){
   if(_chatThinking||!userMsg.trim())return;
   const apiKey=await _loadAIKey();
@@ -7525,6 +7549,7 @@ ${buildTrackerContext()}`;
   const result=await callAI(systemPrompt,_chatHistory,1500);
   if(result.ok){
     _chatHistory.push({role:'assistant',content:result.text});
+    _logChatInteraction(userMsg, result.text);  // log Q&A to Firebase
   }else{
     _chatHistory.push({role:'assistant',content:`⚠ API error: ${result.error}`});
     if(result.authFail){_aiKeyCache=null;localStorage.removeItem('leadbu_ai_key');}
