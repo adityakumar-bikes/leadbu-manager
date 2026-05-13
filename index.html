@@ -554,7 +554,7 @@ canvas{max-height:260px}
       <div class="brand-mark">🏍️</div>
       <div class="brand-text">
         <div class="t1">Bike AOP Tracker</div>
-        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.2.8</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 13/05/2026 13:27</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
+        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.2.8</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 13/05/2026 13:29</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
       </div>
     </div>
     <div class="hdr-right">
@@ -853,7 +853,7 @@ function oemBadge(client){
 }
 
 const ACT_KEY='leadbu_actuals_fy27_v2';
-const DEPLOY_TIME='2026-05-13T13:27:22Z'; // replaced with ISO timestamp at deploy time
+const DEPLOY_TIME='2026-05-13T13:29:34Z'; // replaced with ISO timestamp at deploy time
 let ACTUALS=TARGETS.map(()=>newActualRec()); // populated by Firebase onValue
 
 function newActualRec(){
@@ -1708,7 +1708,7 @@ function updateLastSaved(isoStr){
 }
 function showDeployTime(){
   const el=document.getElementById('hdr-deployed');
-  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-05-13T13:27:22Z')return;
+  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-05-13T13:29:34Z')return;
   try{
     const d=new Date(DEPLOY_TIME);
     const pad=n=>String(n).padStart(2,'0');
@@ -3239,7 +3239,7 @@ function renderREModal(recIdx){
     const CC_FIELDS=['seat_cost','seats','leads_processed','rev_adj','cc_seats','cc_seat_cost','ai_per_lead_cost','ai_leads_processed'];
     const CPS_FIELDS=['cac','retails','google_leads','meta_leads','google_cpl','meta_cpl','organic_leads','total_leads','rev_adj','cc_seats','cc_seat_cost','ai_per_lead_cost','ai_leads_processed'];
     const ML_FIELDS=['cpl_rate','total_leads','rev_adj','cc_seats','cc_seat_cost','ai_per_lead_cost','ai_leads_processed'];
-    const checkFields=adType==='CC contract'?CC_FIELDS:adType==='Media Leads'?ML_FIELDS:CPS_FIELDS;
+    const checkFields=t.ad_type==='CC contract'?CC_FIELDS:t.ad_type==='Media Leads'?ML_FIELDS:CPS_FIELDS;
     const topHasData=checkFields.some(_hasTopData);
     const iceHasData=checkFields.some(_hasIceData);
     if(topHasData && !iceHasData){
@@ -5533,7 +5533,7 @@ _fbRef.on('value', snapshot=>{
 
 // ── Version watcher — nudge users to hard-refresh when a new deploy is live ─
 function _startVersionWatch(){
-  if(!_fbDb || !DEPLOY_TIME || DEPLOY_TIME==='2026-05-13T13:27:22Z') return;
+  if(!_fbDb || !DEPLOY_TIME || DEPLOY_TIME==='2026-05-13T13:29:34Z') return;
   _fbDb.ref('meta/deployVersion').on('value', snap=>{
     const liveTs = snap.val();
     if(!liveTs) return;
