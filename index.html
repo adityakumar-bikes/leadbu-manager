@@ -554,7 +554,7 @@ canvas{max-height:260px}
       <div class="brand-mark">🏍️</div>
       <div class="brand-text">
         <div class="t1">Bike AOP Tracker</div>
-        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.2.8</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 15/05/2026 12:55</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
+        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.2.8</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 15/05/2026 12:57</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
       </div>
     </div>
     <div class="hdr-right">
@@ -853,7 +853,7 @@ function oemBadge(client){
 }
 
 const ACT_KEY='leadbu_actuals_fy27_v2';
-const DEPLOY_TIME='2026-05-15T12:55:11Z'; // replaced with ISO timestamp at deploy time
+const DEPLOY_TIME='2026-05-15T12:57:16Z'; // replaced with ISO timestamp at deploy time
 let ACTUALS=TARGETS.map(()=>newActualRec()); // populated by Firebase onValue
 
 function newActualRec(){
@@ -1121,6 +1121,9 @@ const AUDIT_FIELD_LABELS={
   ai_per_lead_cost:'AI Per Lead Cost',ai_leads_processed:'AI Leads Processed',
   piaggio_retainer:'Piaggio Retainer Cost',
   CLEAR_ALL:'Clear All Actuals',
+  AI_KEY_SET:'AI Key Set',
+  AI_KEY_REMOVED:'AI Key Removed',
+  AI_INSIGHTS_GENERATED:'AI Insights Generated',
 };
 const AUDIT_USER_COLORS=['#60a5fa','#34d399','#f472b6','#fbbf24','#a78bfa','#fb923c','#38bdf8','#4ade80'];
 
@@ -1708,7 +1711,7 @@ function updateLastSaved(isoStr){
 }
 function showDeployTime(){
   const el=document.getElementById('hdr-deployed');
-  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-05-15T12:55:11Z')return;
+  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-05-15T12:57:16Z')return;
   try{
     const d=new Date(DEPLOY_TIME);
     const pad=n=>String(n).padStart(2,'0');
@@ -5537,7 +5540,7 @@ _fbRef.on('value', snapshot=>{
 
 // ── Version watcher — nudge users to hard-refresh when a new deploy is live ─
 function _startVersionWatch(){
-  if(!_fbDb || !DEPLOY_TIME || DEPLOY_TIME==='2026-05-15T12:55:11Z') return;
+  if(!_fbDb || !DEPLOY_TIME || DEPLOY_TIME==='2026-05-15T12:57:16Z') return;
   _fbDb.ref('meta/deployVersion').on('value', snap=>{
     const liveTs = snap.val();
     if(!liveTs) return;
@@ -7254,9 +7257,11 @@ async function _loadAIKey(){
 async function saveAIKeyGlobal(key){
   key=(key||'').trim();
   if(!key) return false;
+  const provider=_aiProviderLabel(key);
   _aiKeyCache=key;
   localStorage.setItem('leadbu_ai_key',key);
   if(_aiKeyRef) await _aiKeyRef.set(_akEnc(key));
+  writeAuditEntry({ts:Date.now(),user:getCurrentUser(),client:'— SYSTEM —',ad_type:'*',btl:'*',ba:'*',field:'AI_KEY_SET',month:'—',old:'',new:provider+' key set ('+key.slice(0,8)+'…)'});
   return true;
 }
 
@@ -7264,6 +7269,7 @@ async function clearAIKeyGlobal(){
   _aiKeyCache=null;
   localStorage.removeItem('leadbu_ai_key');
   if(_aiKeyRef) await _aiKeyRef.remove();
+  writeAuditEntry({ts:Date.now(),user:getCurrentUser(),client:'— SYSTEM —',ad_type:'*',btl:'*',ba:'*',field:'AI_KEY_REMOVED',month:'—',old:'key active',new:'removed'});
 }
 
 // ── Provider auto-detection ───────────────────────────────────────────────
@@ -8160,6 +8166,9 @@ In the Lead & Efficiency Analysis section, specifically cover:
   _insightsAIGenerating=false;
   btn.innerHTML='✦ Regenerate';
   btn.disabled=false;
+  if(result&&result.ok){
+    writeAuditEntry({ts:Date.now(),user:getCurrentUser(),client:'— SYSTEM —',ad_type:'*',btl:'*',ba:'*',field:'AI_INSIGHTS_GENERATED',month:plabel,old:'',new:providerLabel+' · '+rows.length+' accounts'});
+  }
 }
 
 function _buildInsightsPrompt(rows,cols,plabel){
