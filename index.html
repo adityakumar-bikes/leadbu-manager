@@ -554,7 +554,7 @@ canvas{max-height:260px}
       <div class="brand-mark">🏍️</div>
       <div class="brand-text">
         <div class="t1">Bike AOP Tracker</div>
-        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.2.8</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 15/05/2026 12:57</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
+        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.2.8</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 15/05/2026 13:01</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
       </div>
     </div>
     <div class="hdr-right">
@@ -853,7 +853,7 @@ function oemBadge(client){
 }
 
 const ACT_KEY='leadbu_actuals_fy27_v2';
-const DEPLOY_TIME='2026-05-15T12:57:16Z'; // replaced with ISO timestamp at deploy time
+const DEPLOY_TIME='2026-05-15T13:01:03Z'; // replaced with ISO timestamp at deploy time
 let ACTUALS=TARGETS.map(()=>newActualRec()); // populated by Firebase onValue
 
 function newActualRec(){
@@ -1067,6 +1067,7 @@ function logChange(recIdx,field,monthIdx,oldVal,newVal,brand){
 // ── Inline Last-Edited Chips ─────────────────────────────────────────────────
 let _lastEditMap={};
 let _leAuditFetched=false;
+let _fbAuditCache=[];   // Firebase entries cached so every render() can use them
 const _LE_PALETTE=['#60a5fa','#34d399','#f472b6','#fbbf24','#a78bfa','#fb923c','#38bdf8','#4ade80'];
 const _leUserColors={};let _leColorIdx=0;
 function _leColor(u){if(!_leUserColors[u])_leUserColors[u]=_LE_PALETTE[_leColorIdx++%_LE_PALETTE.length];return _leUserColors[u];}
@@ -1077,9 +1078,21 @@ function _timeAgo(ts){
   const dy=Math.floor(h/24);if(dy<7)return dy+'d ago';
   return new Date(ts).toLocaleDateString('en-IN',{day:'numeric',month:'short'});
 }
-function _rebuildLastEditMap(extra){
-  let entries=[];try{entries=JSON.parse(localStorage.getItem('leadbu_audit')||'[]');}catch(e){}
-  if(extra){const seen=new Set(entries.map(e=>e.ts+'|'+e.client+'|'+e.field));extra.forEach(e=>{if(!seen.has(e.ts+'|'+e.client+'|'+e.field))entries.push(e);});}
+function _leDisplayName(user){
+  if(!user||user==='?')return'?';
+  // email → first part before dot or @
+  if(user.includes('@'))return user.split('@')[0].split('.')[0];
+  // display name → first word
+  return user.split(' ')[0].substring(0,14);
+}
+function _rebuildLastEditMap(){
+  // merge localStorage (this device) + Firebase cache (all users)
+  let entries=[];
+  try{entries=JSON.parse(localStorage.getItem('leadbu_audit')||'[]');}catch(e){}
+  if(_fbAuditCache.length){
+    const seen=new Set(entries.map(e=>e.ts+'|'+e.client+'|'+e.field));
+    _fbAuditCache.forEach(e=>{if(!seen.has(e.ts+'|'+e.client+'|'+e.field))entries.push(e);});
+  }
   entries.sort((a,b)=>b.ts-a.ts);
   const tkMap={};
   TARGETS.forEach((t,i)=>{const k=t.client+'§'+t.ad_type+'§'+(t.btl||'—');if(tkMap[k]===undefined)tkMap[k]=i;});
@@ -1094,7 +1107,8 @@ function _loadAuditForChips(){
   if(_leAuditFetched)return;_leAuditFetched=true;
   if(!_auditRef)return;
   _auditRef.orderByKey().limitToLast(500).once('value',snap=>{
-    _rebuildLastEditMap(Object.values(snap.val()||{}));
+    _fbAuditCache=Object.values(snap.val()||{});
+    _rebuildLastEditMap();
     render();
   }).catch(()=>{});
 }
@@ -1711,7 +1725,7 @@ function updateLastSaved(isoStr){
 }
 function showDeployTime(){
   const el=document.getElementById('hdr-deployed');
-  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-05-15T12:57:16Z')return;
+  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-05-15T13:01:03Z')return;
   try{
     const d=new Date(DEPLOY_TIME);
     const pad=n=>String(n).padStart(2,'0');
@@ -2364,7 +2378,7 @@ function buildRows(rows,field,idx,mode,showLY,metricsArr){
     let cells='';metricsArr.forEach(m=>cells+=metricCells(v,mode,showLY,m.key,m.pct,m.intFmt));
     const le=_lastEditMap[i];
     const leChip=le
-      ?`<br><span class="le-chip" title="Last edited by ${le.user}"><span class="le-dot" style="background:${_leColor(le.user)}"></span>${le.user.split(' ')[0].substring(0,12)} · ${_timeAgo(le.ts)}</span>`
+      ?`<br><span class="le-chip" title="Last edited by ${le.user}"><span class="le-dot" style="background:${_leColor(le.user)}"></span>${_leDisplayName(le.user)} · ${_timeAgo(le.ts)}</span>`
       :'';
     return `<tr class="${isZ?'zero-row':''}">
 <td class="dc c0">${t.cat}</td><td class="dc c1">${t.fuel}</td><td class="dc c2">${oemBadge(t.client)}</td><td class="dc c3">${t.ad_type}<br><span style="font-size:9px;color:var(--text3)">${t.btl}${t.ba&&t.ba!=='-'?' <span style="color:#8b949e">/ '+t.ba+'</span>':''}</span>${leChip}</td>
@@ -5540,7 +5554,7 @@ _fbRef.on('value', snapshot=>{
 
 // ── Version watcher — nudge users to hard-refresh when a new deploy is live ─
 function _startVersionWatch(){
-  if(!_fbDb || !DEPLOY_TIME || DEPLOY_TIME==='2026-05-15T12:57:16Z') return;
+  if(!_fbDb || !DEPLOY_TIME || DEPLOY_TIME==='2026-05-15T13:01:03Z') return;
   _fbDb.ref('meta/deployVersion').on('value', snap=>{
     const liveTs = snap.val();
     if(!liveTs) return;
