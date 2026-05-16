@@ -379,8 +379,9 @@ td.dc{text-align:left;color:var(--text);position:sticky;background:var(--bg);fon
 .c1{left:60px;min-width:54px;max-width:54px;z-index:8;color:var(--text2)!important;font-size:11px}
 .c2{left:114px;min-width:108px;max-width:108px;z-index:8;font-weight:500}
 .c3{left:222px;min-width:114px;max-width:114px;z-index:8}
-.c4{left:336px;min-width:42px;max-width:42px;z-index:8;border-right:2px solid var(--border2)!important;padding:0;background:var(--bg)}
-thead th.c0,thead th.c1,thead th.c2,thead th.c3,thead th.c4{z-index:15;background:var(--bg2)}
+.c4{left:336px;min-width:42px;max-width:42px;z-index:8;padding:0;background:var(--bg)}
+.c5{left:378px;min-width:42px;max-width:42px;z-index:8;border-right:2px solid var(--border2)!important;padding:0;background:var(--bg)}
+thead th.c0,thead th.c1,thead th.c2,thead th.c3,thead th.c4,thead th.c5{z-index:15;background:var(--bg2)}
 tbody tr{transition:background-color .08s}
 tbody tr:hover td.dc{background:var(--bg2)}
 tbody tr:hover td{background:var(--bg2)}
@@ -417,6 +418,11 @@ tbody tr:hover td{background:var(--bg2)}
   font-weight:600;width:36px;transition:all .12s;
 }
 .detail-btn:hover{background:var(--accent-soft);color:var(--accent);border-color:var(--accent2)}
+.dash-btn{background:transparent;border:1px solid var(--border2);color:var(--text2);border-radius:5px;padding:3px 7px;cursor:pointer;font-size:10.5px;font-weight:600;width:36px;transition:all .12s;}
+.dash-btn.has-link{border-color:#58a6ff55;color:#58a6ff;}
+.dash-btn.has-link:hover{background:#58a6ff18;border-color:#58a6ff;}
+.dash-btn.no-link{opacity:.35;}
+.dash-btn.no-link:hover{opacity:1;border-color:var(--accent2);color:var(--accent);}
 /* AI Chat Assistant */
 #ai-chat-panel{position:fixed;right:-440px;top:0;bottom:0;width:440px;background:var(--bg2);border-left:1px solid var(--border2);z-index:200;display:flex;flex-direction:column;transition:right .24s cubic-bezier(.4,0,.2,1);box-shadow:-12px 0 48px rgba(0,0,0,.35)}
 #ai-chat-msgs{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px;scroll-behavior:smooth}
@@ -554,7 +560,7 @@ canvas{max-height:260px}
       <div class="brand-mark">🏍️</div>
       <div class="brand-text">
         <div class="t1">Bike AOP Tracker</div>
-        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.2.9</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 15/05/2026 13:25</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
+        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.2.10</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 17/05/2026 01:24</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
       </div>
     </div>
     <div class="hdr-right">
@@ -853,7 +859,7 @@ function oemBadge(client){
 }
 
 const ACT_KEY='leadbu_actuals_fy27_v2';
-const DEPLOY_TIME='2026-05-15T13:25:54Z'; // replaced with ISO timestamp at deploy time
+const DEPLOY_TIME='2026-05-17T01:24:24Z'; // replaced with ISO timestamp at deploy time
 let ACTUALS=TARGETS.map(()=>newActualRec()); // populated by Firebase onValue
 
 function newActualRec(){
@@ -1725,7 +1731,7 @@ function updateLastSaved(isoStr){
 }
 function showDeployTime(){
   const el=document.getElementById('hdr-deployed');
-  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-05-15T13:25:54Z')return;
+  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-05-17T01:24:24Z')return;
   try{
     const d=new Date(DEPLOY_TIME);
     const pad=n=>String(n).padStart(2,'0');
@@ -2367,11 +2373,12 @@ function buildSubRow(rows,field,idx,mode,showLY,metricsArr){
              act:{rev:aR,mktg:aM,gm:aR-aM,gm_pct:pct(aR-aM,aR),cc:aC2,gpm:(aR-aM)-aC2,gpm_pct:pct((aR-aM)-aC2,aR),leads:aL},
              ly:{rev:lyR,mktg:lyM,gm:lyR-lyM,gm_pct:pct(lyR-lyM,lyR),cc:lyC,gpm:(lyR-lyM)-lyC,gpm_pct:pct((lyR-lyM)-lyC,lyR),leads:lyL}};
   let cells='';metricsArr.forEach(m=>cells+=metricCells(sub,mode,showLY,m.key,m.pct,m.intFmt));
-  return `<tr class="sub-row"><td class="dc c0" colspan="4" style="left:0;z-index:9;min-width:300px">▼ TOTAL (${rows.length})</td><td class="dc c4"></td>${cells}</tr>`;
+  return `<tr class="sub-row"><td class="dc c0" colspan="4" style="left:0;z-index:9;min-width:300px">▼ TOTAL (${rows.length})</td><td class="dc c4"></td><td class="dc c5"></td>${cells}</tr>`;
 }
 
 function buildRows(rows,field,idx,mode,showLY,metricsArr){
   metricsArr=metricsArr||METRICS;
+  const _cdAll=loadClientData();
   return rows.map(({t,d,i},ri)=>{
     const v=getPeriodVals(t,d,field,idx);
     const isZ=t.rev.fy===0&&t.mktg.fy===0;
@@ -2380,9 +2387,18 @@ function buildRows(rows,field,idx,mode,showLY,metricsArr){
     const leChip=le
       ?`<br><span class="le-chip" title="Last edited by ${le.user}"><span class="le-dot" style="background:${_leColor(le.user)}"></span>${_leDisplayName(le.user)} · ${_timeAgo(le.ts)}</span>`
       :'';
+    const _cdKey=t.client+'§'+t.ad_type+'§'+(t.btl||'—');
+    const _dashUrl=(_cdAll[_cdKey]||{}).dashboardUrl||'';
+    const _isAdmin=typeof _authIsAdmin==='function'&&_authIsAdmin();
+    const dashBtn=_dashUrl
+      ?`<button class="dash-btn has-link" title="Open CPS Dashboard" onclick="window.open('${_dashUrl.replace(/'/g,"\\'")}','_blank','noopener')"${_isAdmin?` oncontextmenu="event.preventDefault();_editDashLink(${i})"`:''}>🔗</button>`
+      :(_isAdmin
+        ?`<button class="dash-btn no-link" title="Add CPS Dashboard link" onclick="_editDashLink(${i})">＋</button>`
+        :`<button class="dash-btn no-link" style="cursor:default" title="No dashboard linked yet">🔗</button>`);
     return `<tr class="${isZ?'zero-row':''}">
 <td class="dc c0">${t.cat}</td><td class="dc c1">${t.fuel}</td><td class="dc c2">${oemBadge(t.client)}</td><td class="dc c3">${t.ad_type}<br><span style="font-size:9px;color:var(--text3)">${t.btl}${t.ba&&t.ba!=='-'?' <span style="color:#8b949e">/ '+t.ba+'</span>':''}</span>${leChip}</td>
 <td class="dc c4"><button class="detail-btn" title="Open P&L Detail" onclick="openModal(${i})">📋</button></td>
+<td class="dc c5">${dashBtn}</td>
 ${cells}</tr>`;
   }).join('');
 }
@@ -2410,8 +2426,8 @@ function render(){
   if(VIEW==='mon'){field='monthly';idx=PERIOD;label=MONTHS[PERIOD];}
 
   const cols=subCols(DISP_MODE,SHOW_LY);
-  let hRow1=`<tr><th class="dim-h c0" colspan="5" style="min-width:336px;text-align:left">Account — ${label}</th>`;
-  let hRow2=`<tr><th class="dim-h c0">Cat</th><th class="dim-h c1">Fuel</th><th class="dim-h c2">Client</th><th class="dim-h c3">AdType/BTL</th><th class="dim-h c4" style="text-align:center;font-size:9px">P&L</th>`;
+  let hRow1=`<tr><th class="dim-h c0" colspan="6" style="min-width:378px;text-align:left">Account — ${label}</th>`;
+  let hRow2=`<tr><th class="dim-h c0">Cat</th><th class="dim-h c1">Fuel</th><th class="dim-h c2">Client</th><th class="dim-h c3">AdType/BTL</th><th class="dim-h c4" style="text-align:center;font-size:9px">P&L</th><th class="dim-h c5" style="text-align:center;font-size:9px" title="CPS Dashboard Link">🔗</th>`;
   METRICS.forEach(m=>{
     hRow1+=`<th colspan="${cols.length}" style="text-align:center;color:${document.body.classList.contains('light')?m.color:'#fff'};border-top:3px solid ${m.color};background:var(--bg2);font-size:11px">${m.label}</th>`;
     cols.forEach(c=>hRow2+=`<th style="border-top:2px solid ${m.color};font-size:9px">${c}</th>`);
@@ -5548,13 +5564,32 @@ _fbRef.on('value', snapshot=>{
   } else { initUserLabel(); setPage(PAGE); }
 });
   // Start AI insights listener for all users immediately after sync starts
-  // (don't wait for the user to navigate to the Insights tab)
   _watchFBInsights();
+  // Sync dashboard links from Firebase so all users see admin-set links
+  _syncDashLinks();
 } // end _fbStartSync
+
+function _syncDashLinks(){
+  if(typeof _fbDb==='undefined'||!_fbDb)return;
+  _fbDb.ref('meta/dashLinks').on('value',snap=>{
+    const links=snap.val();
+    if(!links)return;
+    const data=loadClientData();
+    let changed=false;
+    Object.entries(links).forEach(([fbKey,url])=>{
+      // Reverse encode: _ → . § becomes __ → §, - → —
+      const cdKey=fbKey.replace(/__/g,'§').replace(/_/g,'.').replace(/§-§/g,'§—§').replace(/--$/,'—');
+      if(!data[cdKey])data[cdKey]={};
+      if(url&&data[cdKey].dashboardUrl!==url){data[cdKey].dashboardUrl=url;changed=true;}
+      else if(!url&&data[cdKey].dashboardUrl){delete data[cdKey].dashboardUrl;changed=true;}
+    });
+    if(changed){saveClientDataStore(data);render();}
+  });
+}
 
 // ── Version watcher — nudge users to hard-refresh when a new deploy is live ─
 function _startVersionWatch(){
-  if(!_fbDb || !DEPLOY_TIME || DEPLOY_TIME==='2026-05-15T13:25:54Z') return;
+  if(!_fbDb || !DEPLOY_TIME || DEPLOY_TIME==='2026-05-17T01:24:24Z') return;
   _fbDb.ref('meta/deployVersion').on('value', snap=>{
     const liveTs = snap.val();
     if(!liveTs) return;
@@ -6472,6 +6507,31 @@ function saveClientDataStore(d){try{localStorage.setItem(CLIENT_DATA_KEY,JSON.st
 function openContractUrl(url){
   if(!url)return;
   window.open(url,'_blank','noopener,noreferrer');
+}
+
+// ── CPS Dashboard link: admin set/clear ──────────────────────────────────────
+function _editDashLink(recIdx){
+  if(!_authIsAdmin())return;
+  const t=TARGETS[recIdx];
+  const _cdKey=t.client+'§'+t.ad_type+'§'+(t.btl||'—');
+  const data=loadClientData();
+  const current=(data[_cdKey]||{}).dashboardUrl||'';
+  const input=prompt(
+    `CPS Dashboard URL for ${t.client} · ${t.btl||t.ad_type}\n\n(Leave blank and click OK to remove the link)`,
+    current
+  );
+  if(input===null)return; // cancelled
+  const url=input.trim();
+  if(!data[_cdKey])data[_cdKey]={};
+  if(url){data[_cdKey].dashboardUrl=url;}
+  else{delete data[_cdKey].dashboardUrl;}
+  saveClientDataStore(data);
+  // sync to Firebase meta/dashLinks
+  if(typeof _fbDb!=='undefined'&&_fbDb){
+    const fbKey=_cdKey.replace(/\./g,'_').replace(/§/g,'__').replace(/—/g,'-');
+    _fbDb.ref('meta/dashLinks/'+fbKey).set(url||null).catch(()=>{});
+  }
+  render();
 }
 
 // ── New clients (added via UI, not in static TARGETS) ──
