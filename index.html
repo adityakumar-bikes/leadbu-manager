@@ -560,7 +560,7 @@ canvas{max-height:260px}
       <div class="brand-mark">🏍️</div>
       <div class="brand-text">
         <div class="t1">Bike AOP Tracker</div>
-        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.2.10</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 17/05/2026 01:24</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
+        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.2.11</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 25/05/2026 12:41</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
       </div>
     </div>
     <div class="hdr-right">
@@ -706,7 +706,7 @@ canvas{max-height:260px}
   </div>
   <div class="ctrl-grp"><span class="ctrl-lbl">BTL:</span><select id="f-btl"><option value="">All</option></select></div>
   <div class="ctrl-grp"><span class="ctrl-lbl">BA:</span><select id="f-ba"><option value="">All</option></select></div>
-  <div class="ctrl-grp"><span class="ctrl-lbl">Zeros:</span><select id="f-zeros"><option value="0">Show all</option><option value="1" selected>Hide zero TGT</option></select></div>
+  <div class="ctrl-grp"><span class="ctrl-lbl">Zeros:</span><select id="f-zeros"><option value="0">Show all</option><option value="1" selected>Hide zero TGT</option><option value="2">Hide zero ACT</option></select></div>
   <button class="btn btn-dim" onclick="resetFilters()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>Reset</button>
   <div class="sep"></div>
   <div class="ctrl-grp"><span class="ctrl-lbl">Show:</span>
@@ -859,7 +859,7 @@ function oemBadge(client){
 }
 
 const ACT_KEY='leadbu_actuals_fy27_v2';
-const DEPLOY_TIME='2026-05-17T01:24:24Z'; // replaced with ISO timestamp at deploy time
+const DEPLOY_TIME='2026-05-25T12:41:10Z'; // replaced with ISO timestamp at deploy time
 let ACTUALS=TARGETS.map(()=>newActualRec()); // populated by Firebase onValue
 
 function newActualRec(){
@@ -1731,7 +1731,7 @@ function updateLastSaved(isoStr){
 }
 function showDeployTime(){
   const el=document.getElementById('hdr-deployed');
-  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-05-17T01:24:24Z')return;
+  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-05-25T12:41:10Z')return;
   try{
     const d=new Date(DEPLOY_TIME);
     const pad=n=>String(n).padStart(2,'0');
@@ -2005,12 +2005,14 @@ bas.forEach(b=>{const o=document.createElement('option');o.value=b;o.textContent
 function getFiltered(){
   const fCat=document.getElementById('f-cat').value,fFuel=document.getElementById('f-fuel').value;
   const fCli=document.getElementById('f-client').value;
-  const fBtl=document.getElementById('f-btl').value,fZero=document.getElementById('f-zeros').value==='1';
+  const fBtl=document.getElementById('f-btl').value,fZeroVal=document.getElementById('f-zeros').value;
   const fBa=document.getElementById('f-ba')?document.getElementById('f-ba').value:'';
-  const filtered=TARGETS.map((t,i)=>({t,a:ACTUALS[i],d:deriveActuals(ACTUALS[i],t.ad_type),i})).filter(({t})=>{
+  const filtered=TARGETS.map((t,i)=>({t,a:ACTUALS[i],d:deriveActuals(ACTUALS[i],t.ad_type),i})).filter(({t,d})=>{
     if(fCat&&t.cat!==fCat)return false;if(fFuel&&t.fuel!==fFuel)return false;
     if(fCli&&t.client!==fCli)return false;if(_fAdTypes.length>0&&!_fAdTypes.includes(t.ad_type))return false;
-    if(fBtl&&t.btl!==fBtl)return false;if(fBa&&t.ba!==fBa)return false;if(fZero&&t.rev.fy===0)return false;
+    if(fBtl&&t.btl!==fBtl)return false;if(fBa&&t.ba!==fBa)return false;
+    if(fZeroVal==='1'&&t.rev.fy===0)return false;
+    if(fZeroVal==='2'&&d.rev_fy===0)return false;
     return true;
   });
   // Merge duplicate client+ad_type rows (e.g. 2× Media Leads per client)
@@ -3753,9 +3755,10 @@ function renderLeads(rows){
     const orgA=getSlice(a.organic_leads||Array(12).fill(0),LEADS_PERIOD)/100000;
     const nmsA=getSlice(a.non_ms_leads||Array(12).fill(0),LEADS_PERIOD)/100000;
 
-    const fZeroL=document.getElementById('f-zeros').value==='1';
-    if(fZeroL&&totT===0) return;
-    if(!fZeroL&&totT===0&&totA===0) return;
+    const fZeroLVal=document.getElementById('f-zeros').value;
+    if(fZeroLVal==='1'&&totT===0) return;
+    if(fZeroLVal==='2'&&totA===0) return;
+    if(fZeroLVal==='0'&&totT===0&&totA===0) return;
 
     gTT+=totT;gTA+=totA;gMT+=mktgT;gMA+=mktgA;gGL+=goolA;gML_+=metaA;gOT+=orgT;gOA+=orgA;gNMS+=nmsA;
 
@@ -3923,13 +3926,13 @@ function renderMktg(rows){
 
     // Visibility rule: hide row only if BOTH targets AND actuals are zero.
     // Zeros filter (fZeroM) may hide no-target rows, but never hides rows that have actual data.
-    const fZeroM=document.getElementById('f-zeros').value==='1';
+    const fZeroMVal=document.getElementById('f-zeros').value;
     const hasAnyActuals=mktgSpendA>0||paidL>0||googL>0||metaL>0;
+    if(fZeroMVal==='2'&&!hasAnyActuals) return;
     if(!hasAnyActuals){
-      // No actuals at all: apply target-based gate
-      if(mktgLT===0&&mktgSpendT===0) return; // no target + no actuals → always hide
+      if(fZeroMVal==='1'&&mktgLT===0&&mktgSpendT===0) return;
+      if(fZeroMVal==='0'&&mktgLT===0&&mktgSpendT===0) return;
     }
-    // Has actuals → always show, regardless of targets or zeros-filter setting
 
     gMktgLT+=mktgLT;gPaidL+=paidL;gTrigL+=trigL;
     gMktgSpendT+=mktgSpendT;gMktgSpendA+=mktgSpendA;
@@ -5589,7 +5592,7 @@ function _syncDashLinks(){
 
 // ── Version watcher — nudge users to hard-refresh when a new deploy is live ─
 function _startVersionWatch(){
-  if(!_fbDb || !DEPLOY_TIME || DEPLOY_TIME==='2026-05-17T01:24:24Z') return;
+  if(!_fbDb || !DEPLOY_TIME || DEPLOY_TIME==='2026-05-25T12:41:10Z') return;
   _fbDb.ref('meta/deployVersion').on('value', snap=>{
     const liveTs = snap.val();
     if(!liveTs) return;
