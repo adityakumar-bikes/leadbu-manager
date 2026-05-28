@@ -560,7 +560,7 @@ canvas{max-height:260px}
       <div class="brand-mark">🏍️</div>
       <div class="brand-text">
         <div class="t1">Bike AOP Tracker</div>
-        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.2.13</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 28/05/2026 15:31</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
+        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.2.14</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 28/05/2026 15:36</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
       </div>
     </div>
     <div class="hdr-right">
@@ -859,7 +859,7 @@ function oemBadge(client){
 }
 
 const ACT_KEY='leadbu_actuals_fy27_v2';
-const DEPLOY_TIME='2026-05-28T15:31:47Z'; // replaced with ISO timestamp at deploy time
+const DEPLOY_TIME='2026-05-28T15:36:52Z'; // replaced with ISO timestamp at deploy time
 let ACTUALS=TARGETS.map(()=>newActualRec()); // populated by Firebase onValue
 
 function newActualRec(){
@@ -1731,7 +1731,7 @@ function updateLastSaved(isoStr){
 }
 function showDeployTime(){
   const el=document.getElementById('hdr-deployed');
-  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-05-28T15:31:47Z')return;
+  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-05-28T15:36:52Z')return;
   try{
     const d=new Date(DEPLOY_TIME);
     const pad=n=>String(n).padStart(2,'0');
@@ -4741,7 +4741,7 @@ function renderRevRecon(rows){
       // ── FY26 Closing column ──
       if(key==='cumgap'){
         if(isCPS){
-          html+=`<td style="padding:5px 8px;font-size:11.5px;text-align:right;border-bottom:1px solid var(--border2);border-left:2px solid #14b8a644;border-right:1px solid var(--border2);background:${_lt?'rgba(234,179,8,.13)':'rgba(234,179,8,.18)'}"><input type="number" step="0.01" value="${fc||''}" placeholder="0.00" oninput="onFY26ClosingChange(${i},this.value)" class="no-spin" style="width:72px;background:transparent;border:none;color:${_lt?'#92400e':'#fde68a'};font-size:11px;text-align:right;outline:none;font-weight:600;cursor:text"></td>`;
+          html+=`<td style="padding:5px 8px;font-size:11.5px;text-align:right;border-bottom:1px solid var(--border2);border-left:2px solid #14b8a644;border-right:1px solid var(--border2);background:#fef08a"><input type="number" step="0.01" value="${fc||''}" placeholder="" oninput="onFY26ClosingChange(${i},this.value)" class="no-spin" style="width:72px;background:transparent;border:none;color:#78350f;font-size:11px;text-align:right;outline:none;font-weight:700;cursor:text"></td>`;
         }else{
           html+=`<td style="${tdClos};color:var(--text3)">—</td>`;
         }
@@ -4817,7 +4817,9 @@ function renderRevRecon(rows){
 function onFY26ClosingChange(recIdx, val){
   ACTUALS[recIdx].fy26_closing = parseFloat(val) || 0;
   saveActuals();
+  const _sy=window.scrollY;
   renderRevRecon(getFiltered());
+  window.scrollTo(0,_sy);
 }
 
 function exportRevReconCSV(){
@@ -5592,7 +5594,7 @@ function _syncDashLinks(){
 
 // ── Version watcher — nudge users to hard-refresh when a new deploy is live ─
 function _startVersionWatch(){
-  if(!_fbDb || !DEPLOY_TIME || DEPLOY_TIME==='2026-05-28T15:31:47Z') return;
+  if(!_fbDb || !DEPLOY_TIME || DEPLOY_TIME==='2026-05-28T15:36:52Z') return;
   _fbDb.ref('meta/deployVersion').on('value', snap=>{
     const liveTs = snap.val();
     if(!liveTs) return;
