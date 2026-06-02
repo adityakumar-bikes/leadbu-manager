@@ -560,7 +560,7 @@ canvas{max-height:260px}
       <div class="brand-mark">🏍️</div>
       <div class="brand-text">
         <div class="t1">Bike AOP Tracker</div>
-        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.2.15</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 28/05/2026 18:03</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
+        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.2.16</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 02/06/2026 15:17</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
       </div>
     </div>
     <div class="hdr-right">
@@ -859,7 +859,7 @@ function oemBadge(client){
 }
 
 const ACT_KEY='leadbu_actuals_fy27_v2';
-const DEPLOY_TIME='2026-05-28T18:03:01Z'; // replaced with ISO timestamp at deploy time
+const DEPLOY_TIME='2026-06-02T15:17:23Z'; // replaced with ISO timestamp at deploy time
 let ACTUALS=TARGETS.map(()=>newActualRec()); // populated by Firebase onValue
 
 function newActualRec(){
@@ -1731,7 +1731,7 @@ function updateLastSaved(isoStr){
 }
 function showDeployTime(){
   const el=document.getElementById('hdr-deployed');
-  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-05-28T18:03:01Z')return;
+  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-06-02T15:17:23Z')return;
   try{
     const d=new Date(DEPLOY_TIME);
     const pad=n=>String(n).padStart(2,'0');
@@ -3742,12 +3742,19 @@ function renderLeads(rows){
   // Totals accumulators
   let [gTT,gTA,gMT,gMA,gGL,gML_,gOT,gOA,gNMS]=[0,0,0,0,0,0,0,0,0];
 
+  // Brand map: which clients have sub-brand segments
+  const _BRAND_MAP={
+    [BAJAJ_CLIENT]:{brands:BAJAJ_BRANDS,labels:BAJAJ_BRAND_LABELS},
+    [TVS_CLIENT]:{brands:TVS_BRANDS,labels:TVS_BRAND_LABELS},
+    [RE_CLIENT]:{brands:RE_BRANDS,labels:RE_BRAND_LABELS},
+    [HARLEY_CLIENT]:{brands:HARLEY_BRANDS,labels:HARLEY_BRAND_LABELS},
+  };
+
   let lastClient='';
   rows.forEach(({t,a,d},ri)=>{
     const totT=getSlice(t.leads.monthly,LEADS_PERIOD);
     const mktgT=t.mktg_leads?getSlice(t.mktg_leads.monthly,LEADS_PERIOD):0;
     const orgT=t.org_leads?getSlice(t.org_leads.monthly,LEADS_PERIOD):0;
-    // Actuals → Lakhs
     const totA=getSlice(d.trig_leads,LEADS_PERIOD)/100000;
     const mktgA=getSlice(d.paid_leads,LEADS_PERIOD)/100000;
     const goolA=getSlice(d.google_leads,LEADS_PERIOD)/100000;
@@ -3764,11 +3771,16 @@ function renderLeads(rows){
 
     const isNewClient=t.client!==lastClient;
     if(isNewClient) lastClient=t.client;
-    const bg=ri%2===0?'var(--bg1)':'var(--bg2)';
+    const bg=ri%2===0?'var(--bg)':'var(--bg2)';
     const borderTop=isNewClient?'border-top:2px solid var(--border2);':'';
-    html+='<tr style="background:'+bg+';'+borderTop+'">'
-      +'<td style="padding:5px 10px;font-size:11px;color:var(--text1);font-weight:'+(isNewClient?'700':'400')+';position:sticky;left:0;background:'+bg+'">'+(isNewClient?oemBadge(t.client):'<span style="opacity:.45;padding-left:30px">'+t.client+'</span>')+'</td>'
-      +'<td style="padding:5px 6px;font-size:10px;color:var(--text3)">'+t.ad_type+'</td>'
+
+    const bMap=_BRAND_MAP[t.client];
+    const hasBrands=bMap&&a.brands&&bMap.brands.some(b=>a.brands[b]);
+
+    // Account summary row (bold when has sub-brands, normal when single-line)
+    html+='<tr style="background:'+bg+';'+borderTop+(hasBrands?';font-weight:700':'')+'">'
+      +'<td style="padding:5px 10px;font-size:11px;color:var(--text1);font-weight:'+(isNewClient||hasBrands?'700':'400')+';position:sticky;left:0;background:'+bg+'">'+(isNewClient?oemBadge(t.client):'<span style="opacity:.45;padding-left:30px">'+t.client+'</span>')+'</td>'
+      +'<td style="padding:5px 6px;font-size:10px;color:var(--text3)">'+t.ad_type+(hasBrands?' <span style="opacity:.5;font-size:9px">▾ all segs</span>':'')+'</td>'
       +td(totT)+td(totA,'var(--blue)')+fAch(totT,totA)
       +td(mktgT)+td(mktgA,'var(--blue)')+fAch(mktgT,mktgA)
       +td(goolA,'#a0a0ff')+fAch(mktgT,goolA)
@@ -3776,6 +3788,42 @@ function renderLeads(rows){
       +td(orgT)+td(orgA,'var(--blue)')+fAch(orgT,orgA)
       +td(nmsA,'#6ee7b7')+fAch(totT,nmsA)
       +'</tr>';
+
+    // Brand segment sub-rows
+    if(hasBrands){
+      bMap.brands.forEach(brand=>{
+        const br=a.brands[brand];if(!br)return;
+        const bGL=getSlice(br.google_leads||Array(12).fill(0),LEADS_PERIOD)/100000;
+        const bML=getSlice(br.meta_leads||Array(12).fill(0),LEADS_PERIOD)/100000;
+        const bOrg=getSlice(br.organic_leads||Array(12).fill(0),LEADS_PERIOD)/100000;
+        const bNms=getSlice(br.non_ms_leads||Array(12).fill(0),LEADS_PERIOD)/100000;
+        const bMktg=bGL+bML;
+        const bTot=bMktg+bOrg+bNms;
+        if(bTot===0&&bGL===0&&bML===0) return; // skip truly empty segments
+        const shortLbl=(bMap.labels[brand]||brand).split(' —')[0].split('(')[0].trim();
+        const subBg='var(--bg3)';
+        html+='<tr style="background:'+subBg+'">'
+          +'<td style="padding:3px 10px 3px 28px;font-size:10px;color:var(--text2);position:sticky;left:0;background:'+subBg+'">'
+          +'<span style="color:var(--text3);margin-right:4px">└</span>'+shortLbl+'</td>'
+          +'<td style="padding:3px 6px;font-size:9px;color:var(--text3)">segment</td>'
+          +'<td style="text-align:right;color:var(--text3);font-size:10px;padding:3px 8px">—</td>'
+          +td(bTot,'var(--blue)')
+          +'<td style="text-align:right;color:var(--text3);font-size:10px">—</td>'
+          +'<td style="text-align:right;color:var(--text3);font-size:10px;padding:3px 8px">—</td>'
+          +td(bMktg,'var(--blue)')
+          +'<td style="text-align:right;color:var(--text3);font-size:10px">—</td>'
+          +td(bGL,'#a0a0ff')
+          +'<td style="text-align:right;color:var(--text3);font-size:10px">—</td>'
+          +td(bML,'#ff80a0')
+          +'<td style="text-align:right;color:var(--text3);font-size:10px">—</td>'
+          +'<td style="text-align:right;color:var(--text3);font-size:10px;padding:3px 8px">—</td>'
+          +td(bOrg,'var(--blue)')
+          +'<td style="text-align:right;color:var(--text3);font-size:10px">—</td>'
+          +td(bNms,'#6ee7b7')
+          +'<td style="text-align:right;color:var(--text3);font-size:10px">—</td>'
+          +'</tr>';
+      });
+    }
   });
 
   // Grand total
@@ -5594,7 +5642,7 @@ function _syncDashLinks(){
 
 // ── Version watcher — nudge users to hard-refresh when a new deploy is live ─
 function _startVersionWatch(){
-  if(!_fbDb || !DEPLOY_TIME || DEPLOY_TIME==='2026-05-28T18:03:01Z') return;
+  if(!_fbDb || !DEPLOY_TIME || DEPLOY_TIME==='2026-06-02T15:17:23Z') return;
   _fbDb.ref('meta/deployVersion').on('value', snap=>{
     const liveTs = snap.val();
     if(!liveTs) return;
