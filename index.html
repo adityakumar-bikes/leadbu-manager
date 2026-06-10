@@ -560,7 +560,7 @@ canvas{max-height:260px}
       <div class="brand-mark">🏍️</div>
       <div class="brand-text">
         <div class="t1">Bike AOP Tracker</div>
-        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.2.16</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 02/06/2026 15:17</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
+        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.2.17</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 10/06/2026 13:00</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
       </div>
     </div>
     <div class="hdr-right">
@@ -859,7 +859,7 @@ function oemBadge(client){
 }
 
 const ACT_KEY='leadbu_actuals_fy27_v2';
-const DEPLOY_TIME='2026-06-02T15:17:23Z'; // replaced with ISO timestamp at deploy time
+const DEPLOY_TIME='2026-06-10T13:00:05Z'; // replaced with ISO timestamp at deploy time
 let ACTUALS=TARGETS.map(()=>newActualRec()); // populated by Firebase onValue
 
 function newActualRec(){
@@ -1731,7 +1731,7 @@ function updateLastSaved(isoStr){
 }
 function showDeployTime(){
   const el=document.getElementById('hdr-deployed');
-  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-06-02T15:17:23Z')return;
+  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-06-10T13:00:05Z')return;
   try{
     const d=new Date(DEPLOY_TIME);
     const pad=n=>String(n).padStart(2,'0');
@@ -3665,6 +3665,7 @@ function renderHarleyModal(recIdx){
 // ═══════════════════════════
 let LEADS_PERIOD='fy';
 let MKTG_PERIOD='fy';
+let _mktgLeadUnit='L'; // 'L' = Lakhs, 'K' = Thousands
 let CC_PERIOD='fy';
 
 function renderLeads(rows){
@@ -3899,7 +3900,7 @@ function renderMktg(rows){
   const fRs=v=>v===0?'—':(v>=10000?'₹'+Math.round(v/1000)+'K':v>=1000?'₹'+Math.round(v):v>=100?'₹'+v.toFixed(0):'₹'+v.toFixed(0));
   const fPct=v=>v===0?'—':v.toFixed(1)+'%';
   const fRoas=v=>v===0||!isFinite(v)?'—':v.toFixed(2)+'x';
-  const fLac=v=>v===0?'—':v.toFixed(2)+'L';
+  const fLead=v=>v===0?'—':_mktgLeadUnit==='K'?(v*100).toFixed(3)+'K':v.toFixed(3)+'L';
 
   // Color helpers
   const tcplColor=(tgt,act)=>{if(tgt<=0||act<=0)return '#8b949e';const r=act/tgt;return r<=1?'#3fb950':r<=1.2?'#d29922':'#f85149';};
@@ -3920,19 +3921,23 @@ function renderMktg(rows){
   const thS='padding:4px 6px;text-align:right;font-size:9px;color:var(--text3);border-bottom:1px solid var(--border2)';
 
   const _mktgExportBtn='<button onclick="exportMktgCSV()" title="Export mktg data for current period" style="margin-left:auto;padding:4px 12px;font-size:11px;border-radius:4px;border:1px solid var(--border2);cursor:pointer;background:var(--bg2);color:var(--text2);display:inline-flex;align-items:center;gap:5px;white-space:nowrap">⬇ Export CSV</button>';
-  let html='<div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center;margin-bottom:16px">'+pb+_mktgExportBtn+'</div>';
+  const _unitToggle='<div style="display:inline-flex;align-items:center;gap:0;border:1px solid var(--border2);border-radius:5px;overflow:hidden;margin-left:8px" title="Lead unit toggle">'
+    +'<button onclick="_mktgLeadUnit=\'L\';renderMktg(getFiltered())" style="padding:3px 9px;font-size:11px;border:none;cursor:pointer;background:'+(_mktgLeadUnit==='L'?'var(--blue)':'var(--bg2)')+';color:'+(_mktgLeadUnit==='L'?'#fff':'var(--text2)')+'">L</button>'
+    +'<button onclick="_mktgLeadUnit=\'K\';renderMktg(getFiltered())" style="padding:3px 9px;font-size:11px;border:none;cursor:pointer;border-left:1px solid var(--border2);background:'+(_mktgLeadUnit==='K'?'var(--blue)':'var(--bg2)')+';color:'+(_mktgLeadUnit==='K'?'#fff':'var(--text2)')+'">K</button>'
+    +'</div>';
+  let html='<div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center;margin-bottom:16px">'+pb+_unitToggle+_mktgExportBtn+'</div>';
   html+='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">';
   html+='<thead>'
     +'<tr>'
     +'<th rowspan="2" style="text-align:left;padding:6px 10px;position:sticky;left:0;z-index:2;background:var(--bg3);border-bottom:2px solid var(--border2);min-width:130px">Account</th>'
     +'<th rowspan="2" style="text-align:left;padding:6px 6px;background:var(--bg3);border-bottom:2px solid var(--border2);font-size:10px;color:var(--text3);min-width:55px">Type</th>'
-    +'<th colspan="3" style="'+thB+';background:'+_bgM('#0a2a10','#dcfce7')+';color:#3fb950">Mktg Leads (L)</th>'
+    +'<th colspan="3" style="'+thB+';background:'+_bgM('#0a2a10','#dcfce7')+';color:#3fb950">Mktg Leads ('+_mktgLeadUnit+')</th>'
     +'<th colspan="2" style="'+thB+';background:'+_bgM('#1a2a0a','#f0fdf4')+';color:'+_bgM('#8eca5a','#4d7c0f')+'">TCPL (Rs/Lead)</th>'
     +'<th colspan="2" style="'+thB+';background:'+_bgM('#0a2040','#dbeafe')+';color:#58a6ff">Google</th>'
     +'<th colspan="2" style="'+thB+';background:'+_bgM('#2a001a','#fdf2f8')+';color:'+_bgM('#ff80a0','#db2777')+'">Meta</th>'
     +'<th colspan="2" style="'+thB+';background:'+_bgM('#2a1a00','#fff7ed')+';color:#f0883e">ROAS</th>'
     +'</tr><tr>'
-    +['TGT','ACT','Contrib%','TGT','ACT','Leads(L)','CPL(Rs)','Leads(L)','CPL(Rs)','Google','Meta'].map((h,i)=>{
+    +['TGT','ACT','Contrib%','TGT','ACT','Leads('+_mktgLeadUnit+')','CPL(Rs)','Leads('+_mktgLeadUnit+')','CPL(Rs)','Google','Meta'].map((h,i)=>{
       const bgs=['#0a2a10','#0a2a10','#0a2a10','#1a2a0a','#1a2a0a','#0a2040','#0a2040','#2a001a','#2a001a','#2a1a00','#2a1a00'];
       return '<th style="'+thS+';background:'+bgs[i]+';border-left:1px solid var(--border2);min-width:58px">'+h+'</th>';
     }).join('')
@@ -4000,18 +4005,18 @@ function renderMktg(rows){
       +'<td style="padding:5px 10px;font-size:11px;color:var(--text1);font-weight:'+(isNewClient?'700':'400')+';position:sticky;left:0;background:'+bg+'">'+(isNewClient?oemBadge(t.client):'<span style="opacity:.45;padding-left:30px">'+t.client+'</span>')+'</td>'
       +'<td style="padding:5px 6px;font-size:10px;color:var(--text3)">'+t.ad_type+'</td>'
       // Mktg Leads TGT | ACT | Contrib%
-      +'<td style="text-align:right;color:var(--text3)">'+fLac(mktgLT)+'</td>'
-      +'<td style="text-align:right;color:#3fb950;font-weight:600">'+fLac(paidL)+'</td>'
+      +'<td style="text-align:right;color:var(--text3)">'+fLead(mktgLT)+'</td>'
+      +'<td style="text-align:right;color:#3fb950;font-weight:600">'+fLead(paidL)+'</td>'
       +'<td style="text-align:right;color:'+(contribPct>=60?'#3fb950':contribPct>=40?'#d29922':'var(--text2)')+'">'+
         (trigL>0?contribPct.toFixed(0)+'%':'—')+'</td>'
       // TCPL TGT | ACT
       +'<td style="text-align:right;color:var(--text3)">'+fRs(tcplT)+'</td>'
       +'<td style="text-align:right;font-weight:600;color:'+cTcpl+'">'+fRs(tcplA)+'</td>'
       // Google Leads | CPL
-      +'<td style="text-align:right;color:#58a6ff">'+fLac(googL)+'</td>'
+      +'<td style="text-align:right;color:#58a6ff">'+fLead(googL)+'</td>'
       +'<td style="text-align:right;color:#a0c4ff">'+fRs(googCpl)+'</td>'
       // Meta Leads | CPL
-      +'<td style="text-align:right;color:#ff80a0">'+fLac(metaL)+'</td>'
+      +'<td style="text-align:right;color:#ff80a0">'+fLead(metaL)+'</td>'
       +'<td style="text-align:right;color:#ffb3c6">'+fRs(metaCpl)+'</td>'
       // ROAS Google | Meta
       +'<td style="text-align:right;color:'+roasColor(googRoas)+'">'+fRoas(googRoas)+'</td>'
@@ -4031,19 +4036,20 @@ function renderMktg(rows){
 
   html+='<tr style="background:var(--bg3);font-weight:700;border-top:2px solid var(--border2)">'
     +'<td colspan="2" style="padding:6px 10px;position:sticky;left:0;background:var(--bg3)">📊 TOTAL</td>'
-    +'<td style="text-align:right;color:var(--text3)">'+fLac(gMktgLT)+'</td>'
-    +'<td style="text-align:right;color:#3fb950">'+fLac(gPaidL)+'</td>'
+    +'<td style="text-align:right;color:var(--text3)">'+fLead(gMktgLT)+'</td>'
+    +'<td style="text-align:right;color:#3fb950">'+fLead(gPaidL)+'</td>'
     +'<td style="text-align:right">'+(gTrigL>0?gContrib.toFixed(0)+'%':'—')+'</td>'
     +'<td style="text-align:right;color:var(--text3)">'+fRs(gTcplT)+'</td>'
     +'<td style="text-align:right;color:'+gcTcpl+'">'+fRs(gTcplA)+'</td>'
-    +'<td style="text-align:right;color:#58a6ff">'+fLac(gGoogL)+'</td>'
+    +'<td style="text-align:right;color:#58a6ff">'+fLead(gGoogL)+'</td>'
     +'<td style="text-align:right;color:#a0c4ff">'+fRs(gGoogCpl)+'</td>'
-    +'<td style="text-align:right;color:#ff80a0">'+fLac(gMetaL)+'</td>'
+    +'<td style="text-align:right;color:#ff80a0">'+fLead(gMetaL)+'</td>'
     +'<td style="text-align:right;color:#ffb3c6">'+fRs(gMetaCpl)+'</td>'
     +'<td style="text-align:right;color:'+roasColor(gGoogRoas)+'">'+fRoas(gGoogRoas)+'</td>'
     +'<td style="text-align:right;color:'+roasColor(gMetaRoas)+'">'+fRoas(gMetaRoas)+'</td>'
     +'</tr>';
   html+='</tbody></table></div>';
+  html+='<p style="font-size:10px;color:var(--text3);margin-top:6px">Leads shown in '+(_mktgLeadUnit==='K'?'Thousands (K) — toggle to L for Lakhs':'Lakhs (L) — toggle to K for Thousands')+' · 3 decimal places · TGT = AOP target · ACT = actuals</p>';
 
   // Charts section
   html+='<div style="margin-top:24px">'
@@ -5642,7 +5648,7 @@ function _syncDashLinks(){
 
 // ── Version watcher — nudge users to hard-refresh when a new deploy is live ─
 function _startVersionWatch(){
-  if(!_fbDb || !DEPLOY_TIME || DEPLOY_TIME==='2026-06-02T15:17:23Z') return;
+  if(!_fbDb || !DEPLOY_TIME || DEPLOY_TIME==='2026-06-10T13:00:05Z') return;
   _fbDb.ref('meta/deployVersion').on('value', snap=>{
     const liveTs = snap.val();
     if(!liveTs) return;
