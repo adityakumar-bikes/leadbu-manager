@@ -560,7 +560,7 @@ canvas{max-height:260px}
       <div class="brand-mark">🏍️</div>
       <div class="brand-text">
         <div class="t1">Bike AOP Tracker</div>
-        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.2.29</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 26/06/2026 18:28</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
+        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.2.31</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 26/06/2026 18:34</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
       </div>
     </div>
     <div class="hdr-right">
@@ -859,7 +859,7 @@ function oemBadge(client){
 }
 
 const ACT_KEY='leadbu_actuals_fy27_v2';
-const DEPLOY_TIME='2026-06-26T18:28:19Z'; // replaced with ISO timestamp at deploy time
+const DEPLOY_TIME='2026-06-26T18:34:33Z'; // replaced with ISO timestamp at deploy time
 let ACTUALS=TARGETS.map(()=>newActualRec()); // populated by Firebase onValue
 
 function newActualRec(){
@@ -1770,7 +1770,7 @@ function updateLastSaved(isoStr){
 }
 function showDeployTime(){
   const el=document.getElementById('hdr-deployed');
-  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-06-26T18:28:19Z')return;
+  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-06-26T18:34:33Z')return;
   try{
     const d=new Date(DEPLOY_TIME);
     const pad=n=>String(n).padStart(2,'0');
@@ -2499,8 +2499,10 @@ function closeModal(){document.getElementById('modal').classList.remove('show');
 function initPLCollapse(){
   const mc=document.getElementById('modal-content');
   if(!mc)return;
+  const allBrands=[];
   mc.querySelectorAll('table.pl-table').forEach(table=>{
-    if((table.getAttribute('style')||'').includes('border:2px'))return; // skip summary table
+    // Skip summary tables (identified by var(--blue) border — brand tables use hex colors or no border)
+    if((table.getAttribute('style')||'').includes('var(--blue)'))return;
     const tbody=table.querySelector('tbody');
     if(!tbody)return;
     const rows=Array.from(tbody.rows);
@@ -2508,34 +2510,14 @@ function initPLCollapse(){
     const hdrRow=rows[0];
     const hdrTd=hdrRow.querySelector('td');
     if(!hdrTd)return;
-    // Prepend toggle arrow to brand header
     hdrTd.innerHTML='<span class="pl-ti" style="margin-right:6px;font-size:11px">▸</span>'+hdrTd.innerHTML;
     hdrRow.style.cursor='pointer';
     hdrRow.style.userSelect='none';
-    // Collapse all content rows initially
+    hdrRow.dataset.plOpen='0';
     const content=rows.slice(1);
     content.forEach(r=>{r.style.display='none';});
-    let open=false;
-    hdrRow.onclick=()=>{
-      open=!open;
-      const ti=hdrRow.querySelector('.pl-ti');
-      if(ti)ti.textContent=open?'▾':'▸';
-      if(open){
-        // Show only section header rows; section bodies stay collapsed
-        content.forEach(r=>{if(r.classList.contains('row-section'))r.style.display='';});
-      }else{
-        // Collapse everything and reset all section states
-        content.forEach(r=>{r.style.display='none';});
-        rows.forEach(r=>{
-          if(r.classList.contains('row-section')){
-            r.dataset.plOpen='0';
-            const si=r.querySelector('.pl-si');
-            if(si)si.textContent='▸';
-          }
-        });
-      }
-    };
-    // Section-level collapse
+    // Collect section headers and their body rows for this brand
+    const secHeaders=[];
     rows.forEach((row,ri)=>{
       if(!row.classList.contains('row-section'))return;
       const secRows=[];
@@ -2556,8 +2538,56 @@ function initPLCollapse(){
         const si=row.querySelector('.pl-si');
         if(si)si.textContent=isOpen?'▸':'▾';
       };
+      secHeaders.push({row,secRows});
     });
+    const collapseBrand=()=>{
+      hdrRow.dataset.plOpen='0';
+      const ti=hdrRow.querySelector('.pl-ti');
+      if(ti)ti.textContent='▸';
+      content.forEach(r=>{r.style.display='none';});
+      secHeaders.forEach(({row})=>{
+        row.dataset.plOpen='0';
+        const si=row.querySelector('.pl-si');
+        if(si)si.textContent='▸';
+      });
+    };
+    const expandBrand=(expandSections)=>{
+      hdrRow.dataset.plOpen='1';
+      const ti=hdrRow.querySelector('.pl-ti');
+      if(ti)ti.textContent='▾';
+      secHeaders.forEach(({row,secRows})=>{
+        row.style.display='';
+        if(expandSections){
+          row.dataset.plOpen='1';
+          secRows.forEach(r=>{r.style.display='';});
+          const si=row.querySelector('.pl-si');
+          if(si)si.textContent='▾';
+        }
+      });
+    };
+    hdrRow.onclick=()=>{
+      if(hdrRow.dataset.plOpen==='1')collapseBrand();
+      else expandBrand(false);
+    };
+    allBrands.push({collapseBrand,expandBrand});
   });
+  // Expand All / Collapse All button bar
+  if(allBrands.length>0){
+    const bar=document.createElement('div');
+    bar.style.cssText='display:flex;justify-content:flex-end;gap:6px;margin-bottom:10px';
+    const mkBtn=(label,fn)=>{
+      const b=document.createElement('button');
+      b.textContent=label;
+      b.style.cssText='font-size:10px;padding:3px 10px;border-radius:4px;border:1px solid var(--border2);background:var(--bg4);color:var(--text2);cursor:pointer';
+      b.onmouseenter=()=>{b.style.background='var(--bg3)';b.style.color='var(--text1)';};
+      b.onmouseleave=()=>{b.style.background='var(--bg4)';b.style.color='var(--text2)';};
+      b.onclick=fn;
+      return b;
+    };
+    bar.appendChild(mkBtn('⊞ Expand All',()=>{allBrands.forEach(b=>b.expandBrand(true));}));
+    bar.appendChild(mkBtn('⊟ Collapse All',()=>{allBrands.forEach(b=>b.collapseBrand());}));
+    mc.insertBefore(bar,mc.firstChild);
+  }
 }
 
 // Current quarter index (0-3) based on today's month within FY27
@@ -5808,7 +5838,7 @@ function saveBtlAllocation(recIdx,newBtl){
 
 // ── Version watcher — nudge users to hard-refresh when a new deploy is live ─
 function _startVersionWatch(){
-  if(!_fbDb || !DEPLOY_TIME || DEPLOY_TIME==='2026-06-26T18:28:19Z') return;
+  if(!_fbDb || !DEPLOY_TIME || DEPLOY_TIME==='2026-06-26T18:34:33Z') return;
   _fbDb.ref('meta/deployVersion').on('value', snap=>{
     const liveTs = snap.val();
     if(!liveTs) return;
