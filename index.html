@@ -560,7 +560,7 @@ canvas{max-height:260px}
       <div class="brand-mark">🏍️</div>
       <div class="brand-text">
         <div class="t1">Bike AOP Tracker</div>
-        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.2.24</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 26/06/2026 17:57</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
+        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.2.25</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 26/06/2026 18:05</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
       </div>
     </div>
     <div class="hdr-right">
@@ -859,7 +859,7 @@ function oemBadge(client){
 }
 
 const ACT_KEY='leadbu_actuals_fy27_v2';
-const DEPLOY_TIME='2026-06-26T17:57:39Z'; // replaced with ISO timestamp at deploy time
+const DEPLOY_TIME='2026-06-26T18:05:56Z'; // replaced with ISO timestamp at deploy time
 let ACTUALS=TARGETS.map(()=>newActualRec()); // populated by Firebase onValue
 
 function newActualRec(){
@@ -913,6 +913,7 @@ function newActualRec(){
     rev_adj: Array(12).fill(0),           // Revenue adjustment (Rs Lacs, +/-)
     rev_adj_comment: Array(12).fill(''),  // Per-month comment for the adjustment
     fy26_closing: 0,                      // FY26 closing gap carry-forward (Lacs) — Rev Recon tab
+    accrued_rev_recon: Array(12).fill(0), // Rev Recon: user-entered Accrued Revenue per month (Lacs)
   };
 }
 // migrateActuals: shape-checks and migrates raw data (from Firebase or backup)
@@ -1769,7 +1770,7 @@ function updateLastSaved(isoStr){
 }
 function showDeployTime(){
   const el=document.getElementById('hdr-deployed');
-  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-06-26T17:57:39Z')return;
+  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-06-26T18:05:56Z')return;
   try{
     const d=new Date(DEPLOY_TIME);
     const pad=n=>String(n).padStart(2,'0');
@@ -4676,7 +4677,7 @@ function renderRevRecon(rows){
   revRows.forEach(({t,a,d})=>{
     const tgtM=t.rev&&t.rev.monthly?t.rev.monthly:Array(12).fill(0);
     const accM=d.rev||Array(12).fill(0);
-    const billM=d.billed_rev||Array(12).fill(0);
+    const billM=t.ad_type==='CPS'?(a.accrued_rev_recon||Array(12).fill(0)):Array(12).fill(0);
     cols.forEach(i=>{gTgt[i]+=(+tgtM[i]||0);gAccrued[i]+=(+accM[i]||0);gBilled[i]+=(+billM[i]||0);});
   });
 
@@ -4718,7 +4719,7 @@ function renderRevRecon(rows){
     // We must compute each account's cumulative gap independently and sum per month
     const _perAccCum=revRows.map(({t,a,d})=>{
       const accM=d.rev||Array(12).fill(0);
-      const billM=d.billed_rev||Array(12).fill(0);
+      const billM=t.ad_type==='CPS'?(a.accrued_rev_recon||Array(12).fill(0)):Array(12).fill(0);
       const isCPS=t.ad_type==='CPS';
       const fc=+(a.fy26_closing)||0;
       if(!isCPS)return Array(12).fill(null);
@@ -4794,9 +4795,10 @@ function renderRevRecon(rows){
 
   let lastClient='';
   revRows.forEach(({t,a,d,i},ri)=>{
+    const recIdx=i; // capture before cols.forEach shadows with month index
     const tgtM  =t.rev&&t.rev.monthly?t.rev.monthly:Array(12).fill(0);
     const accM  =d.rev||Array(12).fill(0);
-    const billM =d.billed_rev||Array(12).fill(0);
+    const billM =t.ad_type==='CPS'?(a.accrued_rev_recon||Array(12).fill(0)):Array(12).fill(0);
     const isCPS =t.ad_type==='CPS';
     const fc    =+(a.fy26_closing)||0;
 
@@ -4843,10 +4845,16 @@ function renderRevRecon(rows){
 
       // ── Month value columns ──
       cols.forEach(i=>{
+        // 'bill' (Accrued Revenue) is user-editable — render input and return early
+        if(key==='bill'){
+          if(!isCPS){html+=`<td style="${td};color:var(--text3)">—</td>`;return;}
+          const bv=+billM[i]||0;
+          html+=`<td style="${td};padding:2px 4px"><input type="number" step="any" value="${bv!==0?bv:''}" placeholder="—" onchange="onAccruedRevChange(${recIdx},${i},this.value)" class="no-spin" style="width:64px;background:transparent;border:none;color:#3fb950;font-size:11px;text-align:right;outline:none;cursor:text;font-weight:600"></td>`;
+          return;
+        }
         let v;
         if(key==='tgt')      v=+tgtM[i]||0;
         else if(key==='acc') v=+accM[i]||0;
-        else if(key==='bill')v=isCPS?(+billM[i]||0):null;
         else if(key==='gap') v=isCPS?((+billM[i]||0)-(+accM[i]||0)):null;
         else if(key==='cumgap')v=isCPS?cumGap12[i]:null;
         else if(key==='diff') v=isCPS?((+accM[i]||0)-(+billM[i]||0)):null;
@@ -4898,7 +4906,7 @@ function renderRevRecon(rows){
   html+=`<div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:12px;padding:10px 14px;background:var(--bg2);border-radius:8px;border:1px solid var(--border2);font-size:10.5px;color:var(--text3)">
     <span><span style="color:var(--text2);font-weight:600">Target</span> — AOP target revenue for the period</span>
     <span><span style="color:#58a6ff;font-weight:600">Accrued</span> — Notional revenue reported to management (Retails × CAC + Adj)</span>
-    <span><span style="color:#3fb950;font-weight:600">Billed</span> — Post-reconciliation revenue (Billed Retails × CAC) · CPS only</span>
+    <span><span style="color:#3fb950;font-weight:600">Accrued Revenue</span> — User-entered accrued revenue per month (editable) · CPS only</span>
     <span><span style="color:#3fb950;font-weight:600">Gap</span> <span style="color:#f85149;font-weight:600">(+/−)</span> — Billed minus Accrued · <span style="color:#3fb950">green = Billed &gt; Accrued</span>, <span style="color:#f85149">red = shortfall</span> · CPS only</span>
     <span><span style="color:#14b8a6;font-weight:600">FY26 Closing</span> — Carry-forward gap from FY26 (editable, CPS only)</span>
     <span><span style="color:var(--text2);font-weight:600">Cumulative Gap</span> — Running total: FY26 Closing + monthly gaps · Apr = FY26 + Apr Gap · May = Apr Cum + May Gap · FY Total = Mar cumulative</span>
@@ -4915,6 +4923,17 @@ function onFY26ClosingChange(recIdx, val){
   window.scrollTo(0,_sy);
 }
 
+function onAccruedRevChange(recIdx, monthIdx, val){
+  const parsed=parseFloat(val);
+  if(!Array.isArray(ACTUALS[recIdx].accrued_rev_recon))
+    ACTUALS[recIdx].accrued_rev_recon=Array(12).fill(0);
+  ACTUALS[recIdx].accrued_rev_recon[monthIdx] = isNaN(parsed) ? 0 : parsed;
+  saveActuals();
+  const _sy=window.scrollY;
+  renderRevRecon(getFiltered());
+  window.scrollTo(0,_sy);
+}
+
 function exportRevReconCSV(){
   const rows=getFiltered();
   const revRows=rows.filter(({t,d})=>(t.rev&&t.rev.fy>0)||(d.rev_fy>0)||(d.billed_rev_fy>0));
@@ -4923,7 +4942,7 @@ function exportRevReconCSV(){
   revRows.forEach(({t,a,d})=>{
     const tgtM=t.rev&&t.rev.monthly?t.rev.monthly:Array(12).fill(0);
     const accM=d.rev||Array(12).fill(0);
-    const billM=d.billed_rev||Array(12).fill(0);
+    const billM=t.ad_type==='CPS'?(a.accrued_rev_recon||Array(12).fill(0)):Array(12).fill(0);
     const isCPS=t.ad_type==='CPS';
     const fc=+(a.fy26_closing)||0;
     const m12=(arr)=>Array(12).fill(0).map((_,i)=>((+arr[i]||0)));
@@ -5721,7 +5740,7 @@ function saveBtlAllocation(recIdx,newBtl){
 
 // ── Version watcher — nudge users to hard-refresh when a new deploy is live ─
 function _startVersionWatch(){
-  if(!_fbDb || !DEPLOY_TIME || DEPLOY_TIME==='2026-06-26T17:57:39Z') return;
+  if(!_fbDb || !DEPLOY_TIME || DEPLOY_TIME==='2026-06-26T18:05:56Z') return;
   _fbDb.ref('meta/deployVersion').on('value', snap=>{
     const liveTs = snap.val();
     if(!liveTs) return;
