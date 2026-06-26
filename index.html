@@ -560,7 +560,7 @@ canvas{max-height:260px}
       <div class="brand-mark">🏍️</div>
       <div class="brand-text">
         <div class="t1">Bike AOP Tracker</div>
-        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.2.33</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 26/06/2026 18:40</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
+        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.2.35</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 26/06/2026 18:48</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
       </div>
     </div>
     <div class="hdr-right">
@@ -859,7 +859,7 @@ function oemBadge(client){
 }
 
 const ACT_KEY='leadbu_actuals_fy27_v2';
-const DEPLOY_TIME='2026-06-26T18:40:59Z'; // replaced with ISO timestamp at deploy time
+const DEPLOY_TIME='2026-06-26T18:48:03Z'; // replaced with ISO timestamp at deploy time
 let ACTUALS=TARGETS.map(()=>newActualRec()); // populated by Firebase onValue
 
 function newActualRec(){
@@ -1770,7 +1770,7 @@ function updateLastSaved(isoStr){
 }
 function showDeployTime(){
   const el=document.getElementById('hdr-deployed');
-  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-06-26T18:40:59Z')return;
+  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-06-26T18:48:03Z')return;
   try{
     const d=new Date(DEPLOY_TIME);
     const pad=n=>String(n).padStart(2,'0');
@@ -4774,7 +4774,7 @@ function renderRevRecon(rows){
   const gTgt=Array(12).fill(0),gAccrued=Array(12).fill(0),gBilled=Array(12).fill(0);
   revRows.forEach(({t,a,d})=>{
     const tgtM=t.rev&&t.rev.monthly?t.rev.monthly:Array(12).fill(0);
-    const accM=d.rev||Array(12).fill(0);
+    const accM=d.billed_rev||Array(12).fill(0);
     const billM=t.ad_type==='CPS'?(a.accrued_rev_recon||Array(12).fill(0)):Array(12).fill(0);
     cols.forEach(i=>{gTgt[i]+=(+tgtM[i]||0);gAccrued[i]+=(+accM[i]||0);gBilled[i]+=(+billM[i]||0);});
   });
@@ -4816,7 +4816,7 @@ function renderRevRecon(rows){
   {
     // We must compute each account's cumulative gap independently and sum per month
     const _perAccCum=revRows.map(({t,a,d})=>{
-      const accM=d.rev||Array(12).fill(0);
+      const accM=d.billed_rev||Array(12).fill(0);
       const billM=t.ad_type==='CPS'?(a.accrued_rev_recon||Array(12).fill(0)):Array(12).fill(0);
       const isCPS=t.ad_type==='CPS';
       const fc=+(a.fy26_closing)||0;
@@ -4895,7 +4895,7 @@ function renderRevRecon(rows){
   revRows.forEach(({t,a,d,i},ri)=>{
     const recIdx=i; // capture before cols.forEach shadows with month index
     const tgtM  =t.rev&&t.rev.monthly?t.rev.monthly:Array(12).fill(0);
-    const accM  =d.rev||Array(12).fill(0);
+    const accM  =d.billed_rev||Array(12).fill(0);
     const billM =t.ad_type==='CPS'?(a.accrued_rev_recon||Array(12).fill(0)):Array(12).fill(0);
     const isCPS =t.ad_type==='CPS';
     const fc    =+(a.fy26_closing)||0;
@@ -5039,7 +5039,7 @@ function exportRevReconCSV(){
   const dataRows=[];
   revRows.forEach(({t,a,d})=>{
     const tgtM=t.rev&&t.rev.monthly?t.rev.monthly:Array(12).fill(0);
-    const accM=d.rev||Array(12).fill(0);
+    const accM=d.billed_rev||Array(12).fill(0);
     const billM=t.ad_type==='CPS'?(a.accrued_rev_recon||Array(12).fill(0)):Array(12).fill(0);
     const isCPS=t.ad_type==='CPS';
     const fc=+(a.fy26_closing)||0;
@@ -5838,7 +5838,7 @@ function saveBtlAllocation(recIdx,newBtl){
 
 // ── Version watcher — nudge users to hard-refresh when a new deploy is live ─
 function _startVersionWatch(){
-  if(!_fbDb || !DEPLOY_TIME || DEPLOY_TIME==='2026-06-26T18:40:59Z') return;
+  if(!_fbDb || !DEPLOY_TIME || DEPLOY_TIME==='2026-06-26T18:48:03Z') return;
   _fbDb.ref('meta/deployVersion').on('value', snap=>{
     const liveTs = snap.val();
     if(!liveTs) return;
