@@ -560,7 +560,7 @@ canvas{max-height:260px}
       <div class="brand-mark">🏍️</div>
       <div class="brand-text">
         <div class="t1">Bike AOP Tracker</div>
-        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.2.20</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 26/06/2026 12:49</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
+        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.2.22</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 26/06/2026 13:05</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
       </div>
     </div>
     <div class="hdr-right">
@@ -859,7 +859,7 @@ function oemBadge(client){
 }
 
 const ACT_KEY='leadbu_actuals_fy27_v2';
-const DEPLOY_TIME='2026-06-26T12:49:39Z'; // replaced with ISO timestamp at deploy time
+const DEPLOY_TIME='2026-06-26T13:05:20Z'; // replaced with ISO timestamp at deploy time
 let ACTUALS=TARGETS.map(()=>newActualRec()); // populated by Firebase onValue
 
 function newActualRec(){
@@ -1769,7 +1769,7 @@ function updateLastSaved(isoStr){
 }
 function showDeployTime(){
   const el=document.getElementById('hdr-deployed');
-  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-06-26T12:49:39Z')return;
+  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-06-26T13:05:20Z')return;
   try{
     const d=new Date(DEPLOY_TIME);
     const pad=n=>String(n).padStart(2,'0');
@@ -4705,8 +4705,8 @@ function renderRevRecon(rows){
 
   const METRICS=[
     {key:'tgt',    label:'Target Revenue (Lacs)',          color:'var(--text2)',  italic:false},
-    {key:'acc',    label:'Accrued Revenue (Lacs)',          color:'#58a6ff',      italic:false},
-    {key:'bill',   label:'Billed Revenue (Lacs)',           color:'#3fb950',      italic:false},
+    {key:'acc',    label:'Final Billed Revenue (Lacs)',          color:'#58a6ff',      italic:false},
+    {key:'bill',   label:'Accrued Revenue (Lacs)',           color:'#3fb950',      italic:false},
     {key:'gap',    label:'Gap (Billed − Accrued) (Lacs)',  color:'dynamic',      italic:true},
     {key:'cumgap', label:'Cumulative Gap (Lacs)',           color:'dynamic',      italic:true},
   ];
@@ -4742,8 +4742,8 @@ function renderRevRecon(rows){
   html+=`<tr><td colspan="${2+1+1+cols.length+(showFY?1:0)}" style="padding:2px 10px;background:var(--bg2);border-bottom:2px solid var(--accent)44;font-size:10px;color:var(--accent);font-weight:700;letter-spacing:.3px;text-align:left">◈ GRAND TOTAL</td></tr>`;
   [
     {key:'tgt',    label:'Target Revenue (Lacs)',          color:'var(--text2)'},
-    {key:'acc',    label:'Accrued Revenue (Lacs)',         color:'#58a6ff'},
-    {key:'bill',   label:'Billed Revenue (Lacs)',          color:'#3fb950'},
+    {key:'acc',    label:'Final Billed Revenue (Lacs)',         color:'#58a6ff'},
+    {key:'bill',   label:'Accrued Revenue (Lacs)',          color:'#3fb950'},
     {key:'gap',    label:'Gap (Billed − Accrued) (Lacs)', color:'dynamic'},
     {key:'cumgap', label:'Cumulative Gap (Lacs)',          color:'dynamic'},
   ].forEach(({key,label,color})=>{
@@ -4935,8 +4935,8 @@ function exportRevReconCSV(){
     const cum12Exp=isCPS?cum12:Array(12).fill('—');
     const cumFY=isCPS?cum12[11]:'—';
     dataRows.push([t.client,t.btl||'—',t.ad_type,'Target Revenue (Lacs)','—',...m12(tgtM),fy(tgtM)]);
-    dataRows.push([t.client,t.btl||'—',t.ad_type,'Accrued Revenue (Lacs)','—',...m12(accM),fy(accM)]);
-    dataRows.push([t.client,t.btl||'—',t.ad_type,'Billed Revenue (Lacs)','—',...(isCPS?m12(billM):Array(12).fill('—')),(isCPS?fy(billM):'—')]);
+    dataRows.push([t.client,t.btl||'—',t.ad_type,'Final Billed Revenue (Lacs)','—',...m12(accM),fy(accM)]);
+    dataRows.push([t.client,t.btl||'—',t.ad_type,'Accrued Revenue (Lacs)','—',...(isCPS?m12(billM):Array(12).fill('—')),(isCPS?fy(billM):'—')]);
     dataRows.push([t.client,t.btl||'—',t.ad_type,'Gap (Billed − Accrued) (Lacs)','—',...gap12,gapFY]);
     dataRows.push([t.client,t.btl||'—',t.ad_type,'Cumulative Gap (Lacs)',isCPS?fc:'—',...cum12Exp,cumFY]);
     dataRows.push(Array(hdr.length).fill(''));
@@ -5686,7 +5686,7 @@ function _syncDashLinks(){
 
 // ── Version watcher — nudge users to hard-refresh when a new deploy is live ─
 function _startVersionWatch(){
-  if(!_fbDb || !DEPLOY_TIME || DEPLOY_TIME==='2026-06-26T12:49:39Z') return;
+  if(!_fbDb || !DEPLOY_TIME || DEPLOY_TIME==='2026-06-26T13:05:20Z') return;
   _fbDb.ref('meta/deployVersion').on('value', snap=>{
     const liveTs = snap.val();
     if(!liveTs) return;
