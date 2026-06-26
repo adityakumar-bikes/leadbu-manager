@@ -560,7 +560,7 @@ canvas{max-height:260px}
       <div class="brand-mark">🏍️</div>
       <div class="brand-text">
         <div class="t1">Bike AOP Tracker</div>
-        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.2.27</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 26/06/2026 18:18</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
+        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.2.29</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 26/06/2026 18:28</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
       </div>
     </div>
     <div class="hdr-right">
@@ -859,7 +859,7 @@ function oemBadge(client){
 }
 
 const ACT_KEY='leadbu_actuals_fy27_v2';
-const DEPLOY_TIME='2026-06-26T18:18:10Z'; // replaced with ISO timestamp at deploy time
+const DEPLOY_TIME='2026-06-26T18:28:19Z'; // replaced with ISO timestamp at deploy time
 let ACTUALS=TARGETS.map(()=>newActualRec()); // populated by Firebase onValue
 
 function newActualRec(){
@@ -1770,7 +1770,7 @@ function updateLastSaved(isoStr){
 }
 function showDeployTime(){
   const el=document.getElementById('hdr-deployed');
-  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-06-26T18:18:10Z')return;
+  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-06-26T18:28:19Z')return;
   try{
     const d=new Date(DEPLOY_TIME);
     const pad=n=>String(n).padStart(2,'0');
@@ -2777,9 +2777,9 @@ function renderModal(recIdx){
       +inputRow('Revenue Adjustment (Lacs)','cv-adj','rev_adj',revAdj,'0.01','Enter positive (+) or negative (−) adjustment')
       +textRow('Adj. Comment','rev_adj_comment',a.rev_adj_comment)
       +compRow('= Total Revenue / Notional (Calc + Adj)',revTotal,'cv-rev-total',1,tRevM)
-      +sectionRow('── ACCRUED REVENUE ──')
+      +sectionRow('── BILLED REVENUE ──')
       +inputRow('Accrued Retails (units reconciled)','','billed_retails',aBilledRet,'1')
-      +compRow('= Accrued Revenue (Accrued Retails × CAC)',d.billed_rev,'cv-rev',1)
+      +compRow('= Billed Revenue (Billed Retails × CAC)',d.billed_rev,'cv-rev',1)
       +sectionRow('── OEM SALE ──')
       +inputRow('OEM Industry Sale (units)','','oem_sale',a.oem_sale||Array(12).fill(0),'1','Total industry retails for this account')
       +sectionRow('── ROAS INPUTS (Ad Revenue) ──')
@@ -2860,7 +2860,7 @@ function renderModal(recIdx){
     +compRow('Calculated Revenue / Notional (Rs Lacs)',d.rev_calc,'cv-rev',1)
     +compRow('Revenue Adjustment (Lacs)',revAdj,'cv-adj',1)
     +compRow('= Total Revenue / Notional (Rs Lacs)',revTotal,'cv-rev-total',1)
-    +(adType==='CPS'?compRow('Accrued Revenue (Accrued Retails × CAC)',d.billed_rev,'cv-rev',1):'')
+    +(adType==='CPS'?compRow('Billed Revenue (Billed Retails × CAC)',d.billed_rev,'cv-rev',1):'')
     +compRow('Abs GM = Total Rev − Mktg',gmTotal,'cv-gm',1,tGM)
     +pctRow('GM %',gmTotal,revTotal,'cv-gm',tGM,tRevM)
     +compRow('Abs GPM = GM − CC − AI',gpmTotal,gpmTotal.some(v=>v<0)?'cv-neg':'cv-gpm',1,tGPM)
@@ -3089,10 +3089,10 @@ function renderBajajModal(recIdx){
       +(saR?bCmp('Total Retails (count)',saR,'cv',0):'')
       +(saR?bPct('Overall Cr%',saR,d.trig_leads,'cv-pct'):'')
       +bCmp('Total Mktg Cost (Lacs)',d.mktg_cost,'cv-mktg',1,tMktgM)
-      +bCmp('Actual Billed Revenue (Lacs)',d.rev_calc,'cv-rev',1)
+      +bCmp('Calculated Revenue (Lacs)',d.rev_calc,'cv-rev',1)
       +bCmp('Revenue Adjustment (Lacs)',revAdjArr,'cv-adj',1)
       +bCmp('= Total Revenue / Notional (Calc+Adj)',revTotalArr,'cv-rev-total',1,tRevM)
-      +bCmp('Accrued Revenue (Accrued Retails × CAC)',d.billed_rev,'cv-rev',1)
+      +bCmp('Billed Revenue (Billed Retails × CAC)',d.billed_rev,'cv-rev',1)
       +bCmp('Total CC Seats (count)',Array(12).fill(0).map((_,i)=>+(a.cc_seats&&a.cc_seats[i])||0),'cv',0)
       +bCmp('CC Cost (Lacs)',d.cc,'cv-mktg',2,tCCM)
       +bCmp('Abs GM',gmTotal,'cv-gm',1,tGM)
@@ -3108,7 +3108,7 @@ function renderBajajModal(recIdx){
     const brGmTotal=bd.gm;
     const brGpmTotal=bd.gpm;
     let rev='';
-    if(adType==='CPS')rev=sec('REVENUE (CAC × Retails)')+bInp('CAC (Rs/Retail)','','cac',br.cac,'1',brand)+bInp('Retails','','retails',br.retails,'1',brand)+bCmp('= Actual Billed Revenue (Lacs)',bd.rev_calc,'cv-rev',1)+bInp('Revenue Adjustment (Lacs)','cv-adj','rev_adj',br.rev_adj||Array(12).fill(0),'0.01',brand)+bTxt('Adj. Comment','rev_adj_comment',br.rev_adj_comment||Array(12).fill(''),brand)+bCmp('= Total Revenue / Notional (Calc+Adj)',brRevTotal,'cv-rev-total',1)+sec('── ACCRUED REVENUE ──')+bInp('Accrued Retails (reconciled)','','billed_retails',br.billed_retails||Array(12).fill(0),'1',brand)+bCmp('= Accrued Revenue (Accrued Retails × CAC)',bd.billed_rev,'cv-rev',1)+sec('── OEM SALE ──')+bInp('OEM Industry Sale (units)','','oem_sale',br.oem_sale||Array(12).fill(0),'1',brand)+sec('ROAS INPUTS (Ad Revenue)')+bInp('Google Absolute Retails (count)','','google_abs_retails',br.google_abs_retails||Array(12).fill(0),'1',brand)+bCmp('Google Revenue from Ads (Rs Lacs)',bd.google_rev,'cv-rev',2)+bInp('Meta Absolute Retails (count)','','meta_abs_retails',br.meta_abs_retails||Array(12).fill(0),'1',brand)+bCmp('Meta Revenue from Ads (Rs Lacs)',bd.meta_rev,'cv-rev',2);
+    if(adType==='CPS')rev=sec('REVENUE (CAC × Retails)')+bInp('CAC (Rs/Retail)','','cac',br.cac,'1',brand)+bInp('Retails','','retails',br.retails,'1',brand)+bCmp('= Calculated Revenue (Lacs)',bd.rev_calc,'cv-rev',1)+bInp('Revenue Adjustment (Lacs)','cv-adj','rev_adj',br.rev_adj||Array(12).fill(0),'0.01',brand)+bTxt('Adj. Comment','rev_adj_comment',br.rev_adj_comment||Array(12).fill(''),brand)+bCmp('= Total Revenue / Notional (Calc+Adj)',brRevTotal,'cv-rev-total',1)+sec('── BILLED REVENUE ──')+bInp('Billed Retails (reconciled)','','billed_retails',br.billed_retails||Array(12).fill(0),'1',brand)+bCmp('= Billed Revenue (Billed Retails × CAC)',bd.billed_rev,'cv-rev',1)+sec('── OEM SALE ──')+bInp('OEM Industry Sale (units)','','oem_sale',br.oem_sale||Array(12).fill(0),'1',brand)+sec('ROAS INPUTS (Ad Revenue)')+bInp('Google Absolute Retails (count)','','google_abs_retails',br.google_abs_retails||Array(12).fill(0),'1',brand)+bCmp('Google Revenue from Ads (Rs Lacs)',bd.google_rev,'cv-rev',2)+bInp('Meta Absolute Retails (count)','','meta_abs_retails',br.meta_abs_retails||Array(12).fill(0),'1',brand)+bCmp('Meta Revenue from Ads (Rs Lacs)',bd.meta_rev,'cv-rev',2);
     else if(adType==='Media Leads')rev=sec('REVENUE (CPL × Leads)')+bInp('CPL Charged (Rs/Lead)','cpl-input','cpl_rate',br.cpl_rate,'1',brand)+bInp('Total Leads (count)','','total_leads',br.total_leads,'1',brand)+bCmp('= Calculated Revenue (Lacs)',bd.rev_calc,'cv-rev',1)+bInp('Revenue Adjustment (Lacs)','cv-adj','rev_adj',br.rev_adj||Array(12).fill(0),'0.01',brand)+bTxt('Adj. Comment','rev_adj_comment',br.rev_adj_comment||Array(12).fill(''),brand)+bCmp('= Total Revenue (Calc+Adj)',brRevTotal,'cv-rev-total',1)+sec('ROAS INPUTS (Ad Revenue)')+bInp('Google Absolute Retails (count)','','google_abs_retails',br.google_abs_retails||Array(12).fill(0),'1',brand)+bCmp('Google Revenue from Ads (Rs Lacs)',bd.google_rev,'cv-rev',2)+bInp('Meta Absolute Retails (count)','','meta_abs_retails',br.meta_abs_retails||Array(12).fill(0),'1',brand)+bCmp('Meta Revenue from Ads (Rs Lacs)',bd.meta_rev,'cv-rev',2);
     else if(adType==='CC contract')rev=sec('REVENUE (SeatCost × Seats)')+bInp('Seat Cost (Rs Abs)','cpl-input','seat_cost',br.seat_cost,'1',brand)+bInp('No. of Seats','','seats',br.seats,'1',brand)+bCmp('= Calculated Revenue (Lacs)',bd.rev_calc,'cv-rev',1)+bInp('Revenue Adjustment (Lacs)','cv-adj','rev_adj',br.rev_adj||Array(12).fill(0),'0.01',brand)+bTxt('Adj. Comment','rev_adj_comment',br.rev_adj_comment||Array(12).fill(''),brand)+bCmp('= Total Revenue (Calc+Adj)',brRevTotal,'cv-rev-total',1);
     return '<table class="pl-table" style="margin-bottom:14px"><thead>'+colHdrs()+'</thead><tbody>'
@@ -3262,10 +3262,10 @@ function renderTVSModal(recIdx){
     +(adType==='CPS'?bCmpT('Total Retails (count)',_tvsRetails,'cv',0):'')
     +(adType==='CPS'?bPctR('Overall Cr%',_tvsRetails,sa(d.trig_leads),'cv-pct'):'')
     +bCmpT('Total Mktg Cost (Lacs)',d.mktg_cost,'cv-mktg',1,tMktgM)
-    +bCmpR('Actual Billed Revenue (Lacs)',sa(d.rev_calc),'cv-rev',1)
+    +bCmpR('Calculated Revenue (Lacs)',sa(d.rev_calc),'cv-rev',1)
     +bCmpR('Revenue Adjustment (Lacs)',_tvsRevAdj,'cv-adj',1)
     +bCmpT('= Total Revenue / Notional (Calc+Adj)',_tvsRevTotal,'cv-rev-total',1,tRevM)
-    +(adType==='CPS'?bCmpR('Accrued Revenue (Accrued Retails × CAC)',sa(d.billed_rev),'cv-rev',1):'')
+    +(adType==='CPS'?bCmpR('Billed Revenue (Billed Retails × CAC)',sa(d.billed_rev),'cv-rev',1):'')
     +bCmpR('Total CC Seats (count)',a.cc_seats,'cv',0)
     +bCmpT('CC Cost (Lacs)',d.cc,'cv-mktg',2,tCCM)
     +bCmpT('Abs GM',_tvsGmTotal,'cv-gm',1,tGM)
@@ -3330,15 +3330,15 @@ function renderTVSModal(recIdx){
     html+=bPctR('DMS Cr% = DMS / Triggered Leads',brDMS,trigLd,'cv-pct');
     html+=bPctR('VoC Cr% = VoC / Triggered Leads',brVoC,trigLd,'cv-pct');
     html+=bInpR('Overall Cr% = Retails / Triggered Leads (%)','cpl-input','overall_cr_pct',brOvCr,'0.01',brand,'');
-    html+=bCmpR('= Actual Billed Revenue (Rs Lacs)',brRev,'cv-rev',1);
+    html+=bCmpR('= Calculated Revenue (Rs Lacs)',brRev,'cv-rev',1);
     html+=bInpR('Revenue Adjustment (Lacs)','cv-adj','rev_adj',brRevAdj,'0.01',brand,'Enter positive or negative adjustment');
     html+=bTxtR('Adj. Comment','rev_adj_comment',Array(12).fill('').map((_,i)=>(br.rev_adj_comment&&br.rev_adj_comment[i])||''),brand);
     const brBilledRet=sa(br.billed_retails);
     const brBilledRev=brBilledRet.map((r,i)=>brCAC[i]*r/100000);
     html+=bCmpR('= Total Revenue / Notional (Calc+Adj)',brRevTotal,'cv-rev-total',1);
-    html+=sec('── ACCRUED REVENUE ──');
-    html+=bInpR('Accrued Retails (reconciled)','','billed_retails',brBilledRet,'1',brand);
-    html+=bCmpR('= Accrued Revenue (Accrued Retails × CAC)',brBilledRev,'cv-rev',1);
+    html+=sec('── BILLED REVENUE ──');
+    html+=bInpR('Billed Retails (reconciled)','','billed_retails',brBilledRet,'1',brand);
+    html+=bCmpR('= Billed Revenue (Billed Retails × CAC)',brBilledRev,'cv-rev',1);
     html+=sec('── OEM SALE ──');
     html+=bInpR('OEM Industry Sale (units)','','oem_sale',sa(br.oem_sale),'1',brand,'Total industry retails for this brand');
     html+=sec('── ROAS INPUTS (Ad Revenue) ──');
@@ -3465,7 +3465,7 @@ function renderREModal(recIdx){
       +bCmp('Calculated Revenue (Lacs)',d.rev_calc,'cv-rev',1)
       +bCmp('Revenue Adjustment (Lacs)',reRevAdj,'cv-adj',1)
       +bCmp('= Total Revenue / Notional (Calc+Adj)',reRevTotal,'cv-rev-total',1,tRevM)
-      +(!isCC?bCmp('Accrued Revenue (Accrued Retails × CAC)',d.billed_rev,'cv-rev',1):'')
+      +(!isCC?bCmp('Billed Revenue (Billed Retails × CAC)',d.billed_rev,'cv-rev',1):'')
       +bCmp('Total CC Seats (count)',Array(12).fill(0).map((_,i)=>+(a.cc_seats&&a.cc_seats[i])||0),'cv',0)
       +bCmp('CC Cost (Lacs)',d.cc,'cv-mktg',2,tCCM)
       +bCmp('Abs GM',reGmTotal,'cv-gm',1,tGM)
@@ -3497,9 +3497,9 @@ function renderREModal(recIdx){
       +bInp('Revenue Adjustment (Lacs)','cv-adj','rev_adj',br.rev_adj||Array(12).fill(0),'0.01',brand)
       +bTxt('Adj. Comment','rev_adj_comment',br.rev_adj_comment||Array(12).fill(''),brand)
       +bCmp('= Total Revenue / Notional (Calc+Adj)',brRevTotal,'cv-rev-total',1)
-      +sec('── ACCRUED REVENUE ──')
-      +bInp('Accrued Retails (reconciled)','','billed_retails',br.billed_retails||Array(12).fill(0),'1',brand)
-      +bCmp('= Accrued Revenue (Accrued Retails × CAC)',bd.billed_rev,'cv-rev',1)
+      +sec('── BILLED REVENUE ──')
+      +bInp('Billed Retails (reconciled)','','billed_retails',br.billed_retails||Array(12).fill(0),'1',brand)
+      +bCmp('= Billed Revenue (Billed Retails × CAC)',bd.billed_rev,'cv-rev',1)
       +sec('── OEM SALE ──')
       +bInp('OEM Industry Sale (units)','','oem_sale',br.oem_sale||Array(12).fill(0),'1',brand)
       +sec('ROAS INPUTS (Ad Revenue)')
@@ -3654,7 +3654,7 @@ function renderHarleyModal(recIdx){
       +bCmp('Calculated Revenue (Lacs)',d.rev_calc,'cv-rev',1)
       +bCmp('Revenue Adjustment (Lacs)',hRevAdj,'cv-adj',1)
       +bCmp('= Total Revenue / Notional (Calc+Adj)',hRevTotal,'cv-rev-total',1,tRevM)
-      +(!isCC&&!isMediaLeads?bCmp('Accrued Revenue (Accrued Retails × CAC)',d.billed_rev,'cv-rev',1):'')
+      +(!isCC&&!isMediaLeads?bCmp('Billed Revenue (Billed Retails × CAC)',d.billed_rev,'cv-rev',1):'')
       +bCmp('Total CC Seats (count)',Array(12).fill(0).map((_,i)=>+(a.cc_seats&&a.cc_seats[i])||0),'cv',0)
       +bCmp('CC Cost (Lacs)',d.cc,'cv-mktg',2,tCCM)
       +bCmp('Abs GM',hGmTotal,'cv-gm',1,tGM)
@@ -3686,9 +3686,9 @@ function renderHarleyModal(recIdx){
       +bInp('Revenue Adjustment (Lacs)','cv-adj','rev_adj',br.rev_adj||Array(12).fill(0),'0.01',brand)
       +bTxt('Adj. Comment','rev_adj_comment',br.rev_adj_comment||Array(12).fill(''),brand)
       +bCmp('= Total Revenue / Notional (Calc+Adj)',brRevTotal,'cv-rev-total',1)
-      +sec('── ACCRUED REVENUE ──')
-      +bInp('Accrued Retails (reconciled)','','billed_retails',br.billed_retails||Array(12).fill(0),'1',brand)
-      +bCmp('= Accrued Revenue (Accrued Retails × CAC)',bd.billed_rev,'cv-rev',1)
+      +sec('── BILLED REVENUE ──')
+      +bInp('Billed Retails (reconciled)','','billed_retails',br.billed_retails||Array(12).fill(0),'1',brand)
+      +bCmp('= Billed Revenue (Billed Retails × CAC)',bd.billed_rev,'cv-rev',1)
       +sec('── OEM SALE ──')
       +bInp('OEM Industry Sale (units)','','oem_sale',br.oem_sale||Array(12).fill(0),'1',brand)
       +sec('ROAS INPUTS (Ad Revenue)')
@@ -5808,7 +5808,7 @@ function saveBtlAllocation(recIdx,newBtl){
 
 // ── Version watcher — nudge users to hard-refresh when a new deploy is live ─
 function _startVersionWatch(){
-  if(!_fbDb || !DEPLOY_TIME || DEPLOY_TIME==='2026-06-26T18:18:10Z') return;
+  if(!_fbDb || !DEPLOY_TIME || DEPLOY_TIME==='2026-06-26T18:28:19Z') return;
   _fbDb.ref('meta/deployVersion').on('value', snap=>{
     const liveTs = snap.val();
     if(!liveTs) return;
