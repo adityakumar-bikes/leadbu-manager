@@ -560,7 +560,7 @@ canvas{max-height:260px}
       <div class="brand-mark">🏍️</div>
       <div class="brand-text">
         <div class="t1">Bike AOP Tracker</div>
-        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.2.35</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 26/06/2026 18:48</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
+        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.2.37</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 29/06/2026 09:57</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
       </div>
     </div>
     <div class="hdr-right">
@@ -859,7 +859,7 @@ function oemBadge(client){
 }
 
 const ACT_KEY='leadbu_actuals_fy27_v2';
-const DEPLOY_TIME='2026-06-26T18:48:03Z'; // replaced with ISO timestamp at deploy time
+const DEPLOY_TIME='2026-06-29T09:57:10Z'; // replaced with ISO timestamp at deploy time
 let ACTUALS=TARGETS.map(()=>newActualRec()); // populated by Firebase onValue
 
 function newActualRec(){
@@ -1770,7 +1770,7 @@ function updateLastSaved(isoStr){
 }
 function showDeployTime(){
   const el=document.getElementById('hdr-deployed');
-  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-06-26T18:48:03Z')return;
+  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-06-29T09:57:10Z')return;
   try{
     const d=new Date(DEPLOY_TIME);
     const pad=n=>String(n).padStart(2,'0');
@@ -2496,6 +2496,25 @@ function openModal(recIdx){
 
 function closeModal(){document.getElementById('modal').classList.remove('show');modalRecIdx=-1;}
 
+let _plExpandState=null; // snapshot of expand state before a modal re-render
+
+function _capturePLState(){
+  const mc=document.getElementById('modal-content');
+  if(!mc){_plExpandState=null;return;}
+  const brands=[];
+  mc.querySelectorAll('table.pl-table').forEach(table=>{
+    if((table.getAttribute('style')||'').includes('var(--blue)'))return;
+    const tbody=table.querySelector('tbody');
+    if(!tbody)return;
+    const rows=Array.from(tbody.rows);
+    if(!rows.length)return;
+    const brandOpen=rows[0].dataset.plOpen==='1';
+    const secs=rows.filter(r=>r.classList.contains('row-section')).map(r=>r.dataset.plOpen==='1');
+    brands.push({brandOpen,secs});
+  });
+  _plExpandState=brands;
+}
+
 function initPLCollapse(){
   const mc=document.getElementById('modal-content');
   if(!mc)return;
@@ -2569,8 +2588,24 @@ function initPLCollapse(){
       if(hdrRow.dataset.plOpen==='1')collapseBrand();
       else expandBrand(false);
     };
-    allBrands.push({collapseBrand,expandBrand});
+    allBrands.push({collapseBrand,expandBrand,secHeaders});
   });
+  // Restore expand state from before the re-render (if triggered by an input change)
+  if(_plExpandState&&_plExpandState.length){
+    allBrands.forEach(({expandBrand,secHeaders},i)=>{
+      const saved=_plExpandState[i];
+      if(!saved||!saved.brandOpen)return;
+      expandBrand(false); // show section header rows
+      secHeaders.forEach(({row,secRows},si)=>{
+        if(!saved.secs[si])return;
+        row.dataset.plOpen='1';
+        secRows.forEach(r=>{r.style.display='';});
+        const arrow=row.querySelector('.pl-si');
+        if(arrow)arrow.textContent='▾';
+      });
+    });
+    _plExpandState=null;
+  }
   // Expand All / Collapse All button bar
   if(allBrands.length>0){
     const bar=document.createElement('div');
@@ -3053,6 +3088,7 @@ function onBrandInputChange(inp){
   }
 
   recomputeBrandTotals(ri,BRANDS_FOR);
+  _capturePLState();
   renderModal(ri);
   updateKPIs(getFiltered());
   saveActuals();
@@ -5838,7 +5874,7 @@ function saveBtlAllocation(recIdx,newBtl){
 
 // ── Version watcher — nudge users to hard-refresh when a new deploy is live ─
 function _startVersionWatch(){
-  if(!_fbDb || !DEPLOY_TIME || DEPLOY_TIME==='2026-06-26T18:48:03Z') return;
+  if(!_fbDb || !DEPLOY_TIME || DEPLOY_TIME==='2026-06-29T09:57:10Z') return;
   _fbDb.ref('meta/deployVersion').on('value', snap=>{
     const liveTs = snap.val();
     if(!liveTs) return;
