@@ -360,6 +360,7 @@ async function _authInit(){
 let _allUsers = {};
 let _allUsersListening = false;
 let _onlineUsers = {};
+let _btlFCat='', _btlFFuel='', _btlFClient='', _btlFAdType=''; // BTL Account Allocation filters
 
 function _watchAllUsers(){
   if (_allUsersListening || !_userListRef) return;
@@ -529,45 +530,98 @@ function renderUsers(){
 
   // ── BTL Account Allocation (admin only) ──
   if(typeof TARGETS !== 'undefined' && TARGETS && TARGETS.length){
-    const _btls=[...new Set(TARGETS.map(t=>t.btl).filter(Boolean))].sort();
-    const _selStyle='background:var(--bg);border:1px solid var(--border2);border-radius:5px;padding:4px 8px;color:var(--text1);font-size:11px;font-family:inherit;outline:none;cursor:pointer';
-    html+=`<div style="margin:0 22px 22px">
-      <div style="font-size:13px;font-weight:700;color:var(--text1);margin-bottom:4px">👥 BTL Account Allocation</div>
-      <div style="font-size:11px;color:var(--text3);margin-bottom:14px">Reassign accounts between team leads. Changes sync instantly for all users.</div>`;
-    _btls.forEach(btl=>{
-      const rows=TARGETS.map((t,i)=>({t,i})).filter(({t})=>t.btl===btl);
-      html+=`<div style="background:var(--bg2);border:1px solid var(--border);border-radius:9px;margin-bottom:12px;overflow:hidden">
-        <div style="background:var(--bg3);padding:10px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border)">
-          <span style="font-size:12px;font-weight:700;color:var(--text1)">${btl}</span>
-          <span style="font-size:10px;color:var(--text3);background:var(--bg);padding:2px 8px;border-radius:10px;border:1px solid var(--border2)">${rows.length} account${rows.length!==1?'s':''}</span>
-        </div>
-        <table style="width:100%;border-collapse:collapse;font-size:11px">
-          <thead><tr style="background:var(--bg3);border-bottom:1px solid var(--border)">
-            <th style="text-align:left;padding:6px 16px;font-size:9px;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:.5px">Client</th>
-            <th style="text-align:left;padding:6px 8px;font-size:9px;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:.5px">Ad Type</th>
-            <th style="text-align:left;padding:6px 8px;font-size:9px;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:.5px">BA</th>
-            <th style="text-align:right;padding:6px 16px;font-size:9px;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:.5px">Reassign BTL</th>
-          </tr></thead><tbody>`;
-      rows.forEach(({t,i})=>{
-        html+=`<tr style="border-top:1px solid var(--border)">
-          <td style="padding:8px 16px;color:var(--text1);font-weight:500">${t.client}</td>
-          <td style="padding:8px 8px;color:var(--text3)">${t.ad_type}</td>
-          <td style="padding:8px 8px;color:var(--text3)">${t.ba||'—'}</td>
-          <td style="padding:8px 16px;text-align:right">
-            <select onchange="saveBtlAllocation(${i},this.value);this.closest('tr').style.background='#3fb95022'" style="${_selStyle}">
-              ${_btls.map(b=>`<option value="${b}"${b===t.btl?' selected':''}>${b}</option>`).join('')}
-            </select>
-          </td>
-        </tr>`;
-      });
-      html+=`</tbody></table></div>`;
-    });
-    html+=`</div>`;
+    html+=`<div id="btl-alloc-wrap" style="margin:0 22px 22px">${_renderBtlAllocation()}</div>`;
   }
 
   el.innerHTML = html;
   _watchPreInvites();   // start/keep live listener
   _renderPreInvites();  // paint from cached data immediately
+}
+
+/* ─── BTL Account Allocation (filterable) ───────────────────────── */
+function _renderBtlAllocation(){
+  if(typeof TARGETS === 'undefined' || !TARGETS || !TARGETS.length) return '';
+  const cats    = [...new Set(TARGETS.map(t=>t.cat).filter(Boolean))].sort();
+  const fuels   = [...new Set(TARGETS.map(t=>t.fuel).filter(Boolean))].sort();
+  const clients = [...new Set(TARGETS.map(t=>t.client).filter(Boolean))].sort();
+  const adTypes = [...new Set(TARGETS.map(t=>t.ad_type).filter(Boolean))].sort();
+  const _btls   = [...new Set(TARGETS.map(t=>t.btl).filter(Boolean))].sort();
+  const _selStyle='background:var(--bg);border:1px solid var(--border2);border-radius:5px;padding:4px 8px;color:var(--text1);font-size:11px;font-family:inherit;outline:none;cursor:pointer';
+
+  const mkFilter=(id,label,options,current)=>
+    `<select id="${id}" onchange="_btlFilterChange('${id}',this.value)" style="${_selStyle}">
+      <option value="">${label}: All</option>
+      ${options.map(o=>`<option value="${o.replace(/"/g,'&quot;')}"${o===current?' selected':''}>${o}</option>`).join('')}
+    </select>`;
+
+  const hasFilter = _btlFCat||_btlFFuel||_btlFClient||_btlFAdType;
+  let html=`<div style="font-size:13px;font-weight:700;color:var(--text1);margin-bottom:4px">👥 BTL Account Allocation</div>
+    <div style="font-size:11px;color:var(--text3);margin-bottom:10px">Reassign accounts between team leads. Changes sync instantly for all users.</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px">
+      ${mkFilter('btl-f-cat','Category',cats,_btlFCat)}
+      ${mkFilter('btl-f-fuel','Fuel',fuels,_btlFFuel)}
+      ${mkFilter('btl-f-client','Client',clients,_btlFClient)}
+      ${mkFilter('btl-f-adtype','Ad Type',adTypes,_btlFAdType)}
+      ${hasFilter?`<button onclick="_btlFilterClear()" style="font-size:10px;padding:4px 10px;border-radius:5px;border:1px solid var(--border2);background:var(--bg4);color:var(--text2);cursor:pointer">✕ Clear filters</button>`:''}
+    </div>`;
+
+  const filtered=TARGETS.map((t,i)=>({t,i})).filter(({t})=>
+    (!_btlFCat||t.cat===_btlFCat) &&
+    (!_btlFFuel||t.fuel===_btlFFuel) &&
+    (!_btlFClient||t.client===_btlFClient) &&
+    (!_btlFAdType||t.ad_type===_btlFAdType)
+  );
+
+  if(!filtered.length){
+    html+=`<div style="padding:24px;text-align:center;color:var(--text3);font-size:12px;background:var(--bg2);border:1px solid var(--border);border-radius:9px">No accounts match the selected filters.</div>`;
+    return html;
+  }
+
+  _btls.forEach(btl=>{
+    const rows=filtered.filter(({t})=>t.btl===btl);
+    if(!rows.length)return;
+    html+=`<div style="background:var(--bg2);border:1px solid var(--border);border-radius:9px;margin-bottom:12px;overflow:hidden">
+      <div style="background:var(--bg3);padding:10px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border)">
+        <span style="font-size:12px;font-weight:700;color:var(--text1)">${btl}</span>
+        <span style="font-size:10px;color:var(--text3);background:var(--bg);padding:2px 8px;border-radius:10px;border:1px solid var(--border2)">${rows.length} account${rows.length!==1?'s':''}</span>
+      </div>
+      <table style="width:100%;border-collapse:collapse;font-size:11px">
+        <thead><tr style="background:var(--bg3);border-bottom:1px solid var(--border)">
+          <th style="text-align:left;padding:6px 16px;font-size:9px;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:.5px">Client</th>
+          <th style="text-align:left;padding:6px 8px;font-size:9px;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:.5px">Ad Type</th>
+          <th style="text-align:left;padding:6px 8px;font-size:9px;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:.5px">BA</th>
+          <th style="text-align:right;padding:6px 16px;font-size:9px;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:.5px">Reassign BTL</th>
+        </tr></thead><tbody>`;
+    rows.forEach(({t,i})=>{
+      html+=`<tr style="border-top:1px solid var(--border)">
+        <td style="padding:8px 16px;color:var(--text1);font-weight:500">${t.client}</td>
+        <td style="padding:8px 8px;color:var(--text3)">${t.ad_type}</td>
+        <td style="padding:8px 8px;color:var(--text3)">${t.ba||'—'}</td>
+        <td style="padding:8px 16px;text-align:right">
+          <select onchange="saveBtlAllocation(${i},this.value);this.closest('tr').style.background='#3fb95022'" style="${_selStyle}">
+            ${_btls.map(b=>`<option value="${b}"${b===t.btl?' selected':''}>${b}</option>`).join('')}
+          </select>
+        </td>
+      </tr>`;
+    });
+    html+=`</tbody></table></div>`;
+  });
+  return html;
+}
+
+function _btlFilterChange(id,val){
+  if(id==='btl-f-cat')_btlFCat=val;
+  else if(id==='btl-f-fuel')_btlFFuel=val;
+  else if(id==='btl-f-client')_btlFClient=val;
+  else if(id==='btl-f-adtype')_btlFAdType=val;
+  const wrap=document.getElementById('btl-alloc-wrap');
+  if(wrap)wrap.innerHTML=_renderBtlAllocation();
+}
+
+function _btlFilterClear(){
+  _btlFCat='';_btlFFuel='';_btlFClient='';_btlFAdType='';
+  const wrap=document.getElementById('btl-alloc-wrap');
+  if(wrap)wrap.innerHTML=_renderBtlAllocation();
 }
 
 /* ─── Pre-invite management ──────────────────────────────────────── */
