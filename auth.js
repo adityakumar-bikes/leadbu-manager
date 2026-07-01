@@ -527,6 +527,44 @@ function renderUsers(){
 
   html += `<div style="padding:0 22px 22px;font-size:11px;color:var(--text3);line-height:1.7;max-width:780px"><b style="color:var(--text2)">Quick rules:</b> Admins manage users + edit data. Editors edit data only. Viewers see everything but cannot change anything. Disabling a user revokes access immediately on their next page load. Force sign-out ends a user's current session next time the page reloads.</div>`;
 
+  // ── BTL Account Allocation (admin only) ──
+  if(typeof TARGETS !== 'undefined' && TARGETS && TARGETS.length){
+    const _btls=[...new Set(TARGETS.map(t=>t.btl).filter(Boolean))].sort();
+    const _selStyle='background:var(--bg);border:1px solid var(--border2);border-radius:5px;padding:4px 8px;color:var(--text1);font-size:11px;font-family:inherit;outline:none;cursor:pointer';
+    html+=`<div style="margin:0 22px 22px">
+      <div style="font-size:13px;font-weight:700;color:var(--text1);margin-bottom:4px">👥 BTL Account Allocation</div>
+      <div style="font-size:11px;color:var(--text3);margin-bottom:14px">Reassign accounts between team leads. Changes sync instantly for all users.</div>`;
+    _btls.forEach(btl=>{
+      const rows=TARGETS.map((t,i)=>({t,i})).filter(({t})=>t.btl===btl);
+      html+=`<div style="background:var(--bg2);border:1px solid var(--border);border-radius:9px;margin-bottom:12px;overflow:hidden">
+        <div style="background:var(--bg3);padding:10px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border)">
+          <span style="font-size:12px;font-weight:700;color:var(--text1)">${btl}</span>
+          <span style="font-size:10px;color:var(--text3);background:var(--bg);padding:2px 8px;border-radius:10px;border:1px solid var(--border2)">${rows.length} account${rows.length!==1?'s':''}</span>
+        </div>
+        <table style="width:100%;border-collapse:collapse;font-size:11px">
+          <thead><tr style="background:var(--bg3);border-bottom:1px solid var(--border)">
+            <th style="text-align:left;padding:6px 16px;font-size:9px;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:.5px">Client</th>
+            <th style="text-align:left;padding:6px 8px;font-size:9px;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:.5px">Ad Type</th>
+            <th style="text-align:left;padding:6px 8px;font-size:9px;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:.5px">BA</th>
+            <th style="text-align:right;padding:6px 16px;font-size:9px;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:.5px">Reassign BTL</th>
+          </tr></thead><tbody>`;
+      rows.forEach(({t,i})=>{
+        html+=`<tr style="border-top:1px solid var(--border)">
+          <td style="padding:8px 16px;color:var(--text1);font-weight:500">${t.client}</td>
+          <td style="padding:8px 8px;color:var(--text3)">${t.ad_type}</td>
+          <td style="padding:8px 8px;color:var(--text3)">${t.ba||'—'}</td>
+          <td style="padding:8px 16px;text-align:right">
+            <select onchange="saveBtlAllocation(${i},this.value);this.closest('tr').style.background='#3fb95022'" style="${_selStyle}">
+              ${_btls.map(b=>`<option value="${b}"${b===t.btl?' selected':''}>${b}</option>`).join('')}
+            </select>
+          </td>
+        </tr>`;
+      });
+      html+=`</tbody></table></div>`;
+    });
+    html+=`</div>`;
+  }
+
   el.innerHTML = html;
   _watchPreInvites();   // start/keep live listener
   _renderPreInvites();  // paint from cached data immediately
