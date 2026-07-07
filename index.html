@@ -560,7 +560,7 @@ canvas{max-height:260px}
       <div class="brand-mark">🏍️</div>
       <div class="brand-text">
         <div class="t1">Bike AOP Tracker</div>
-        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.2.40</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 01/07/2026 11:58</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
+        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.2.41</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 07/07/2026 18:05</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
       </div>
     </div>
     <div class="hdr-right">
@@ -859,7 +859,7 @@ function oemBadge(client){
 }
 
 const ACT_KEY='leadbu_actuals_fy27_v2';
-const DEPLOY_TIME='2026-07-01T11:58:59Z'; // replaced with ISO timestamp at deploy time
+const DEPLOY_TIME='2026-07-07T18:05:27Z'; // replaced with ISO timestamp at deploy time
 let ACTUALS=TARGETS.map(()=>newActualRec()); // populated by Firebase onValue
 
 function newActualRec(){
@@ -966,7 +966,9 @@ function loadActuals(){
 // Firebase ref (set during init)
 let _fbRef=null;
 let _fbSaveTimer=null;
-let _fbLocalUpdate=false; // flag to suppress echo from our own write
+let _fbEchoSkip=0;        // count of pending own-write echoes to ignore in the value listener
+let _dirtyRecs=new Set(); // record indices with local edits not yet flushed to Firebase
+let _fbSaveAll=false;     // next flush writes the whole tree (restore/clear/migration paths)
 
 // ═══════════════════════════
 // USER IDENTITY + AUDIT LOG
@@ -1101,7 +1103,7 @@ function undoChange(ts){
     old:s.newVal,new:s.oldVal,
   });
   _undoStack.splice(idx,1);
-  saveActuals();
+  saveActuals(s.recIdx);
   render();
 }
 
@@ -1729,7 +1731,17 @@ function _buildAuditV2(allEntries){
 }
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-function saveActuals(){
+// Stamp identity key so records can be re-matched if TARGETS is ever reordered/resized
+function _stampClientKey(i){
+  const t=TARGETS[i];
+  if(!t||!ACTUALS[i])return;
+  ACTUALS[i]._clientKey=[t.client,t.ad_type,t.btl,t.cat,t.fuel].join('|');
+}
+// saveActuals(recIdx): pass the edited record's index for a scoped per-record write.
+// Called with no args (restore/clear/header Save), the whole tree is written.
+function saveActuals(recIdx){
+  if(typeof recIdx==='number'&&recIdx>=0)_dirtyRecs.add(recIdx);
+  else _fbSaveAll=true;
   // Optimistic local indicator
   const el=document.getElementById('save-ok');
   el.textContent='⏫ Syncing…';el.classList.add('show');
@@ -1737,15 +1749,34 @@ function saveActuals(){
   clearTimeout(_fbSaveTimer);
   _fbSaveTimer=setTimeout(()=>{
     if(_fbRef){
-      _fbLocalUpdate=true;
+      const saveAll=_fbSaveAll;
+      const flushed=[..._dirtyRecs];
+      _fbSaveAll=false;_dirtyRecs.clear();
       const _saveTs=new Date().toISOString();
-      _fbRef.set(ACTUALS).then(()=>{
+      let p;
+      if(saveAll){
+        ACTUALS.forEach((_,i)=>_stampClientKey(i));
+        _fbEchoSkip++;
+        p=_fbRef.set(ACTUALS);
+      }else{
+        // Per-record patch: only edited accounts are written, so concurrent
+        // edits by other users to OTHER accounts are never clobbered.
+        const patch={};
+        flushed.forEach(i=>{if(ACTUALS[i]){_stampClientKey(i);patch[i]=ACTUALS[i];}});
+        if(!Object.keys(patch).length){el.classList.remove('show');return;}
+        _fbEchoSkip++;
+        p=_fbRef.update(patch);
+      }
+      p.then(()=>{
         el.textContent='✅ Saved & Synced';
         setTimeout(()=>{ el.classList.remove('show'); el.textContent='✅ Saved'; },2500);
         updateLastSaved(_saveTs);
         try{_fbDb.ref('meta/lastSaved').set(_saveTs);}catch(e){}
       }).catch(err=>{
-        // Firebase write failed – fallback to localStorage
+        // Firebase write failed – re-mark dirty so a later save retries, keep local copy
+        if(saveAll)_fbSaveAll=true;
+        flushed.forEach(i=>_dirtyRecs.add(i));
+        _fbEchoSkip=Math.max(0,_fbEchoSkip-1);
         localStorage.setItem(ACT_KEY,JSON.stringify(ACTUALS));
         el.textContent='⚠ Offline – saved locally';
         setTimeout(()=>el.classList.remove('show'),3000);
@@ -1754,6 +1785,7 @@ function saveActuals(){
     } else {
       // Firebase not yet ready – save locally
       localStorage.setItem(ACT_KEY,JSON.stringify(ACTUALS));
+      _fbSaveAll=false;_dirtyRecs.clear();
       el.textContent='✅ Saved (local)';
       setTimeout(()=>el.classList.remove('show'),2000);
     }
@@ -1770,7 +1802,7 @@ function updateLastSaved(isoStr){
 }
 function showDeployTime(){
   const el=document.getElementById('hdr-deployed');
-  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-07-01T11:58:59Z')return;
+  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-07-07T18:05:27Z')return;
   try{
     const d=new Date(DEPLOY_TIME);
     const pad=n=>String(n).padStart(2,'0');
@@ -1841,6 +1873,7 @@ function restoreActuals(input){
       el.textContent='✓ Restored '+matched+' accounts'+(skipped?' ('+skipped+' skipped)':'');
       el.classList.add('show');setTimeout(()=>{el.textContent='✓ Saved';el.classList.remove('show');},3000);
       render();
+      saveActuals(); // full-tree sync so the restore reaches Firebase
     }catch(err){alert('Could not read backup file: '+err.message);}
   };
   reader.readAsText(file);
@@ -1920,6 +1953,7 @@ function confirmClearActuals(){
 
   document.getElementById('clear-modal').classList.remove('show');
   render();
+  saveActuals(); // full-tree sync so the clear reaches Firebase
 
   const el=document.getElementById('save-ok');
   el.textContent='✓ Cleared — backup saved in logs';
@@ -2683,7 +2717,7 @@ function copyMonthInModal(recIdx, fromM, toM){
       });
     });
   }
-  saveActuals();
+  saveActuals(recIdx);
   updateKPIs(getFiltered());
   renderModal(recIdx);
 }
@@ -2957,7 +2991,7 @@ function onModalInputChange(input){
     const newRetails=trig>0?Math.round(v/100*trig):0;
     const oldR=+(ACTUALS[ri].retails&&ACTUALS[ri].retails[mi])||0;
     if(oldR!==newRetails){logChange(ri,'retails',mi,oldR,newRetails,null);ACTUALS[ri].retails[mi]=newRetails;}
-    renderModal(ri);updateKPIs(getFiltered());saveActuals();return;
+    renderModal(ri);updateKPIs(getFiltered());saveActuals(ri);return;
   }
   if(field==='retails'){
     const oldV=+(ACTUALS[ri].retails&&ACTUALS[ri].retails[mi])||0;
@@ -2968,7 +3002,7 @@ function onModalInputChange(input){
     const trig=d.trig_leads[mi];
     const newCr=trig>0?(v/trig*100):0;
     ACTUALS[ri].overall_cr_pct[mi]=newCr;
-    renderModal(ri);updateKPIs(getFiltered());saveActuals();return;
+    renderModal(ri);updateKPIs(getFiltered());saveActuals(ri);return;
   }
   // ── DMS + VoC → auto-sum to retails ──
   if(field==='dms_retails'||field==='voc_retails'){
@@ -2983,7 +3017,7 @@ function onModalInputChange(input){
     const d=deriveActuals(ACTUALS[ri],TARGETS[ri].ad_type);
     const trig=d.trig_leads[mi];
     ACTUALS[ri].overall_cr_pct[mi]=trig>0?(total/trig*100):0;
-    renderModal(ri);updateKPIs(getFiltered());saveActuals();return;
+    renderModal(ri);updateKPIs(getFiltered());saveActuals(ri);return;
   }
   onModalEdit(field,mi,input.value,ri);
 }
@@ -2996,11 +3030,11 @@ function onModalEdit(field,monthIdx,val,recIdx){
   ACTUALS[ri][field][monthIdx]=v;
   renderModal(ri);
   updateKPIs(getFiltered());
-  saveActuals(); // auto-save debounced
+  saveActuals(ri); // auto-save debounced
 }
 
 function saveModal(){
-  saveActuals();
+  saveActuals(modalRecIdx>=0?modalRecIdx:undefined);
   closeModal();
   render();
 }
@@ -3019,7 +3053,7 @@ function onRevAdjCommentChange(input){
     if(!ACTUALS[ri].rev_adj_comment)ACTUALS[ri].rev_adj_comment=Array(12).fill('');
     ACTUALS[ri].rev_adj_comment[mi]=v;
   }
-  saveActuals();
+  saveActuals(ri);
 }
 
 // ═══════════════════════════
@@ -3091,7 +3125,7 @@ function onBrandInputChange(inp){
   _capturePLState();
   renderModal(ri);
   updateKPIs(getFiltered());
-  saveActuals();
+  saveActuals(ri);
 }
 function renderBajajModal(recIdx){
   const t=TARGETS[recIdx],a=ACTUALS[recIdx];
@@ -3457,7 +3491,7 @@ function renderREModal(recIdx){
       [...CC_FIELDS,...CPS_FIELDS,...ML_FIELDS,...['rev_adj_comment','billed_retails','oem_sale','google_abs_retails','meta_abs_retails','overall_cr_pct','dms_retails','voc_retails','non_ms_leads']].filter((f,i,arr)=>arr.indexOf(f)===i).forEach(f=>{
         if(a[f]!=null)iceBrand[f]=Array.isArray(a[f])?a[f].slice():a[f];
       });
-      saveActuals();
+      saveActuals(recIdx);
     }
   })();
   // Sync each brand's retails from DMS+VoC
@@ -5051,7 +5085,7 @@ function renderRevRecon(rows){
 function onFY26ClosingChange(recIdx, val){
   const parsed=parseFloat(val);
   ACTUALS[recIdx].fy26_closing = isNaN(parsed) ? 0 : parsed;
-  saveActuals();
+  saveActuals(recIdx);
   const _sy=window.scrollY;
   renderRevRecon(getFiltered());
   window.scrollTo(0,_sy);
@@ -5062,7 +5096,7 @@ function onAccruedRevChange(recIdx, monthIdx, val){
   if(!Array.isArray(ACTUALS[recIdx].accrued_rev_recon))
     ACTUALS[recIdx].accrued_rev_recon=Array(12).fill(0);
   ACTUALS[recIdx].accrued_rev_recon[monthIdx] = isNaN(parsed) ? 0 : parsed;
-  saveActuals();
+  saveActuals(recIdx);
   const _sy=window.scrollY;
   renderRevRecon(getFiltered());
   window.scrollTo(0,_sy);
@@ -5748,10 +5782,13 @@ function _fbStartSync(){
   _fbDb.ref('presence/fy27').on('value', snap=>renderActiveUsers(snap));
 _fbRef.on('value', snapshot=>{
   const raw = snapshot.val();
-  if(_fbLocalUpdate){ _fbLocalUpdate=false; return; } // skip echo of our own write
+  if(_fbEchoSkip>0){ _fbEchoSkip--; return; } // skip echo of our own write
   if(raw && Array.isArray(raw) && raw.length===TARGETS.length){
-    // Fast path: lengths match, load directly
-    ACTUALS = migrateActuals(raw);
+    // Fast path: lengths match, load — but preserve records with local edits
+    // still waiting in the debounce window so a remote snapshot can't revert them
+    const incoming = migrateActuals(raw);
+    _dirtyRecs.forEach(i=>{ if(ACTUALS&&ACTUALS[i]) incoming[i]=ACTUALS[i]; });
+    ACTUALS = incoming;
   } else if(raw && Array.isArray(raw) && raw.length>0 && _fbFirstLoad){
     // Length mismatch (TARGETS changed) — key-based rescue: match by client+ad_type+btl+cat+fuel
     console.warn('[Firebase] Row count mismatch: Firebase='+raw.length+' TARGETS='+TARGETS.length+' — recovering by key match');
@@ -5778,7 +5815,7 @@ _fbRef.on('value', snapshot=>{
       ACTUALS=newAct;
     }
     // Rewrite Firebase with correct length so future loads are fast-path
-    _fbLocalUpdate=true;
+    _fbEchoSkip++;
     _fbRef.set(ACTUALS);
     console.log('[Firebase] Recovered and rewrote Firebase with '+ACTUALS.length+' rows');
   } else if(_fbFirstLoad) {
@@ -5787,7 +5824,7 @@ _fbRef.on('value', snapshot=>{
     const hasLocal = local.some(r=>Object.keys(r).some(k=>Array.isArray(r[k])&&r[k].some(v=>v>0)));
     if(hasLocal){
       ACTUALS = local;
-      _fbLocalUpdate=true;
+      _fbEchoSkip++;
       _fbRef.set(ACTUALS); // seed Firebase with existing local data
       console.log('Seeded Firebase from localStorage');
     } else {
@@ -5801,6 +5838,7 @@ _fbRef.on('value', snapshot=>{
   try{_fbDb.ref('meta/lastSaved').once('value',s=>{if(s.val())updateLastSaved(s.val());});}catch(e){}
   _startVersionWatch(); // nudge stale clients when a new deploy is live
   registerPresence(); // announce this user as active
+  setTimeout(_dailyBackupCheck,8000); // daily snapshot once auth role has settled
   // Hide loading overlay on first successful load
   const ov=document.getElementById('fb-loading');
   if(ov) ov.remove();
@@ -5872,9 +5910,37 @@ function saveBtlAllocation(recIdx,newBtl){
   render();
 }
 
+// ── Daily auto-snapshot — first admin session of the day backs up ACTUALS ──
+let _dailyBackupChecked=false;
+function _dailyBackupCheck(){
+  if(_dailyBackupChecked)return;
+  if(!_fbDb||typeof _authIsAdmin!=='function'||!_authIsAdmin())return;
+  _dailyBackupChecked=true;
+  const today=new Date().toISOString().slice(0,10);
+  const metaRef=_fbDb.ref('backups/meta');
+  metaRef.once('value').then(snap=>{
+    const meta=snap.val()||{};
+    if(meta.lastDate===today)return; // already snapshotted today
+    const dates=Array.isArray(meta.dates)?meta.dates.slice():(meta.dates?Object.values(meta.dates):[]);
+    _fbDb.ref('backups/daily/'+today).set({
+      ts:Date.now(), by:getCurrentUser(), account_count:TARGETS.length, data:ACTUALS
+    }).then(()=>{
+      dates.push(today);
+      const drop=[];
+      while(dates.length>14)drop.push(dates.shift()); // keep last 14 days
+      metaRef.set({lastDate:today,dates}).catch(()=>{});
+      drop.forEach(d=>_fbDb.ref('backups/daily/'+d).remove().catch(()=>{}));
+      console.log('[Backup] Daily snapshot saved:',today);
+    }).catch(e=>{
+      _dailyBackupChecked=false; // retry next session if rules not yet published
+      console.warn('[Backup] Daily snapshot failed (backups rule published?):',e.message);
+    });
+  }).catch(()=>{_dailyBackupChecked=false;});
+}
+
 // ── Version watcher — nudge users to hard-refresh when a new deploy is live ─
 function _startVersionWatch(){
-  if(!_fbDb || !DEPLOY_TIME || DEPLOY_TIME==='2026-07-01T11:58:59Z') return;
+  if(!_fbDb || !DEPLOY_TIME || DEPLOY_TIME==='2026-07-07T18:05:27Z') return;
   _fbDb.ref('meta/deployVersion').on('value', snap=>{
     const liveTs = snap.val();
     if(!liveTs) return;
@@ -6629,10 +6695,7 @@ function renderOverview(){
 // ═══════════════════════════
 // CLIENTS PAGE
 // ═══════════════════════════
-// ── Client master filter state ────────────────────────────────────────────────
-let _cmFClient='',_cmFAdType='',_cmFContract='',_cmFBTL='';
-function applyCMFilter(f,v){if(f==='client')_cmFClient=v;else if(f==='adtype')_cmFAdType=v;else if(f==='contract')_cmFContract=v;else if(f==='btl')_cmFBTL=v;renderClients();}
-function clearCMFilters(){_cmFClient='';_cmFAdType='';_cmFContract='';_cmFBTL='';renderClients();}
+// (Client-master filters live in the cm-f-* <select> elements; see renderClients/clearCMFilters below)
 
 // ── UNIFIED Full Backup / Restore (Actuals + Client Master in one file) ──────
 function backupFull(){
@@ -6728,6 +6791,7 @@ function restoreFull(input){
             new:'Actuals restored from full backup saved '+savedLabel+' ('+matched+' matched, '+skipped+' skipped)'});
           actualsMsg=matched+' actuals accounts restored'+(skipped?' ('+skipped+' skipped)':'');
           render();
+          saveActuals(); // full-tree sync so the restore reaches Firebase
         }
       }
 
@@ -7649,7 +7713,7 @@ async function callAI(systemPrompt, messages, maxTokens=2000){
   if(!apiKey)return{ok:false,error:'no_key'};
   const trimmedKey=apiKey.trim();
   const provider=_aiProvider(trimmedKey);
-  console.log('[AI] provider:',provider,'| key prefix:',trimmedKey.slice(0,12)+'…');
+  console.log('[AI] provider:',provider);
   try{
     if(provider==='openai'){
       const resp=await fetch('https://api.openai.com/v1/chat/completions',{
@@ -7674,7 +7738,7 @@ async function callAI(systemPrompt, messages, maxTokens=2000){
         if(mData.data) availModels=mData.data.map(m=>m.id);
       }catch(me){console.warn('[AI] models probe failed:',me.message);}
 
-      const _preferred=['claude-3-7-sonnet-20250219','claude-3-5-sonnet-20241022','claude-3-5-haiku-20241022','claude-3-haiku-20240307'];
+      const _preferred=['claude-sonnet-5','claude-haiku-4-5-20251001','claude-3-7-sonnet-20250219','claude-3-5-sonnet-20241022','claude-3-5-haiku-20241022','claude-3-haiku-20240307'];
       const _models=availModels
         ? _preferred.filter(m=>availModels.includes(m)).concat(availModels.filter(m=>!_preferred.includes(m)))
         : _preferred;
@@ -8174,6 +8238,110 @@ function renderInsights(){
   // ── CSS shorthand ──
   const card=(extra='')=>`background:var(--bg2);border:1px solid var(--border2);border-radius:12px;padding:18px 20px;${extra}`;
   const scard=(extra='')=>`background:var(--bg3);border:1px solid var(--border2);border-radius:10px;padding:14px 16px;${extra}`;
+
+  // ═══ PACING vs TARGET (always FY-scoped, independent of period selector) ═══
+  const _now=new Date();
+  const _fyIdx=_now.getMonth()>=3?_now.getMonth()-3:_now.getMonth()+9; // Apr=0
+  const elapsed=_fyIdx;            // complete FY months (current month excluded)
+  const remaining=12-elapsed;
+  const pacingMap={};              // per-OEM FY pacing
+  let paceTotTgt=0,paceTotAct=0;
+  const acctFYTD=[];               // per-account FYTD revenue for concentration
+  rows.forEach(({t,d})=>{
+    const fyTgt=(t.rev&&t.rev.fy)||0;
+    let fytd=0;for(let i=0;i<elapsed;i++)fytd+=(+d.rev[i]||0);
+    paceTotTgt+=fyTgt;paceTotAct+=fytd;
+    if(!pacingMap[t.client])pacingMap[t.client]={tgt:0,act:0};
+    pacingMap[t.client].tgt+=fyTgt;pacingMap[t.client].act+=fytd;
+    acctFYTD.push({label:t.client+' · '+t.ad_type+(t.ba&&t.ba!=='-'?' · '+t.ba:''),client:t.client,rev:fytd,gpm:0});
+  });
+  const paceRows=Object.entries(pacingMap).filter(([,p])=>p.tgt>0).map(([client,p])=>{
+    const cur=elapsed>0?p.act/elapsed:0;                    // current monthly run-rate
+    const req=remaining>0?Math.max(0,(p.tgt-p.act))/remaining:0; // required monthly rate
+    const proj=p.act+cur*remaining;                          // projected FY landing
+    const achv=p.tgt>0?p.act/p.tgt*100:0;
+    const lift=cur>0?((req-cur)/cur*100):(req>0?Infinity:0); // % step-up needed
+    return{client,tgt:p.tgt,act:p.act,cur,req,proj,achv,lift};
+  }).sort((a,b)=>(b.tgt-b.proj)-(a.tgt-a.proj));
+  const paceCur=elapsed>0?paceTotAct/elapsed:0;
+  const paceReq=remaining>0?Math.max(0,paceTotTgt-paceTotAct)/remaining:0;
+  const paceProj=paceTotAct+paceCur*remaining;
+  const paceLift=paceCur>0?((paceReq-paceCur)/paceCur*100):(paceReq>0?Infinity:0);
+
+  // ═══ CONCENTRATION RISK (top-5 accounts' share of FYTD revenue) ═══
+  const _concSorted=[...acctFYTD].sort((a,b)=>b.rev-a.rev);
+  const _concTot=_concSorted.reduce((s,r)=>s+r.rev,0);
+  const _concTop5=_concSorted.slice(0,5);
+  const concShare=_concTot>0?_concTop5.reduce((s,r)=>s+r.rev,0)/_concTot*100:0;
+  const concTopOEM=topRevOEMs.length&&totRev>0?topRevOEMs[0][1].rev/totRev*100:0;
+
+  // ═══ DATA QUALITY & FRESHNESS (FYTD scope) ═══
+  const _staleList=[],_qualityFlags=[];
+  const STALE_DAYS=7;
+  rows.forEach(({t,a,d,i})=>{
+    let fytdRev=0,fytdMktg=0,fytdLeads=0,fytdRevCalc=0,fytdRet=0;
+    for(let m=0;m<elapsed;m++){
+      fytdRev+=(+d.rev[m]||0);fytdMktg+=(+d.mktg_cost[m]||0);
+      fytdLeads+=(+d.trig_leads[m]||0);fytdRevCalc+=(+d.rev_calc[m]||0);
+      fytdRet+=(+(a.retails&&a.retails[m])||0);
+    }
+    const hasData=fytdRev>0||fytdMktg>0||fytdLeads>0;
+    const lbl=t.client+' · '+t.ad_type+(t.ba&&t.ba!=='-'?' · '+t.ba:'');
+    // Freshness — accounts with data whose last recorded edit is old
+    if(hasData&&typeof _lastEditMap==='object'){
+      const le=_lastEditMap[i];
+      if(le&&le.ts){
+        const days=Math.floor((Date.now()-le.ts)/86400000);
+        if(days>STALE_DAYS)_staleList.push({lbl,days,user:le.user});
+      }
+    }
+    // Leads exist but zero mktg cost → CPL not entered, cost understated
+    if(fytdLeads>0&&fytdMktg===0)
+      _qualityFlags.push({lbl,msg:'Leads entered but Mktg cost is 0 — CPL missing, cost understated',sev:'high'});
+    // CPS: retails exist but zero calculated revenue → CAC missing
+    if(t.ad_type==='CPS'&&fytdRet>0&&fytdRevCalc===0)
+      _qualityFlags.push({lbl,msg:'Retails entered but Calculated Revenue is 0 — CAC missing',sev:'high'});
+    // Revenue adjustment without a comment
+    let adjNoComment=0;
+    const _checkAdj=(adj,com)=>{for(let m=0;m<12;m++){if(Math.abs(+(adj&&adj[m])||0)>0.005&&!((com&&com[m])||'').trim())adjNoComment++;}};
+    _checkAdj(a.rev_adj,a.rev_adj_comment);
+    if(a.brands)Object.values(a.brands).forEach(br=>_checkAdj(br.rev_adj,br.rev_adj_comment));
+    if(adjNoComment>0)
+      _qualityFlags.push({lbl,msg:adjNoComment+' month'+(adjNoComment>1?'s':'')+' with Revenue Adjustment but no comment',sev:'med'});
+  });
+  _staleList.sort((a,b)=>b.days-a.days);
+
+  // ═══ ANOMALY FLAGS — CPL & Cr% vs trailing-3-month mean (>50% deviation) ═══
+  const _anomalies=[];
+  rows.forEach(({t,a,d})=>{
+    const lbl=t.client+' · '+t.ad_type+(t.ba&&t.ba!=='-'?' · '+t.ba:'');
+    // Blended CPL series (months with paid leads AND mktg cost)
+    const cplSeries=Array(12).fill(null).map((_,m)=>{
+      const pl=+d.paid_leads[m]||0,mk=+d.mktg_cost[m]||0;
+      return(pl>0&&mk>0)?(mk*100000/pl):null;
+    });
+    // CPS Cr% series
+    const crSeries=Array(12).fill(null).map((_,m)=>{
+      if(t.ad_type!=='CPS')return null;
+      const tl=+d.trig_leads[m]||0,rt=+(a.retails&&a.retails[m])||0;
+      return(tl>0&&rt>0)?(rt/tl*100):null;
+    });
+    const _scan=(series,metric,fmtV)=>{
+      for(let m=0;m<Math.min(elapsed+1,12);m++){
+        if(series[m]==null)continue;
+        const prev=[];
+        for(let k=m-1;k>=0&&prev.length<3;k--)if(series[k]!=null)prev.push(series[k]);
+        if(prev.length<2)continue; // need ≥2 prior months for a meaningful baseline
+        const mean=prev.reduce((s,v)=>s+v,0)/prev.length;
+        if(mean<=0)continue;
+        const dev=(series[m]-mean)/mean*100;
+        if(Math.abs(dev)>50)_anomalies.push({lbl,metric,month:MONTHS[m],val:fmtV(series[m]),base:fmtV(mean),dev});
+      }
+    };
+    _scan(cplSeries,'CPL',v=>'₹'+Math.round(v).toLocaleString('en-IN'));
+    _scan(crSeries,'Cr%',v=>v.toFixed(2)+'%');
+  });
+  _anomalies.sort((a,b)=>Math.abs(b.dev)-Math.abs(a.dev));
   const kpiCard=(label,val,sub,accent='var(--accent)',icon='')=>`
     <div style="${scard('flex:1;min-width:140px;')}">
       <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">${icon?icon+' ':''}${label}</div>
@@ -8342,6 +8510,56 @@ function renderInsights(){
     ${kpiCard('Active Accounts',rows.length+'',`${Object.keys(oemMap).length} OEMs · ${Object.keys(adTypeMap).length} ad types`,'var(--text2)','🏢')}
   </div>
 
+  <!-- Pacing vs Target (FY-scoped) + Concentration -->
+  <div style="display:grid;grid-template-columns:1fr 280px;gap:16px;margin-bottom:16px">
+    <div style="${card()}">
+      <div style="font-size:13px;font-weight:700;color:var(--text1);margin-bottom:4px">⏱ Pacing vs FY27 Target <span style="font-size:10px;color:var(--text3);font-weight:400">· always full-year view · ${elapsed} month${elapsed!==1?'s':''} complete, ${remaining} remaining</span></div>
+      <div style="font-size:11px;color:var(--text2);margin-bottom:12px">
+        Portfolio: <b style="color:var(--text1)">${fc(paceTotAct)}</b> of ${fc(paceTotTgt)} target ·
+        projected landing <b style="color:${paceProj>=paceTotTgt?'#3fb950':'#f0a500'}">${fc(paceProj)}</b> ·
+        required run-rate <b style="color:var(--text1)">${fc(paceReq)}/mo</b> vs current ${fc(paceCur)}/mo
+        ${paceCur>0?`<span style="color:${paceLift>10?'#f85149':paceLift>0?'#f0a500':'#3fb950'};font-weight:700">(${!isFinite(paceLift)?'∞':(paceLift>0?'+':'')+paceLift.toFixed(0)}% step-up needed)</span>`:''}
+      </div>
+      ${elapsed===0?'<div style="color:var(--text3);font-size:12px">FY has just started — pacing appears after the first complete month.</div>':`
+      <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:11px">
+        <thead><tr style="background:var(--bg3)">
+          <th style="text-align:left;padding:6px 8px;border-bottom:2px solid var(--border2);color:var(--text2)">OEM</th>
+          <th style="text-align:right;padding:6px 8px;border-bottom:2px solid var(--border2);color:var(--text2)">FY Target</th>
+          <th style="text-align:right;padding:6px 8px;border-bottom:2px solid var(--border2);color:var(--text2)">Actual FYTD</th>
+          <th style="text-align:right;padding:6px 8px;border-bottom:2px solid var(--border2);color:var(--text2)">Achv%</th>
+          <th style="text-align:right;padding:6px 8px;border-bottom:2px solid var(--border2);color:var(--text2)">Run-rate/mo</th>
+          <th style="text-align:right;padding:6px 8px;border-bottom:2px solid var(--border2);color:#f0a500">Required/mo</th>
+          <th style="text-align:right;padding:6px 8px;border-bottom:2px solid var(--border2);color:var(--text2)">Step-up</th>
+          <th style="text-align:right;padding:6px 8px;border-bottom:2px solid var(--border2);color:var(--accent)">Projected FY</th>
+        </tr></thead><tbody>
+        ${paceRows.map(r=>{
+          const liftStr=!isFinite(r.lift)?'∞':(r.lift>0?'+':'')+r.lift.toFixed(0)+'%';
+          const liftCol=!isFinite(r.lift)||r.lift>25?'#f85149':r.lift>0?'#f0a500':'#3fb950';
+          const projCol=r.proj>=r.tgt?'#3fb950':'#f0a500';
+          return`<tr style="border-bottom:1px solid var(--border2)40">
+            <td style="padding:5px 8px;color:var(--text1);font-weight:600">${r.client}</td>
+            <td style="padding:5px 8px;text-align:right;color:var(--text2)">${fc(r.tgt)}</td>
+            <td style="padding:5px 8px;text-align:right;color:var(--text1)">${fc(r.act)}</td>
+            <td style="padding:5px 8px;text-align:right">${badge(r.achv,elapsed/12*100,elapsed/12*50)}</td>
+            <td style="padding:5px 8px;text-align:right;color:var(--text2)">${fc(r.cur)}</td>
+            <td style="padding:5px 8px;text-align:right;color:#f0a500;font-weight:600">${fc(r.req)}</td>
+            <td style="padding:5px 8px;text-align:right;color:${liftCol};font-weight:700">${r.cur>0?liftStr:'—'}</td>
+            <td style="padding:5px 8px;text-align:right;color:${projCol};font-weight:600">${fc(r.proj)}</td>
+          </tr>`;}).join('')}
+      </tbody></table></div>`}
+    </div>
+    <div style="${card()}">
+      <div style="font-size:13px;font-weight:700;color:var(--text1);margin-bottom:12px">🎯 Concentration Risk</div>
+      <div style="font-size:28px;font-weight:800;color:${concShare>75?'#f85149':concShare>60?'#f0a500':'#3fb950'};margin-bottom:2px">${_concTot>0?concShare.toFixed(0)+'%':'—'}</div>
+      <div style="font-size:11px;color:var(--text3);margin-bottom:14px">of FYTD revenue sits in the top-5 accounts${concTopOEM>0?` · largest OEM alone: ${concTopOEM.toFixed(0)}%`:''}</div>
+      ${_concTop5.filter(r=>r.rev>0).map(r=>`
+        <div style="display:flex;justify-content:space-between;font-size:11px;padding:4px 0;border-bottom:1px solid var(--border2)40">
+          <span style="color:var(--text2)">${r.label}</span>
+          <span style="color:var(--text1);font-weight:600">${fc(r.rev)}${_concTot>0?` <span style="color:var(--text3)">(${(r.rev/_concTot*100).toFixed(0)}%)</span>`:''}</span>
+        </div>`).join('')||'<div style="color:var(--text3);font-size:12px">No FYTD revenue yet</div>'}
+    </div>
+  </div>
+
   <!-- Row 1: OEM Leaderboard + AdType + MoM Trend -->
   <div style="display:grid;grid-template-columns:1fr 280px;gap:16px;margin-bottom:16px">
 
@@ -8415,6 +8633,45 @@ function renderInsights(){
     <div style="${card()}">
       <div style="font-size:13px;font-weight:700;color:#f0a500;margin-bottom:12px">📉 Under 50% Target Achievement</div>
       ${underAchievers.length?underAchievers.map(r=>underRow(r)).join(''):'<div style="color:#3fb950;font-size:12px;padding:12px 0">✓ All accounts above 50% target</div>'}
+    </div>
+  </div>
+
+  <!-- Row 3: Data Quality & Freshness + Anomaly Flags -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+
+    <!-- Data quality & freshness -->
+    <div style="${card(( _staleList.length+_qualityFlags.length)?'border-color:#f0a50033':'')}">
+      <div style="font-size:13px;font-weight:700;color:var(--text1);margin-bottom:12px">🧹 Data Quality &amp; Freshness
+        <span style="background:${(_staleList.length+_qualityFlags.length)?'#f0a50022':'#3fb95022'};color:${(_staleList.length+_qualityFlags.length)?'#f0a500':'#3fb950'};padding:1px 7px;border-radius:8px;font-size:10px">${_staleList.length+_qualityFlags.length} flag${(_staleList.length+_qualityFlags.length)!==1?'s':''}</span>
+      </div>
+      ${_qualityFlags.slice(0,8).map(f=>`
+        <div style="display:flex;gap:8px;font-size:11px;padding:5px 0;border-bottom:1px solid var(--border2)40;align-items:baseline">
+          <span style="color:${f.sev==='high'?'#f85149':'#f0a500'};font-weight:700;flex-shrink:0">${f.sev==='high'?'●':'○'}</span>
+          <span style="color:var(--text1);font-weight:600;flex-shrink:0">${f.lbl}</span>
+          <span style="color:var(--text3)">${f.msg}</span>
+        </div>`).join('')}
+      ${_staleList.slice(0,6).map(s=>`
+        <div style="display:flex;gap:8px;font-size:11px;padding:5px 0;border-bottom:1px solid var(--border2)40;align-items:baseline">
+          <span style="color:var(--text3);flex-shrink:0">🕓</span>
+          <span style="color:var(--text1);font-weight:600;flex-shrink:0">${s.lbl}</span>
+          <span style="color:var(--text3)">last edited <b style="color:#f0a500">${s.days}d ago</b> by ${s.user}</span>
+        </div>`).join('')}
+      ${(!_qualityFlags.length&&!_staleList.length)?'<div style="color:#3fb950;font-size:12px;padding:8px 0">✓ No data-quality issues detected — all active accounts fresh within 7 days</div>':''}
+    </div>
+
+    <!-- Anomaly flags -->
+    <div style="${card(_anomalies.length?'border-color:#f8514933':'')}">
+      <div style="font-size:13px;font-weight:700;color:var(--text1);margin-bottom:4px">🚨 Anomaly Flags
+        <span style="background:${_anomalies.length?'#f8514922':'#3fb95022'};color:${_anomalies.length?'#f85149':'#3fb950'};padding:1px 7px;border-radius:8px;font-size:10px">${_anomalies.length}</span>
+      </div>
+      <div style="font-size:10px;color:var(--text3);margin-bottom:10px">Months where CPL or Cr% deviates &gt;50% from that account's trailing 3-month average — catches typos and real market shifts</div>
+      ${_anomalies.slice(0,10).map(an=>`
+        <div style="display:flex;gap:8px;font-size:11px;padding:5px 0;border-bottom:1px solid var(--border2)40;align-items:baseline">
+          <span style="background:${an.dev>0?'#f85149':'#58a6ff'}22;color:${an.dev>0?'#f85149':'#58a6ff'};padding:1px 6px;border-radius:4px;font-size:9px;font-weight:700;flex-shrink:0">${an.metric} ${an.dev>0?'▲':'▼'}${Math.abs(an.dev).toFixed(0)}%</span>
+          <span style="color:var(--text1);font-weight:600;flex-shrink:0">${an.lbl}</span>
+          <span style="color:var(--text3)">${an.month}: ${an.val} vs ${an.base} avg</span>
+        </div>`).join('')}
+      ${!_anomalies.length?'<div style="color:#3fb950;font-size:12px;padding:8px 0">✓ No CPL or Cr% anomalies in entered data</div>':''}
     </div>
   </div>
 
