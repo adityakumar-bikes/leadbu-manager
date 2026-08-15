@@ -560,7 +560,7 @@ canvas{max-height:260px}
       <div class="brand-mark">🏍️</div>
       <div class="brand-text">
         <div class="t1">Bike AOP Tracker</div>
-        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.2.43</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 14/08/2026 15:20</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
+        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.2.44</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 15/08/2026 11:48</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
       </div>
     </div>
     <div class="hdr-right">
@@ -859,7 +859,7 @@ function oemBadge(client){
 }
 
 const ACT_KEY='leadbu_actuals_fy27_v2';
-const DEPLOY_TIME='2026-08-14T15:20:41Z'; // replaced with ISO timestamp at deploy time
+const DEPLOY_TIME='2026-08-15T11:48:17Z'; // replaced with ISO timestamp at deploy time
 let ACTUALS=TARGETS.map(()=>newActualRec()); // populated by Firebase onValue
 
 function newActualRec(){
@@ -1802,7 +1802,7 @@ function updateLastSaved(isoStr){
 }
 function showDeployTime(){
   const el=document.getElementById('hdr-deployed');
-  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-08-14T15:20:41Z')return;
+  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-08-15T11:48:17Z')return;
   try{
     const d=new Date(DEPLOY_TIME);
     const pad=n=>String(n).padStart(2,'0');
@@ -3271,12 +3271,16 @@ function renderTVSModal(recIdx){
     if(!a.brands[b])a.brands[b]=newBrandRec();
     else{const _nr=newBrandRec();Object.keys(_nr).forEach(k=>{if(a.brands[b][k]==null)a.brands[b][k]=_nr[k];});}
   });
-  // Sync brand retails & recompute totals
+  // Sync brand retails & recompute totals.
+  // Only derive retails from DMS+VoC for months where DMS/VoC actually has data —
+  // otherwise a retails value set via "Overall Cr%" (the alternate entry path) was
+  // getting silently clobbered back to 0 on every re-render.
   TVS_BRANDS.forEach(b=>{
     const br=a.brands[b];if(!br)return;
     const dms=Array(12).fill(0).map((_,i)=>+(br.dms_retails&&br.dms_retails[i])||0);
     const voc=Array(12).fill(0).map((_,i)=>+(br.voc_retails&&br.voc_retails[i])||0);
-    br.retails=dms.map((d,i)=>d+voc[i]);
+    if(!br.retails||!Array.isArray(br.retails))br.retails=Array(12).fill(0);
+    br.retails=br.retails.map((r,i)=>(dms[i]>0||voc[i]>0)?dms[i]+voc[i]:r);
   });
   recomputeBrandTotals(recIdx,TVS_BRANDS);
   const d=deriveActuals(a,t.ad_type);
@@ -3497,8 +3501,10 @@ function renderREModal(recIdx){
       saveActuals(recIdx);
     }
   })();
-  // Sync each brand's retails from DMS+VoC
-  RE_BRANDS.forEach(b=>{const br=a.brands[b];if(!br)return;const dms=Array(12).fill(0).map((_,i)=>+(br.dms_retails&&br.dms_retails[i])||0);const voc=Array(12).fill(0).map((_,i)=>+(br.voc_retails&&br.voc_retails[i])||0);br.retails=dms.map((d,i)=>d+voc[i]);});
+  // Sync each brand's retails from DMS+VoC — but only for months where DMS/VoC
+  // actually has data; otherwise a retails value set via "Overall Cr%" (the
+  // alternate entry path) was getting silently clobbered back to 0 on every re-render.
+  RE_BRANDS.forEach(b=>{const br=a.brands[b];if(!br)return;const dms=Array(12).fill(0).map((_,i)=>+(br.dms_retails&&br.dms_retails[i])||0);const voc=Array(12).fill(0).map((_,i)=>+(br.voc_retails&&br.voc_retails[i])||0);if(!br.retails||!Array.isArray(br.retails))br.retails=Array(12).fill(0);br.retails=br.retails.map((r,i)=>(dms[i]>0||voc[i]>0)?dms[i]+voc[i]:r);});
   recomputeBrandTotals(recIdx,RE_BRANDS);
   const d=deriveActuals(a,t.ad_type);
   const vis=getVisibleMonths(),nc=vis.length*2+3,adType=t.ad_type;
@@ -5943,7 +5949,7 @@ function _dailyBackupCheck(){
 
 // ── Version watcher — nudge users to hard-refresh when a new deploy is live ─
 function _startVersionWatch(){
-  if(!_fbDb || !DEPLOY_TIME || DEPLOY_TIME==='2026-08-14T15:20:41Z') return;
+  if(!_fbDb || !DEPLOY_TIME || DEPLOY_TIME==='2026-08-15T11:48:17Z') return;
   _fbDb.ref('meta/deployVersion').on('value', snap=>{
     const liveTs = snap.val();
     if(!liveTs) return;
