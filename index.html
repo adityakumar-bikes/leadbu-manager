@@ -564,7 +564,7 @@ canvas{max-height:260px}
       <div class="brand-mark">🏍️</div>
       <div class="brand-text">
         <div class="t1">Bike AOP Tracker</div>
-        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.2.48</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 24/08/2026 17:30</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
+        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.2.49</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 24/08/2026 17:43</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
       </div>
     </div>
     <div class="hdr-right">
@@ -709,7 +709,6 @@ canvas{max-height:260px}
     <button id="fat-cc"  class="pchip" style="padding:3px 8px;font-size:10.5px" onclick="toggleAdType('CC contract')">CC</button>
   </div>
   <div class="ctrl-grp"><span class="ctrl-lbl">BTL:</span><select id="f-btl"><option value="">All</option></select></div>
-  <div class="ctrl-grp"><span class="ctrl-lbl">BA:</span><select id="f-ba"><option value="">All</option></select></div>
   <div class="ctrl-grp"><span class="ctrl-lbl">Zeros:</span><select id="f-zeros"><option value="0">Show all</option><option value="1" selected>Hide zero TGT</option><option value="2">Hide zero ACT</option></select></div>
   <button class="btn btn-dim" onclick="resetFilters()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>Reset</button>
   <div class="sep"></div>
@@ -863,7 +862,7 @@ function oemBadge(client){
 }
 
 const ACT_KEY='leadbu_actuals_fy27_v2';
-const DEPLOY_TIME='2026-08-24T17:30:15Z'; // replaced with ISO timestamp at deploy time
+const DEPLOY_TIME='2026-08-24T17:43:06Z'; // replaced with ISO timestamp at deploy time
 let ACTUALS=TARGETS.map(()=>newActualRec()); // populated by Firebase onValue
 
 function newActualRec(){
@@ -1225,7 +1224,6 @@ function openAuditPanel(){
   window._auditClientFilter='';
   window._auditAdTypeFilter='';
   window._auditBtlFilter='';
-  window._auditBaFilter='';
   _renderAuditPanel(mc,entries);
 
   // Async: merge Firebase entries in background
@@ -1306,10 +1304,9 @@ function _renderAuditPanel(mc,allEntries){
   });
   html+='</div>'; // end user cards
 
-  // Filter row — Account, AdType, BTL, BA
+  // Filter row — Account, AdType, BTL
   const adTypes=[...new Set(allEntries.map(e=>e.ad_type).filter(Boolean))].sort();
   const btls=[...new Set(allEntries.map(e=>e.btl).filter(v=>v&&v!=='—'))].sort();
-  const bas=[...new Set(allEntries.map(e=>e.ba).filter(v=>v&&v!=='—'))].sort();
   const mkSel=(id,label,opts,cur,prop)=>'<select id="'+id+'" onchange="window.'+prop+'=this.value;_auditRefreshTable()" style="font-size:11px;background:var(--bg2);color:var(--text1);border:1px solid var(--border2);border-radius:4px;padding:3px 8px">'
     +'<option value="">'+label+'</option>'+opts.map(o=>'<option'+(o===cur?' selected':'')+'>'+o+'</option>').join('')+'</select>';
   html+='<div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap;padding:8px 10px;background:var(--bg3);border-radius:6px;border:1px solid var(--border)">'
@@ -1317,8 +1314,7 @@ function _renderAuditPanel(mc,allEntries){
     +mkSel('al-client','All Accounts',clients,window._auditClientFilter||'','_auditClientFilter')
     +mkSel('al-adtype','All Ad Types',adTypes,window._auditAdTypeFilter||'','_auditAdTypeFilter')
     +mkSel('al-btl','All BTL',btls,window._auditBtlFilter||'','_auditBtlFilter')
-    +mkSel('al-ba','All BA',bas,window._auditBaFilter||'','_auditBaFilter')
-    +'<button onclick="window._auditClientFilter=\'\';window._auditAdTypeFilter=\'\';window._auditBtlFilter=\'\';window._auditBaFilter=\'\';window._auditUserFilter=\'\';_renderAuditPanel(document.getElementById(\'modal-content\'),window._auditEntries)" style="font-size:10px;padding:3px 8px;border-radius:4px;border:1px solid var(--border2);background:var(--bg4);color:var(--text2);cursor:pointer">✕ Clear</button>'
+    +'<button onclick="window._auditClientFilter=\'\';window._auditAdTypeFilter=\'\';window._auditBtlFilter=\'\';window._auditUserFilter=\'\';_renderAuditPanel(document.getElementById(\'modal-content\'),window._auditEntries)" style="font-size:10px;padding:3px 8px;border-radius:4px;border:1px solid var(--border2);background:var(--bg4);color:var(--text2);cursor:pointer">✕ Clear</button>'
     +'<span id="al-count" style="font-size:10px;color:var(--text3);margin-left:auto"></span>'
     +'</div>';
 
@@ -1344,16 +1340,14 @@ function _auditRefreshTable(){
   const fc=window._auditClientFilter||'';
   const fat=window._auditAdTypeFilter||'';
   const fbtl=window._auditBtlFilter||'';
-  const fba=window._auditBaFilter||'';
-  // For old entries without btl/ba, look up from TARGETS
+  // For old entries without btl, look up from TARGETS
   const tMap={};
   TARGETS.forEach(t=>{tMap[t.client+'|'+t.ad_type]=t;});
   const entries=(window._auditEntries||[]).filter(e=>{
     const t=tMap[e.client+'|'+e.ad_type];
     const ebtl=e.btl||(t?t.btl:'')||'';
-    const eba=e.ba||(t?t.ba:'')||'';
     return (!fu||e.user===fu)&&(!fc||e.client===fc)
-      &&(!fat||e.ad_type===fat)&&(!fbtl||ebtl===fbtl)&&(!fba||eba===fba);
+      &&(!fat||e.ad_type===fat)&&(!fbtl||ebtl===fbtl);
   });
   const tbody=document.getElementById('audit-tbody');
   if(!tbody) return;
@@ -1806,7 +1800,7 @@ function updateLastSaved(isoStr){
 }
 function showDeployTime(){
   const el=document.getElementById('hdr-deployed');
-  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-08-24T17:30:15Z')return;
+  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-08-24T17:43:06Z')return;
   try{
     const d=new Date(DEPLOY_TIME);
     const pad=n=>String(n).padStart(2,'0');
@@ -2073,21 +2067,18 @@ try{const _p=localStorage.getItem('aop_page'); if(_p) PAGE=_p;}catch(e){}
 // Dropdowns
 const clients=[...new Set(TARGETS.map(r=>r.client))].sort();
 const btls=[...new Set(TARGETS.map(r=>r.btl))].sort();
-const bas=[...new Set(TARGETS.map(r=>r.ba))].filter(b=>b&&b!=='-').sort();
-const fc=document.getElementById('f-client');const fb=document.getElementById('f-btl');const fba=document.getElementById('f-ba');
+const fc=document.getElementById('f-client');const fb=document.getElementById('f-btl');
 clients.forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;fc.appendChild(o)});
 btls.forEach(b=>{const o=document.createElement('option');o.value=b;o.textContent=b;fb.appendChild(o)});
-bas.forEach(b=>{const o=document.createElement('option');o.value=b;o.textContent=b;fba.appendChild(o)});
 
 function getFiltered(){
   const fCat=document.getElementById('f-cat').value,fFuel=document.getElementById('f-fuel').value;
   const fCli=document.getElementById('f-client').value;
   const fBtl=document.getElementById('f-btl').value,fZeroVal=document.getElementById('f-zeros').value;
-  const fBa=document.getElementById('f-ba')?document.getElementById('f-ba').value:'';
   const filtered=TARGETS.map((t,i)=>({t,a:ACTUALS[i],d:deriveActuals(ACTUALS[i],t.ad_type),i})).filter(({t,d})=>{
     if(fCat&&t.cat!==fCat)return false;if(fFuel&&t.fuel!==fFuel)return false;
     if(fCli&&t.client!==fCli)return false;if(_fAdTypes.length>0&&!_fAdTypes.includes(t.ad_type))return false;
-    if(fBtl&&t.btl!==fBtl)return false;if(fBa&&t.ba!==fBa)return false;
+    if(fBtl&&t.btl!==fBtl)return false;
     if(fZeroVal==='1'&&t.rev.fy===0)return false;
     if(fZeroVal==='2'&&d.rev_fy===0&&d.mktg_fy===0&&d.cc_fy===0)return false;
     return true;
@@ -2153,7 +2144,7 @@ function resetFilters(){
   document.getElementById('fat-cps').classList.remove('active');
   document.getElementById('fat-ml').classList.remove('active');
   document.getElementById('fat-cc').classList.remove('active');
-  ['f-cat','f-fuel','f-client','f-btl','f-ba','f-zeros'].forEach(id=>document.getElementById(id).value='');
+  ['f-cat','f-fuel','f-client','f-btl','f-zeros'].forEach(id=>document.getElementById(id).value='');
   render();
 }
 function setPage(p){
@@ -2475,7 +2466,7 @@ function buildRows(rows,field,idx,mode,showLY,metricsArr){
         ?`<button class="dash-btn no-link" title="Add CPS Dashboard link" onclick="_editDashLink(${i})">＋</button>`
         :`<button class="dash-btn no-link" style="cursor:default" title="No dashboard linked yet">🔗</button>`);
     return `<tr class="${isZ?'zero-row':''}">
-<td class="dc c0">${t.cat}</td><td class="dc c1">${t.fuel}</td><td class="dc c2">${oemBadge(t.client)}</td><td class="dc c3">${t.ad_type}<br><span style="font-size:9px;color:var(--text3)">${t.btl}${t.ba&&t.ba!=='-'?' <span style="color:#8b949e">/ '+t.ba+'</span>':''}</span>${leChip}</td>
+<td class="dc c0">${t.cat}</td><td class="dc c1">${t.fuel}</td><td class="dc c2">${oemBadge(t.client)}</td><td class="dc c3">${t.ad_type}<br><span style="font-size:9px;color:var(--text3)">${t.btl}</span>${leChip}</td>
 <td class="dc c4"><button class="detail-btn" title="Open P&L Detail" onclick="openModal(${i})">📋</button></td>
 <td class="dc c5">${dashBtn}</td>
 ${cells}</tr>`;
@@ -2527,7 +2518,7 @@ function openModal(recIdx){
   modalMonthFilter=currentQIdx();
   const t=TARGETS[recIdx];
   document.getElementById('modal-title').textContent=t.client+' | '+t.ad_type+' | '+t.btl+' — Monthly P&L';
-  document.getElementById('modal-sub').textContent='Cat: '+t.cat+' · Fuel: '+t.fuel+' · BA: '+t.ba+' · AdType: '+t.ad_type+'  |  Blue=input · Green=computed · Orange=rate input';
+  document.getElementById('modal-sub').textContent='Cat: '+t.cat+' · Fuel: '+t.fuel+' · AdType: '+t.ad_type+'  |  Blue=input · Green=computed · Orange=rate input';
   renderModal(recIdx);
   document.getElementById('modal').classList.add('show');
 }
@@ -4600,11 +4591,11 @@ function exportCSV(){
 
   // FY / Charts / Team: wide 12-month format (all data)
   if(VIEW==='fy'||VIEW==='charts'||VIEW==='team'){
-    const hdr=['Cat','Fuel','Client','AdType','BTL','BA'];
+    const hdr=['Cat','Fuel','Client','AdType','BTL'];
     MONTHS.forEach(m=>{['TGT_Rev','TGT_Mktg','TGT_GM','TGT_CC','TGT_GPM','TGT_Leads','ACT_PaidLeads','ACT_OrgLeads','ACT_TrigLeads','ACT_CPL','ACT_MktgCost','ACT_Rev','ACT_CC','ACT_GM','ACT_GPM'].forEach(k=>hdr.push(m+'_'+k));});
     hdr.push('FY_TGT_Rev','FY_TGT_Mktg','FY_TGT_GM','FY_TGT_CC','FY_TGT_GPM','FY_ACT_Rev','FY_ACT_Mktg','FY_ACT_GM','FY_ACT_CC','FY_ACT_GPM');
     const dataRows=rows.map(({t,a,d})=>{
-      const base=[t.cat,t.fuel,t.client,t.ad_type,t.btl||'—',t.ba||'—'];
+      const base=[t.cat,t.fuel,t.client,t.ad_type,t.btl||'—'];
       const nums=[];
       MONTHS.forEach((_,i)=>{
         const tGM=t.rev.monthly[i]-t.mktg.monthly[i];
@@ -4633,7 +4624,7 @@ function exportCSV(){
   }
   const sumM=arr=>mIdxs.reduce((s,i)=>s+(+(arr&&arr[i]||0)),0);
   const pct=(t,a)=>t>0?(a/t*100).toFixed(2)+'%':'—';
-  const hdr=['Cat','Fuel','Client','AdType','BTL','BA','Period',
+  const hdr=['Cat','Fuel','Client','AdType','BTL','Period',
     'Rev_TGT(L)','Rev_ACT(L)','Rev_ACH%',
     'MktgCost_TGT(L)','MktgCost_ACT(L)',
     'GM_TGT(L)','GM_ACT(L)','GM_ACH%',
@@ -4648,7 +4639,7 @@ function exportCSV(){
     const lT=sumM(t.leads.monthly);
     const plA=sumM(d.paid_leads)/100000,olA=sumM(a.organic_leads||Array(12).fill(0))/100000,tlA=sumM(d.trig_leads)/100000;
     const tcpl=plA>0?mA/plA:0;
-    return [t.cat,t.fuel,t.client,t.ad_type,t.btl||'—',t.ba||'—',periodLabel,
+    return [t.cat,t.fuel,t.client,t.ad_type,t.btl||'—',periodLabel,
       rT,rA,pct(rT,rA),mT,mA,
       gmT,gmA,pct(gmT,gmA),cT,cA,
       gpmT,gpmA,pct(gpmT,gpmA),lT,plA,olA,tlA,tcpl];
@@ -5778,7 +5769,7 @@ function renderActiveUsers(snapshot){
 }
 
 // Wire up filters + modal close (non-data setup, safe to do immediately)
-['f-cat','f-fuel','f-client','f-btl','f-ba','f-zeros'].forEach(id=>document.getElementById(id).addEventListener('change',render));
+['f-cat','f-fuel','f-client','f-btl','f-zeros'].forEach(id=>document.getElementById(id).addEventListener('change',render));
 document.getElementById('modal').addEventListener('click',e=>{if(e.target===document.getElementById('modal'))closeModal();});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&document.getElementById('modal').classList.contains('show')){e.preventDefault();closeModal();}});
 buildPeriodBar();
@@ -5953,7 +5944,7 @@ function _dailyBackupCheck(){
 
 // ── Version watcher — nudge users to hard-refresh when a new deploy is live ─
 function _startVersionWatch(){
-  if(!_fbDb || !DEPLOY_TIME || DEPLOY_TIME==='2026-08-24T17:30:15Z') return;
+  if(!_fbDb || !DEPLOY_TIME || DEPLOY_TIME==='2026-08-24T17:43:06Z') return;
   _fbDb.ref('meta/deployVersion').on('value', snap=>{
     const liveTs = snap.val();
     if(!liveTs) return;
@@ -6056,20 +6047,6 @@ function renderTeam(){
         <div style="font-weight:700;color:${pod.color};font-size:13px">${pod.name}</div>
         <div style="font-size:10px;color:var(--text3)">${pod.role}</div>
       </div>`;
-    if(pod.bas.length){
-      html+='<div style="width:2px;height:12px;background:var(--border2)"></div>';
-      html+='<div style="display:flex;gap:12px">';
-      pod.bas.forEach(ba=>{
-        html+=`<div style="display:flex;flex-direction:column;align-items:center">
-          <div style="width:2px;height:12px;background:var(--border2)"></div>
-          <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:6px;padding:6px 14px;text-align:center;min-width:80px">
-            <div style="font-weight:600;color:var(--text1);font-size:12px">${ba}</div>
-            <div style="font-size:9px;color:var(--text3)">BA</div>
-          </div>
-        </div>`;
-      });
-      html+='</div>';
-    }
     html+='</div>';
   });
   html+='</div></div></div>';
@@ -6104,7 +6081,6 @@ function renderTeam(){
           <div>
             <span style="font-weight:700;color:${pod.color};font-size:15px">${pod.name}</span>
             <span style="color:var(--text3);font-size:11px;margin-left:8px">${pod.role}</span>
-            ${pod.bas.length?`<span style="color:var(--text3);font-size:11px;margin-left:12px">· BA: ${pod.bas.join(', ')}</span>`:''}
             <span style="color:var(--text3);font-size:11px;margin-left:12px">· ${podRows.filter(({t})=>t.rev.fy>0).length} active accounts</span>
           </div>
           <button id="${btnId}" onclick="(function(){
@@ -6144,21 +6120,11 @@ function renderTeam(){
       <!-- Collapsible account detail -->
       <div id="${detailId}" style="display:none">`;
 
-    // BA grouping
-    const baGroups={};
-    (pod.bas.length?pod.bas:['-']).forEach(ba=>{baGroups[ba]=[];});
-    podRows.forEach(row=>{
-      const ba=(row.t.ba&&row.t.ba!=='-')?row.t.ba:'-';
-      if(!baGroups[ba])baGroups[ba]=[];
-      baGroups[ba].push(row);
-    });
-
     html+=`<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:11px">
       <thead><tr style="background:var(--bg2)">
         <th style="${thL}">Client</th>
         <th style="${thL}">AdType</th>
         <th style="${thL}">Fuel</th>
-        <th style="${thS}">BA</th>
         <th style="${thS}">Rev TGT (L)</th>
         <th style="${thS}">Mktg (L)</th>
         <th style="${thS}">GM%</th>
@@ -6168,37 +6134,30 @@ function renderTeam(){
       </tr></thead><tbody>`;
 
     let ri=0;
-    Object.entries(baGroups).forEach(([ba,brows])=>{
-      if(!brows.length)return;
-      if(pod.bas.length>1){
-        html+=`<tr style="background:var(--bg3)"><td colspan="10" style="padding:3px 10px;font-size:10px;font-weight:700;color:var(--text3);border-top:1px solid var(--border2)">BA: ${ba==='-'?'Not Assigned':ba}</td></tr>`;
-      }
-      brows.forEach(({t})=>{
-        const bg=ri%2===0?'var(--bg1)':'var(--bg2)'; ri++;
-        const gm=t.gm_pct&&t.gm_pct.fy!=null?t.gm_pct.fy:null;
-        const gpm=t.gpm_pct&&t.gpm_pct.fy!=null?t.gpm_pct.fy:null;
-        const leads=t.leads&&t.leads.fy?fmtN(Math.round(t.leads.fy*100000)):'—';
-        const orgL=t.org_leads&&t.org_leads.fy?fmtN(Math.round(t.org_leads.fy*100000)):'—';
-        const gmC=gm!=null?(gm>=70?'#3fb950':gm>=55?'#d29922':'#f85149'):'var(--text3)';
-        const gpmC=gpm!=null?(gpm>=40?'#58a6ff':gpm>=25?'#d29922':'#f85149'):'var(--text3)';
-        html+=`<tr style="background:${bg}">
-          <td style="padding:5px 10px;color:var(--text1);font-weight:500">${oemBadge(t.client)}</td>
-          <td style="padding:5px 10px;color:var(--text2)">${t.ad_type}</td>
-          <td style="padding:5px 10px;color:var(--text3)">${t.fuel}</td>
-          <td style="padding:5px 10px;text-align:right;color:var(--text3)">${ba==='-'?'—':ba}</td>
-          <td style="padding:5px 10px;text-align:right;color:#3fb950;font-weight:600">${t.rev.fy.toFixed(1)}</td>
-          <td style="padding:5px 10px;text-align:right;color:var(--text2)">${t.mktg.fy.toFixed(1)}</td>
-          <td style="padding:5px 10px;text-align:right;color:${gmC}">${gm!=null?gm.toFixed(1)+'%':'—'}</td>
-          <td style="padding:5px 10px;text-align:right;color:${gpmC}">${gpm!=null?gpm.toFixed(1)+'%':'—'}</td>
-          <td style="padding:5px 10px;text-align:right;color:#58a6ff">${leads}</td>
-          <td style="padding:5px 10px;text-align:right;color:#f0883e">${orgL}</td>
-        </tr>`;
-      });
+    podRows.forEach(({t})=>{
+      const bg=ri%2===0?'var(--bg1)':'var(--bg2)'; ri++;
+      const gm=t.gm_pct&&t.gm_pct.fy!=null?t.gm_pct.fy:null;
+      const gpm=t.gpm_pct&&t.gpm_pct.fy!=null?t.gpm_pct.fy:null;
+      const leads=t.leads&&t.leads.fy?fmtN(Math.round(t.leads.fy*100000)):'—';
+      const orgL=t.org_leads&&t.org_leads.fy?fmtN(Math.round(t.org_leads.fy*100000)):'—';
+      const gmC=gm!=null?(gm>=70?'#3fb950':gm>=55?'#d29922':'#f85149'):'var(--text3)';
+      const gpmC=gpm!=null?(gpm>=40?'#58a6ff':gpm>=25?'#d29922':'#f85149'):'var(--text3)';
+      html+=`<tr style="background:${bg}">
+        <td style="padding:5px 10px;color:var(--text1);font-weight:500">${oemBadge(t.client)}</td>
+        <td style="padding:5px 10px;color:var(--text2)">${t.ad_type}</td>
+        <td style="padding:5px 10px;color:var(--text3)">${t.fuel}</td>
+        <td style="padding:5px 10px;text-align:right;color:#3fb950;font-weight:600">${t.rev.fy.toFixed(1)}</td>
+        <td style="padding:5px 10px;text-align:right;color:var(--text2)">${t.mktg.fy.toFixed(1)}</td>
+        <td style="padding:5px 10px;text-align:right;color:${gmC}">${gm!=null?gm.toFixed(1)+'%':'—'}</td>
+        <td style="padding:5px 10px;text-align:right;color:${gpmC}">${gpm!=null?gpm.toFixed(1)+'%':'—'}</td>
+        <td style="padding:5px 10px;text-align:right;color:#58a6ff">${leads}</td>
+        <td style="padding:5px 10px;text-align:right;color:#f0883e">${orgL}</td>
+      </tr>`;
     });
 
     // POD total row
     html+=`<tr style="background:var(--bg3);font-weight:700;border-top:2px solid var(--border2)">
-      <td colspan="4" style="padding:6px 10px;color:var(--text1)">POD Total (${podRows.filter(({t})=>t.rev.fy>0).length} active)</td>
+      <td colspan="3" style="padding:6px 10px;color:var(--text1)">POD Total (${podRows.filter(({t})=>t.rev.fy>0).length} active)</td>
       <td style="padding:6px 10px;text-align:right;color:#3fb950">${pRev.toFixed(1)}</td>
       <td style="padding:6px 10px;text-align:right;color:var(--text2)">${pMktg.toFixed(1)}</td>
       <td style="padding:6px 10px;text-align:right;color:${pGMpct>=70?'#3fb950':pGMpct>=55?'#d29922':'#f85149'}">${pGMpct.toFixed(1)}%</td>
@@ -7875,7 +7834,7 @@ function buildTrackerContext(){
     const a=ACTUALS[i]; if(!a)return;
     const d=deriveActuals(a,t.ad_type);
     const hasAnyData=d.rev.some(v=>v>0)||d.mktg_cost.some(v=>v>0)||(a.google_leads&&a.google_leads.some(v=>v>0));
-    lines.push(`\n### ${t.client} | ${t.ad_type} | BTL:${t.btl}${t.ba&&t.ba!=='-'?'|BA:'+t.ba:''} | Cat:${t.cat} | Fuel:${t.fuel}`);
+    lines.push(`\n### ${t.client} | ${t.ad_type} | BTL:${t.btl} | Cat:${t.cat} | Fuel:${t.fuel}`);
     if(hasAnyData){
       lines.push('Month,GL,ML,PaidLd,TrigLd,GCPL,MCPL,CAC,Retails,CPL_Rate,TotalLeads,Rev(L),Mktg(L),CC(L),GM(L),GPM(L)');
       MONTHS.forEach((m,mi)=>{
@@ -8291,7 +8250,7 @@ function renderInsights(){
     paceTotTgt+=fyTgt;paceTotAct+=fytd;
     if(!pacingMap[t.client])pacingMap[t.client]={tgt:0,act:0};
     pacingMap[t.client].tgt+=fyTgt;pacingMap[t.client].act+=fytd;
-    acctFYTD.push({label:t.client+' · '+t.ad_type+(t.ba&&t.ba!=='-'?' · '+t.ba:''),client:t.client,rev:fytd,gpm:0});
+    acctFYTD.push({label:t.client+' · '+t.ad_type,client:t.client,rev:fytd,gpm:0});
   });
   const paceRows=Object.entries(pacingMap).filter(([,p])=>p.tgt>0).map(([client,p])=>{
     const cur=elapsed>0?p.act/elapsed:0;                    // current monthly run-rate
@@ -8324,7 +8283,7 @@ function renderInsights(){
       fytdRet+=(+(a.retails&&a.retails[m])||0);
     }
     const hasData=fytdRev>0||fytdMktg>0||fytdLeads>0;
-    const lbl=t.client+' · '+t.ad_type+(t.ba&&t.ba!=='-'?' · '+t.ba:'');
+    const lbl=t.client+' · '+t.ad_type;
     // Freshness — accounts with data whose last recorded edit is old
     if(hasData&&typeof _lastEditMap==='object'){
       const le=_lastEditMap[i];
@@ -8352,7 +8311,7 @@ function renderInsights(){
   // ═══ ANOMALY FLAGS — CPL & Cr% vs trailing-3-month mean (>50% deviation) ═══
   const _anomalies=[];
   rows.forEach(({t,a,d})=>{
-    const lbl=t.client+' · '+t.ad_type+(t.ba&&t.ba!=='-'?' · '+t.ba:'');
+    const lbl=t.client+' · '+t.ad_type;
     // Blended CPL series (months with paid leads AND mktg cost)
     const cplSeries=Array(12).fill(null).map((_,m)=>{
       const pl=+d.paid_leads[m]||0,mk=+d.mktg_cost[m]||0;
