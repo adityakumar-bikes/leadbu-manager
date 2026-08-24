@@ -589,14 +589,12 @@ function _renderBtlAllocation(){
         <thead><tr style="background:var(--bg3);border-bottom:1px solid var(--border)">
           <th style="text-align:left;padding:6px 16px;font-size:9px;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:.5px">Client</th>
           <th style="text-align:left;padding:6px 8px;font-size:9px;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:.5px">Ad Type</th>
-          <th style="text-align:left;padding:6px 8px;font-size:9px;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:.5px">BA</th>
           <th style="text-align:right;padding:6px 16px;font-size:9px;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:.5px">Reassign BTL</th>
         </tr></thead><tbody>`;
     rows.forEach(({t,i})=>{
       html+=`<tr style="border-top:1px solid var(--border)">
         <td style="padding:8px 16px;color:var(--text1);font-weight:500">${t.client}</td>
         <td style="padding:8px 8px;color:var(--text3)">${t.ad_type}</td>
-        <td style="padding:8px 8px;color:var(--text3)">${t.ba||'—'}</td>
         <td style="padding:8px 16px;text-align:right">
           <select onchange="saveBtlAllocation(${i},this.value);this.closest('tr').style.background='#3fb95022'" style="${_selStyle}">
             ${_btls.map(b=>`<option value="${b}"${b===t.btl?' selected':''}>${b}</option>`).join('')}
