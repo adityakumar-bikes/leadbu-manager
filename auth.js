@@ -277,7 +277,9 @@ async function _authInit(){
         console.warn('[auth] Could not read preInvited:', e.code || e.message);
       }
       const isSuper = (user.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase());
-      const initialRole = isSuper ? 'admin' : (preInvite && preInvite.role ? preInvite.role : 'viewer');
+      // Non-preinvited first-time sign-ins land in 'pending' — an admin must explicitly
+      // approve and choose a role (Viewer/Editor/Admin) in the Users tab before they get in.
+      const initialRole = isSuper ? 'admin' : (preInvite && preInvite.role ? preInvite.role : 'pending');
       prof = {
         email: user.email.toLowerCase(),
         displayName: user.displayName || '',
@@ -306,6 +308,16 @@ async function _authInit(){
       _authShowSpecial(
         '<span style="color:#f85149">Access revoked</span>',
         `Your account <b style="color:#e6edf3">${user.email}</b> has been disabled by an admin. Contact <b>${SUPER_ADMIN_EMAIL}</b> if this is an error.`);
+      // Watch for re-enable so the page can recover on its own, no manual refresh needed.
+      ref.on('value', s=>{ const np=s.val(); if(np && !np.disabled) location.reload(); });
+      return;
+    }
+    if (prof.role === 'pending'){
+      _authShowSpecial(
+        '<span style="color:#f0a500">Access pending approval</span>',
+        `Your account <b style="color:#e6edf3">${user.email}</b> is waiting for an admin to approve access and assign a role. No need to sign in again — you'll get in automatically once approved.`);
+      // Watch for approval so the page can recover on its own, no manual refresh needed.
+      ref.on('value', s=>{ const np=s.val(); if(np && np.role!=='pending' && !np.disabled) location.reload(); });
       return;
     }
 
@@ -501,7 +513,10 @@ function renderUsers(){
     html += `<div style="margin:0 22px 14px;background:#f0a50012;border:1px solid #f0a50044;border-radius:8px;padding:14px"><div style="font-size:12px;font-weight:600;color:#f0a500;margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px">⚠ Pending approval (${pendings.length})</div>`;
     pendings.forEach(u=>{
       const av = u.photoURL ? `<img src="${u.photoURL}" style="width:30px;height:30px;border-radius:50%" referrerpolicy="no-referrer">` : `<div style="width:30px;height:30px;border-radius:50%;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--text2)">${(u.email||'?').slice(0,1).toUpperCase()}</div>`;
-      html += `<div style="display:flex;align-items:center;gap:11px;padding:8px 0;border-top:1px solid #f0a50022">${av}<div style="flex:1;min-width:0"><div style="font-size:12px;color:var(--text1);font-weight:500">${u.displayName||u.email}</div><div style="font-size:11px;color:var(--text3);font-family:var(--mono)">${u.email}</div></div><button class="btn btn-pri" onclick="_authSetRole('${u.uid}','editor')" style="padding:4px 10px;font-size:11px">✓ Approve as Editor</button><button class="btn btn-dim" onclick="_authSetRole('${u.uid}','viewer')" style="padding:4px 10px;font-size:11px">View only</button><button class="btn btn-dim" onclick="_authToggleDisabled('${u.uid}',true)" style="padding:4px 10px;font-size:11px;color:#f85149">Reject</button></div>`;
+      html += `<div style="display:flex;align-items:center;gap:11px;padding:8px 0;border-top:1px solid #f0a50022">${av}<div style="flex:1;min-width:0"><div style="font-size:12px;color:var(--text1);font-weight:500">${u.displayName||u.email}</div><div style="font-size:11px;color:var(--text3);font-family:var(--mono)">${u.email}</div></div>`
+        + `<select id="pend-role-${u.uid}" style="background:var(--bg);border:1px solid var(--border2);border-radius:5px;padding:4px 8px;color:var(--text1);font-size:11px;font-family:inherit"><option value="viewer" selected>Viewer</option><option value="editor">Editor</option><option value="admin">Admin</option></select>`
+        + `<button class="btn btn-pri" onclick="_authApprovePending('${u.uid}')" style="padding:4px 10px;font-size:11px">✓ Approve</button>`
+        + `<button class="btn btn-dim" onclick="_authRejectPending('${u.uid}')" style="padding:4px 10px;font-size:11px;color:#f85149">Reject</button></div>`;
     });
     html += `</div>`;
   }
@@ -739,8 +754,9 @@ function _authActionMenu(u, me){
     h += `<button class="btn btn-pri" onclick="_authToggleDisabled('${u.uid}',false)" style="padding:3px 9px;font-size:10px">Re-enable</button>`;
   } else {
     if (u.role === 'pending'){
-      h += `<button class="btn btn-pri" onclick="_authSetRole('${u.uid}','editor')" style="padding:3px 9px;font-size:10px">Approve→Editor</button>`;
-      h += `<button class="btn btn-dim" onclick="_authSetRole('${u.uid}','viewer')" style="padding:3px 9px;font-size:10px">→Viewer</button>`;
+      h += `<button class="btn btn-pri" onclick="_authApprovePending('${u.uid}','editor')" style="padding:3px 9px;font-size:10px">Approve→Editor</button>`;
+      h += `<button class="btn btn-dim" onclick="_authApprovePending('${u.uid}','viewer')" style="padding:3px 9px;font-size:10px">→Viewer</button>`;
+      h += `<button class="btn btn-dim" onclick="_authApprovePending('${u.uid}','admin')" style="padding:3px 9px;font-size:10px;color:#ee6a3a">→Admin</button>`;
     } else {
       const opts = [];
       if (u.role !== 'admin')  opts.push(`<button class="btn btn-dim" onclick="_authSetRole('${u.uid}','admin')"  style="padding:3px 9px;font-size:10px;color:#ee6a3a">↑ Admin</button>`);
@@ -762,6 +778,24 @@ async function _authSetRole(uid, newRole){
   if (!confirm(`Change ${u.email} role from ${u.role} → ${newRole}?`)) return;
   await _userListRef.child(uid).update({role:newRole});
   _roleAuditRef.push({ts:firebase.database.ServerValue.TIMESTAMP, actor:AUTH_USER.email, target:u.email, action:'role_change', oldRole:u.role, newRole});
+}
+// Approve a pending sign-in request with an explicitly chosen role — logged as a
+// distinct 'approve' action (separate from later role_change edits) for a clear audit trail.
+async function _authApprovePending(uid, roleOverride){
+  if (!_authIsAdmin()) return;
+  const u = _allUsers[uid]; if (!u) return;
+  const sel = document.getElementById('pend-role-'+uid);
+  const newRole = roleOverride || (sel ? sel.value : 'viewer');
+  if (!confirm(`Approve ${u.email} as ${newRole}?`)) return;
+  await _userListRef.child(uid).update({role:newRole});
+  _roleAuditRef.push({ts:firebase.database.ServerValue.TIMESTAMP, actor:AUTH_USER.email, target:u.email, action:'approve', oldRole:'pending', newRole});
+}
+async function _authRejectPending(uid){
+  if (!_authIsAdmin()) return;
+  const u = _allUsers[uid]; if (!u) return;
+  if (!confirm(`Reject access request from ${u.email}? Their account stays pending and disabled — they won't be able to sign in.`)) return;
+  await _userListRef.child(uid).update({disabled:true});
+  _roleAuditRef.push({ts:firebase.database.ServerValue.TIMESTAMP, actor:AUTH_USER.email, target:u.email, action:'reject', oldRole:'pending', newRole:'pending'});
 }
 async function _authToggleDisabled(uid, disabled){
   if (!_authIsAdmin()) return;
@@ -854,8 +888,8 @@ async function _authViewRoleAudit(){
     const d = new Date(ts);
     return d.toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
   };
-  const _actLabel={login:'Login',role_change:'Role Changed',create:'Account Created',disable:'Disabled',enable:'Re-enabled',force_signout:'Force Sign-out',pre_add:'Pre-Invited',revoke_invite:'Invite Revoked'};
-  const _actColor={login:'#7d8590',role_change:'#58a6ff',create:'#3fb950',disable:'#f85149',enable:'#3fb950',force_signout:'#f0a500',pre_add:'#a78bfa',revoke_invite:'#f85149'};
+  const _actLabel={login:'Login',role_change:'Role Changed',create:'Account Created',disable:'Disabled',enable:'Re-enabled',force_signout:'Force Sign-out',pre_add:'Pre-Invited',revoke_invite:'Invite Revoked',approve:'Approved',reject:'Rejected'};
+  const _actColor={login:'#7d8590',role_change:'#58a6ff',create:'#3fb950',disable:'#f85149',enable:'#3fb950',force_signout:'#f0a500',pre_add:'#a78bfa',revoke_invite:'#f85149',approve:'#3fb950',reject:'#f85149'};
   let html = `<div style="background:var(--bg);border-radius:10px;border:1px solid var(--border);max-width:820px;width:92%;max-height:80vh;overflow:auto">
     <div style="padding:14px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:var(--bg);z-index:1">
       <div>
