@@ -78,7 +78,7 @@ function _buildAuthGate(){
       </button>
       <div id="auth-gate-msg" style="margin-top:14px;font-size:12px;color:#7d8590;text-align:center;min-height:16px;line-height:1.5"></div>
       <div style="margin-top:24px;padding-top:18px;border-top:1px solid #21262d;font-size:11px;color:#6e7681;line-height:1.6">
-        First time signing in? Your account will start with <b>Viewer</b> access (read-only). Ask <b>Aditya</b> to promote you.
+        First time signing in? Your access request will go to <b>Aditya</b> for approval — you'll be let in automatically once they assign you a role.
       </div>
     </div>`;
   document.body.appendChild(gate);
