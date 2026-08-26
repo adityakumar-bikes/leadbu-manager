@@ -564,7 +564,7 @@ canvas{max-height:260px}
       <div class="brand-mark">🏍️</div>
       <div class="brand-text">
         <div class="t1">Bike AOP Tracker</div>
-        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.2.50</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 26/08/2026 11:38</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
+        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.2.51</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 26/08/2026 16:00</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
       </div>
     </div>
     <div class="hdr-right">
@@ -576,6 +576,15 @@ canvas{max-height:260px}
           <span id="user-label-hdr">—</span>
         </button>
         <div class="ctx-sep" style="height:16px;width:1px;background:var(--border2);margin:0 2px"></div>
+      </div>
+      <div id="zoom-ctrl" style="display:inline-flex;align-items:center;border:1px solid var(--border2);border-radius:6px;overflow:hidden;margin-right:4px">
+        <button id="zoom-out-btn" class="btn btn-dim" onclick="decreaseZoom()" title="Decrease font size" style="padding:6px 8px;min-width:0;border:none;border-radius:0">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        </button>
+        <span id="zoom-label" title="Dashboard text size" style="font-size:10px;color:var(--text3);padding:0 6px;min-width:32px;text-align:center;font-variant-numeric:tabular-nums;user-select:none">100%</span>
+        <button id="zoom-in-btn" class="btn btn-dim" onclick="increaseZoom()" title="Increase font size" style="padding:6px 8px;min-width:0;border:none;border-radius:0;border-left:1px solid var(--border2)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        </button>
       </div>
       <button id="theme-toggle" class="btn btn-dim" onclick="toggleTheme()" title="Toggle light / dark theme" style="padding:6px 9px;min-width:0">
         <svg id="theme-icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
@@ -862,7 +871,7 @@ function oemBadge(client){
 }
 
 const ACT_KEY='leadbu_actuals_fy27_v2';
-const DEPLOY_TIME='2026-08-26T11:38:19Z'; // replaced with ISO timestamp at deploy time
+const DEPLOY_TIME='2026-08-26T16:00:56Z'; // replaced with ISO timestamp at deploy time
 let ACTUALS=TARGETS.map(()=>newActualRec()); // populated by Firebase onValue
 
 function newActualRec(){
@@ -1800,7 +1809,7 @@ function updateLastSaved(isoStr){
 }
 function showDeployTime(){
   const el=document.getElementById('hdr-deployed');
-  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-08-26T11:38:19Z')return;
+  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-08-26T16:00:56Z')return;
   try{
     const d=new Date(DEPLOY_TIME);
     const pad=n=>String(n).padStart(2,'0');
@@ -5944,7 +5953,7 @@ function _dailyBackupCheck(){
 
 // ── Version watcher — nudge users to hard-refresh when a new deploy is live ─
 function _startVersionWatch(){
-  if(!_fbDb || !DEPLOY_TIME || DEPLOY_TIME==='2026-08-26T11:38:19Z') return;
+  if(!_fbDb || !DEPLOY_TIME || DEPLOY_TIME==='2026-08-26T16:00:56Z') return;
   _fbDb.ref('meta/deployVersion').on('value', snap=>{
     const liveTs = snap.val();
     if(!liveTs) return;
@@ -7603,6 +7612,32 @@ function toggleTheme(){
 (function(){
   const saved=localStorage.getItem('leadbu_theme')||'dark';
   applyTheme(saved);
+})();
+
+// ── Dashboard text size (zoom) — scales the whole app like native browser zoom,
+// so every hardcoded px font-size, table layout, and sticky column scales together. ──
+const ZOOM_MIN=80, ZOOM_MAX=140, ZOOM_STEP=10;
+let _uiZoom=100;
+function applyZoom(pct){
+  _uiZoom=Math.max(ZOOM_MIN,Math.min(ZOOM_MAX,pct));
+  document.body.style.zoom=(_uiZoom/100);
+  const label=document.getElementById('zoom-label');
+  if(label) label.textContent=_uiZoom+'%';
+  const outBtn=document.getElementById('zoom-out-btn'), inBtn=document.getElementById('zoom-in-btn');
+  if(outBtn){outBtn.disabled=(_uiZoom<=ZOOM_MIN);outBtn.style.opacity=outBtn.disabled?.4:1;outBtn.style.cursor=outBtn.disabled?'default':'pointer';}
+  if(inBtn){inBtn.disabled=(_uiZoom>=ZOOM_MAX);inBtn.style.opacity=inBtn.disabled?.4:1;inBtn.style.cursor=inBtn.disabled?'default':'pointer';}
+}
+function increaseZoom(){
+  applyZoom(_uiZoom+ZOOM_STEP);
+  localStorage.setItem('leadbu_zoom',_uiZoom);
+}
+function decreaseZoom(){
+  applyZoom(_uiZoom-ZOOM_STEP);
+  localStorage.setItem('leadbu_zoom',_uiZoom);
+}
+(function(){
+  const saved=parseInt(localStorage.getItem('leadbu_zoom'),10);
+  applyZoom(isNaN(saved)?100:saved);
 })();
 
 // Keep view-tabs + period-bar sticky below the header
