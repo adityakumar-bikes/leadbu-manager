@@ -564,7 +564,7 @@ canvas{max-height:260px}
       <div class="brand-mark">🏍️</div>
       <div class="brand-text">
         <div class="t1">Bike AOP Tracker</div>
-        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.2.51</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 26/08/2026 16:00</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
+        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.2.52</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 17/11/2026 09:58</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
       </div>
     </div>
     <div class="hdr-right">
@@ -747,6 +747,7 @@ canvas{max-height:260px}
   <div class="vtab"        data-v="cc"     onclick="setView('cc')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>CC</div>
   <div class="vtab"        data-v="revrec"  onclick="setView('revrec')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12"/><path d="M6 8h12"/><path d="M6 13l8.5 8"/><path d="M6 13h3"/><path d="M9 13c6.667 0 6.667-10 0-10"/></svg>Rev Recon</div>
   <div class="vtab"        data-v="retails" onclick="setView('retails')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h18"/><path d="M3 9h18"/><path d="M3 15h18"/><path d="M3 21h18"/><circle cx="7" cy="12" r="1" fill="currentColor"/></svg>Retails</div>
+  <div class="vtab"        data-v="yield"   onclick="setView('yield')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 17 9 11 13 15 21 7"/><polyline points="15 7 21 7 21 13"/></svg>Yield Management</div>
 </div>
 <div class="period-bar" id="period-bar"></div>
 
@@ -777,6 +778,7 @@ canvas{max-height:260px}
 <div id="cc-area"      class="hidden" style="padding:0 16px"></div>
 <div id="revrec-area"   class="hidden" style="padding:0 16px"></div>
 <div id="retails-area" class="hidden" style="padding:0 16px"></div>
+<div id="yield-area"   class="hidden" style="padding:0 16px"></div>
 </div><!-- /#page-tracker -->
 
 <!-- ============= PAGE: CLIENTS ============= -->
@@ -871,7 +873,7 @@ function oemBadge(client){
 }
 
 const ACT_KEY='leadbu_actuals_fy27_v2';
-const DEPLOY_TIME='2026-08-26T16:00:56Z'; // replaced with ISO timestamp at deploy time
+const DEPLOY_TIME='2026-11-17T09:58:43Z'; // replaced with ISO timestamp at deploy time
 let ACTUALS=TARGETS.map(()=>newActualRec()); // populated by Firebase onValue
 
 function newActualRec(){
@@ -1809,7 +1811,7 @@ function updateLastSaved(isoStr){
 }
 function showDeployTime(){
   const el=document.getElementById('hdr-deployed');
-  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-08-26T16:00:56Z')return;
+  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-11-17T09:58:43Z')return;
   try{
     const d=new Date(DEPLOY_TIME);
     const pad=n=>String(n).padStart(2,'0');
@@ -2180,7 +2182,8 @@ function setView(v){
   const isCC=v==='cc';
   const isRR=v==='revrec';
   const isRT=v==='retails';
-  document.getElementById('table-area').classList.toggle('hidden',isC||isL||isT||isM||isCC||isRR||isRT);
+  const isYD=v==='yield';
+  document.getElementById('table-area').classList.toggle('hidden',isC||isL||isT||isM||isCC||isRR||isRT||isYD);
   document.getElementById('charts-area').classList.toggle('hidden',!isC);
   document.getElementById('leads-area').classList.toggle('hidden',!isL);
   document.getElementById('team-area').classList.toggle('hidden',!isT);
@@ -2188,13 +2191,14 @@ function setView(v){
   document.getElementById('cc-area').classList.toggle('hidden',!isCC);
   document.getElementById('revrec-area').classList.toggle('hidden',!isRR);
   document.getElementById('retails-area').classList.toggle('hidden',!isRT);
+  document.getElementById('yield-area').classList.toggle('hidden',!isYD);
   buildPeriodBar();
   render();
 }
 function setMode(m){DISP_MODE=m;['tgt','act','tva','all'].forEach(x=>document.getElementById('m-'+x).classList.toggle('active',x===m));render();}
 function buildPeriodBar(){
   const pb=document.getElementById('period-bar');
-  if(VIEW==='charts'||VIEW==='leads'||VIEW==='team'||VIEW==='mktg'||VIEW==='cc'||VIEW==='revrec'||VIEW==='retails'){pb.classList.remove('show');return;}
+  if(VIEW==='charts'||VIEW==='leads'||VIEW==='team'||VIEW==='mktg'||VIEW==='cc'||VIEW==='revrec'||VIEW==='retails'||VIEW==='yield'){pb.classList.remove('show');return;}
   pb.classList.add('show');
   const exportBtn=document.createElement('button');
   exportBtn.textContent='⬇ Export CSV';
@@ -2493,6 +2497,7 @@ function render(){
   if(VIEW==='cc'){renderCC(rows);return;}
   if(VIEW==='revrec'){renderRevRecon(rows);return;}
   if(VIEW==='retails'){renderRetails(rows);return;}
+  if(VIEW==='yield'){renderYield(rows);return;}
   if(VIEW==='team'){renderTeam();return;}
   const thead=document.getElementById('thead');
   const tbody=document.getElementById('tbody');
@@ -4589,6 +4594,7 @@ function exportCSVDispatch(){
   if(VIEW==='cc'){exportCCCSV();return;}
   if(VIEW==='revrec'){exportRevReconCSV();return;}
   if(VIEW==='retails'){exportRetailsCSV();return;}
+  if(VIEW==='yield'){exportYieldCSV();return;}
   exportCSV();
 }
 
@@ -5456,6 +5462,267 @@ function exportRetailsCSV(){
 }
 
 // ═══════════════════════════
+// YIELD MANAGEMENT — revenue per lead supplied, month on month & quarter on quarter
+//   Yield (Rs/lead) = revenue in the period ÷ total leads supplied in the period
+//   Revenue = "Total Revenue" line of each P&L modal (calculated + adjustment)
+//   Leads   = "Triggered Leads" line of each P&L modal (paid + organic + non-MS)
+//   Quarter / FY yield = total revenue ÷ total leads (weighted) — never an average of monthly yields.
+// ═══════════════════════════
+let YIELD_GRAN='m';          // 'm' = month on month, 'q' = quarter on quarter
+const _yieldOpen=new Set();  // TARGETS index of accounts whose brand rows are expanded
+
+function _yPeriods(){
+  return YIELD_GRAN==='q'
+    ? QTRS.map((q,qi)=>({label:q+' FY27',idx:[qi*3,qi*3+1,qi*3+2]}))
+    : MONTHS.map((m,i)=>({label:m,idx:[i]}));
+}
+// Aggregate a line {r:[12] rev Lacs, l:[12] leads, tr/tl: optional target arrays} over month indices
+function _yAgg(o,idx){
+  let r=0,l=0,tr=0,tl=0;
+  idx.forEach(i=>{r+=o.r[i];l+=o.l[i];if(o.tr){tr+=o.tr[i];tl+=o.tl[i];}});
+  return {r,l,y:l>0?r*100000/l:null,ty:(tl>0&&tr>0)?tr/tl:null}; // target: Lacs ÷ Lacs = Rs/lead
+}
+
+// Builds the data behind the tab from the same fields the P&L modals use
+function _yieldModel(rows){
+  const sa=arr=>Array.from({length:12},(_,i)=>+(arr&&arr[i])||0);
+  const zero=()=>Array(12).fill(0);
+  const procs=['CPS','Media Leads'];
+  const brandsOf={};
+  brandsOf[BAJAJ_CLIENT]=BAJAJ_BRANDS;brandsOf[TVS_CLIENT]=TVS_BRANDS;brandsOf[RE_CLIENT]=RE_BRANDS;brandsOf[HARLEY_CLIENT]=HARLEY_BRANDS;
+  const groups=procs.map(p=>({proc:p,lines:[],r:zero(),l:zero(),tr:zero(),tl:zero()}));
+  const add=(g,L)=>{for(let i=0;i<12;i++){g.r[i]+=L.r[i];g.l[i]+=L.l[i];g.tr[i]+=L.tr[i];g.tl[i]+=L.tl[i];}};
+
+  rows.filter(({t})=>procs.includes(t.ad_type)).forEach(row=>{
+    const {t,d}=row;
+    const g=groups[procs.indexOf(t.ad_type)];
+    const L={kind:'acct',key:row.i,label:t.client,btl:t.btl||'',
+      r:sa(d.rev),l:sa(d.trig_leads),
+      tr:sa(t.rev&&t.rev.monthly),tl:sa(t.leads&&t.leads.monthly),brands:[]};
+
+    // Sub-brand lines (Bajaj / TVS / RE / Harley) — read from each brand's own P&L inputs
+    const BR=brandsOf[t.client];
+    if(BR){
+      const lblMap=_CLIENT_BRAND_LABELS[t.client]||{};
+      const idxs=[];
+      TARGETS.forEach((x,j)=>{if(x.client===t.client&&x.ad_type===t.ad_type)idxs.push(j);});
+      BR.forEach(b=>{
+        const r=zero(),l=zero();
+        idxs.forEach(j=>{
+          const br=ACTUALS[j]&&ACTUALS[j].brands&&ACTUALS[j].brands[b];
+          if(!br)return;
+          try{
+            const nb=newBrandRec();
+            Object.keys(nb).forEach(k=>{nb[k]=Array.isArray(nb[k])?sa(br[k]):(br[k]!=null?br[k]:nb[k]);});
+            const bd=deriveActuals(nb,t.ad_type);
+            for(let i=0;i<12;i++){r[i]+=+bd.rev[i]||0;l[i]+=+bd.trig_leads[i]||0;}
+          }catch(e){}
+        });
+        if(!r.some(v=>v!==0)&&!l.some(v=>v>0))return;
+        const short=(lblMap[b]||b).split('(')[0].trim().replace(/^(TVS|RE|Bajaj|Harley)\s+/,'');
+        L.brands.push({kind:'brand',label:short||b,r,l,tr:null,tl:null});
+      });
+    }
+    g.lines.push(L);
+    add(g,L);
+  });
+  const all={r:zero(),l:zero(),tr:zero(),tl:zero()};
+  groups.forEach(g=>add(all,g));
+  return {groups,all};
+}
+
+function setYieldGran(g){YIELD_GRAN=g;renderYield(getFiltered());}
+function yieldToggle(k){if(_yieldOpen.has(k))_yieldOpen.delete(k);else _yieldOpen.add(k);renderYield(getFiltered());}
+function yieldToggleAll(open){
+  _yieldOpen.clear();
+  if(open){
+    const M=_yieldModel(getFiltered());
+    M.groups.forEach(g=>g.lines.forEach(L=>{if(L.brands.length)_yieldOpen.add(L.key);}));
+  }
+  renderYield(getFiltered());
+}
+
+function renderYield(rows){
+  const el=document.getElementById('yield-area');
+  if(!el)return;
+  const _lt=document.body.classList.contains('light');
+  const M=_yieldModel(rows);
+  if(!M.groups.some(g=>g.lines.length)){
+    el.innerHTML='<p style="color:var(--text3);padding:24px">No CPS or Media Leads accounts match the current filters.</p>';
+    return;
+  }
+  const per=_yPeriods();
+  const allIdx=Array.from({length:12},(_,i)=>i);
+  const cols=per.length+1; // periods + FY
+
+  // ── formatting helpers ──
+  const fY=v=>{
+    if(v==null||!isFinite(v))return '—';
+    const dec=Math.abs(v)>=100?0:1;
+    return (v<0?'−':'')+'₹'+Math.abs(v).toLocaleString('en-IN',{minimumFractionDigits:dec,maximumFractionDigits:dec});
+  };
+  const nStr=v=>Math.round(v).toLocaleString('en-IN');
+  // Colour vs the account's own target yield (target revenue ÷ target leads): higher is better
+  const yCol=(y,ty)=>{if(y==null||ty==null||ty<=0)return 'var(--text1)';const q=y/ty;return q>=1?'#3fb950':q>=0.8?'#d29922':'#f85149';};
+  const chip=(cur,prev)=>{
+    if(cur==null||prev==null||prev===0)return '<div style="font-size:9px;line-height:1.2">&nbsp;</div>';
+    const ch=(cur-prev)/Math.abs(prev)*100;
+    if(Math.abs(ch)<0.05)return '<div style="font-size:9px;line-height:1.2;color:var(--text3)">0.0%</div>';
+    const up=ch>0;
+    return `<div style="font-size:9px;line-height:1.2;font-weight:600;color:${up?'#3fb950':'#f85149'}">${up?'▲':'▼'}${Math.abs(ch).toFixed(1)}%</div>`;
+  };
+
+  // ── styles (match the other trackers) ──
+  const fyBg=_lt?'rgba(99,102,241,.06)':'#1a1a28';
+  const fyBdr='border-left:2px solid var(--accent3)';
+  const thH='padding:6px 8px;font-size:10.5px;font-weight:700;border-bottom:2px solid var(--border2);border-left:1px solid var(--border2);text-align:center;background:var(--bg3);white-space:nowrap';
+  const tdB='padding:4px 8px;font-size:11px;border-bottom:1px solid var(--border2);text-align:right;border-left:1px solid var(--border2);white-space:nowrap;min-width:'+(YIELD_GRAN==='q'?'92':'66')+'px;font-family:\'JetBrains Mono\',ui-monospace,monospace;font-variant-numeric:tabular-nums';
+  const sL='padding:5px 10px;font-size:11.5px;border-bottom:1px solid var(--border2);position:sticky;left:0;z-index:1;min-width:190px;white-space:nowrap;text-align:left';
+
+  // one row of period cells + FY cell for a line
+  const cells=(o,useTgt)=>{
+    let h='',prev=null;
+    per.forEach(p=>{
+      const a=_yAgg(o,p.idx);
+      const tip=`Revenue ₹${a.r.toFixed(2)} L ÷ ${nStr(a.l)} leads supplied`+(useTgt&&a.ty!=null?` · Target yield ${fY(a.ty)}`:'');
+      h+=`<td title="${tip}" style="${tdB}"><div style="font-weight:600;color:${useTgt?yCol(a.y,a.ty):'var(--text1)'}">${fY(a.y)}</div>${chip(a.y,prev)}</td>`;
+      prev=a.y;
+    });
+    const f=_yAgg(o,allIdx);
+    h+=`<td title="Revenue ₹${f.r.toFixed(2)} L ÷ ${nStr(f.l)} leads supplied" style="${tdB};${fyBdr};background:${fyBg};font-weight:700"><div style="color:${useTgt?yCol(f.y,f.ty):'var(--text1)'}">${fY(f.y)}</div><div style="font-size:9px;line-height:1.2">&nbsp;</div></td>`;
+    return h;
+  };
+
+  // ── toolbar ──
+  const gBtn=(id,label)=>{const a=YIELD_GRAN===id;return `<button class="pchip"${a?' style="background:var(--blue2);color:#fff;border-color:var(--blue)"':''} onclick="setYieldGran('${id}')">${label}</button>`;};
+  const smallBtn='padding:4px 10px;font-size:11px;border-radius:4px;border:1px solid var(--border2);cursor:pointer;background:var(--bg2);color:var(--text2);white-space:nowrap';
+  let html=`<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:4px 0 14px">
+    <span style="font-size:10px;color:var(--text2);font-weight:700;margin-right:2px">VIEW:</span>${gBtn('m','Month on Month')}${gBtn('q','Quarter on Quarter')}
+    <span style="width:1px;height:16px;background:var(--border2);margin:0 6px"></span>
+    <button onclick="yieldToggleAll(true)" style="${smallBtn}">⊞ Expand brands</button>
+    <button onclick="yieldToggleAll(false)" style="${smallBtn}">⊟ Collapse</button>
+    <button onclick="exportYieldCSV()" style="${smallBtn};margin-left:auto">⬇ Export CSV</button>
+  </div>`;
+
+  // ── KPI strip: summary before detail ──
+  const aAll=_yAgg(M.all,allIdx);
+  const gCps=M.groups[0],gMl=M.groups[1];
+  const aCps=_yAgg(gCps,allIdx),aMl=_yAgg(gMl,allIdx);
+  let lastI=-1;
+  per.forEach((p,i)=>{if(_yAgg(M.all,p.idx).l>0)lastI=i;});
+  const kCard=(title,val,sub,subClr)=>`<div style="flex:1;min-width:170px;background:var(--bg2);border:1px solid var(--border2);border-radius:10px;padding:12px 14px">
+      <div style="font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text3)">${title}</div>
+      <div style="font-size:22px;font-weight:700;margin-top:4px;font-variant-numeric:tabular-nums;color:var(--text1)">${val}</div>
+      <div style="font-size:10.5px;margin-top:3px;color:${subClr||'var(--text3)'}">${sub}</div></div>`;
+  const subFy=a=>`₹${a.r.toFixed(1)} L revenue ÷ ${nStr(a.l)} leads`;
+  let latestCard=kCard('Latest period','—','No leads supplied yet');
+  if(lastI>=0){
+    const cur=_yAgg(M.all,per[lastI].idx).y;
+    const prevY=lastI>0?_yAgg(M.all,per[lastI-1].idx).y:null;
+    let sub='first period with data',clr='var(--text3)';
+    if(prevY!=null&&prevY!==0&&cur!=null){
+      const ch=(cur-prevY)/Math.abs(prevY)*100;
+      sub=`${ch>0?'▲':'▼'} ${Math.abs(ch).toFixed(1)}% vs ${per[lastI-1].label}`;
+      clr=ch>0?'#3fb950':ch<0?'#f85149':'var(--text3)';
+    }
+    latestCard=kCard(`${per[lastI].label} · all programs`,fY(cur),sub,clr);
+  }
+  html+=`<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px">
+    ${kCard('All programs · FY to date',fY(aAll.y),subFy(aAll))}
+    ${kCard('CPS · FY to date',fY(aCps.y),subFy(aCps))}
+    ${kCard('Media Leads · FY to date',fY(aMl.y),subFy(aMl))}
+    ${latestCard}</div>`;
+
+  // ── main table ──
+  html+=`<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr>`;
+  html+=`<th style="${thH};text-align:left;position:sticky;left:0;z-index:3;min-width:190px">Program / Account</th>`;
+  per.forEach(p=>{html+=`<th style="${thH}">${p.label}</th>`;});
+  html+=`<th style="${thH};background:${fyBg};color:var(--accent3);${fyBdr}">FY27<br><small style="font-weight:400;font-size:9px">to date</small></th>`;
+  html+=`</tr></thead><tbody>`;
+
+  const secBg=_lt?'rgba(99,102,241,.10)':'rgba(99,102,241,.16)';
+  const totBg=_lt?'rgba(99,102,241,.07)':'rgba(99,102,241,.11)';
+  const acctBg=_lt?'#ffffff':'var(--bg)';
+  M.groups.forEach(g=>{
+    if(!g.lines.length)return;
+    html+=`<tr><td colspan="${cols+1}" style="padding:6px 10px;font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--accent);background:${secBg};border-bottom:1px solid var(--border2)">${g.proc} <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text3)">· ${g.lines.length} account${g.lines.length!==1?'s':''}</span></td></tr>`;
+    g.lines.forEach(L=>{
+      const open=_yieldOpen.has(L.key);
+      const hasB=L.brands.length>0;
+      const arrow=hasB?`<span style="display:inline-block;width:12px;color:var(--text3);font-size:10px">${open?'▾':'▸'}</span>`:'<span style="display:inline-block;width:12px"></span>';
+      html+=`<tr${hasB?` onclick="yieldToggle(${L.key})" style="cursor:pointer"`:''}>`;
+      html+=`<td style="${sL};background:${acctBg};font-weight:600;color:var(--text1)">${arrow}${L.label}${L.btl?` <span style="font-size:9px;font-weight:400;color:var(--text3)">${L.btl}</span>`:''}</td>`;
+      html+=cells(L,true)+`</tr>`;
+      if(hasB&&open){
+        L.brands.forEach(B=>{
+          html+=`<tr><td style="${sL};background:${acctBg};padding-left:30px;font-size:10.5px;color:var(--text2)">↳ ${B.label}</td>`+cells(B,false)+`</tr>`;
+        });
+      }
+    });
+    html+=`<tr><td style="${sL};background:${totBg};font-weight:700;color:var(--text1)">${g.proc} — blended</td>${cells(g,true)}</tr>`;
+  });
+  html+=`<tr style="border-top:2px solid var(--border2)"><td style="${sL};background:${secBg};font-weight:700;color:var(--accent)">◈ All programs — blended</td>${cells(M.all,true)}</tr>`;
+  html+=`</tbody></table></div>`;
+
+  // ── trend chart ──
+  html+=`<div style="background:var(--bg2);border:1px solid var(--border2);border-radius:10px;padding:14px 16px;margin-top:16px">
+    <div style="font-size:12px;font-weight:700;color:var(--text1);margin-bottom:8px">Yield trend — ${YIELD_GRAN==='q'?'quarter on quarter':'month on month'} (Rs revenue per lead)</div>
+    <div style="position:relative;height:240px"><canvas id="yld-chart"></canvas></div></div>`;
+
+  html+=`<div style="font-size:10.5px;color:var(--text3);line-height:1.7;margin-top:14px;max-width:900px">
+    <b style="color:var(--text2)">How this is calculated:</b> Yield = revenue in the period ÷ total leads supplied in the period. Revenue and leads are read straight from each account's P&amp;L modal ("Total Revenue (Calc + Adj)" and "Triggered Leads"; sub-brand rows use that brand's own modal inputs). Quarter and FY yield are total revenue ÷ total leads, not an average of monthly yields.
+    Cell colour compares the actual with the account's target yield (target revenue ÷ target leads): green = at/above target, amber = within 20% below, red = more than 20% below. Small arrows show the change vs the previous ${YIELD_GRAN==='q'?'quarter':'month'}. Respects the filters above (Cat, Fuel, Client, BTL, Zeros); CC contract accounts are not part of this view.</div>`;
+
+  const _sy=window.scrollY;
+  el.innerHTML=html;
+  window.scrollTo(0,_sy);
+  setTimeout(()=>_yieldChart(M,per),40);
+}
+
+function _yieldChart(M,per){
+  const ctx=document.getElementById('yld-chart');
+  if(!ctx||typeof Chart==='undefined')return;
+  dc('yld-chart');
+  const base=CO();
+  const series=o=>per.map(p=>{const y=_yAgg(o,p.idx).y;return y==null||!isFinite(y)?null:+y.toFixed(2);});
+  const mk=(label,o,color,dash)=>({label,data:series(o),borderColor:color,backgroundColor:color+'33',fill:false,tension:.3,pointRadius:4,pointHoverRadius:6,borderWidth:2,spanGaps:true,borderDash:dash||[]});
+  CI['yld-chart']=new Chart(ctx,{type:'line',
+    data:{labels:per.map(p=>p.label),datasets:[
+      mk('CPS',M.groups[0],'#818cf8'),
+      mk('Media Leads',M.groups[1],'#34d399'),
+      mk('All programs',M.all,'#fb923c',[5,4])]},
+    options:{...base,maintainAspectRatio:false,
+      plugins:{...base.plugins,tooltip:{callbacks:{label:c=>`${c.dataset.label}: ₹${c.parsed.y==null?'—':c.parsed.y.toLocaleString('en-IN')} / lead`}}},
+      scales:{...base.scales,y:{...base.scales.y,ticks:{...base.scales.y.ticks,callback:v=>'₹'+v}}}}});
+}
+
+function exportYieldCSV(){
+  const M=_yieldModel(getFiltered());
+  const per=_yPeriods();
+  const allIdx=Array.from({length:12},(_,i)=>i);
+  const hdr=['Program','Account','Brand','BTL'];
+  per.forEach(p=>hdr.push(p.label+' Revenue(L)',p.label+' Leads',p.label+' Yield(Rs/lead)'));
+  hdr.push('FY Revenue(L)','FY Leads','FY Yield(Rs/lead)');
+  const trip=a=>[+a.r.toFixed(4),Math.round(a.l),a.y==null?'':+a.y.toFixed(2)];
+  const data=[];
+  const push=(proc,acct,brand,btl,o)=>{
+    const row=[proc,acct,brand,btl];
+    per.forEach(p=>row.push(...trip(_yAgg(o,p.idx))));
+    row.push(...trip(_yAgg(o,allIdx)));
+    data.push(row);
+  };
+  M.groups.forEach(g=>{
+    g.lines.forEach(L=>{
+      push(g.proc,L.label,'Total',L.btl,L);
+      L.brands.forEach(B=>push(g.proc,L.label,B.label,L.btl,B));
+    });
+    if(g.lines.length)push(g.proc,'◈ '+g.proc+' blended','','',g);
+  });
+  push('All programs','◈ All programs blended','','',M.all);
+  _dlCSV(_exportStamp('yield_'+(YIELD_GRAN==='q'?'QoQ':'MoM')),hdr,data);
+}
+
+// ═══════════════════════════
 // CC TRACKER
 // ═══════════════════════════
 function renderCC(rows){
@@ -5953,7 +6220,7 @@ function _dailyBackupCheck(){
 
 // ── Version watcher — nudge users to hard-refresh when a new deploy is live ─
 function _startVersionWatch(){
-  if(!_fbDb || !DEPLOY_TIME || DEPLOY_TIME==='2026-08-26T16:00:56Z') return;
+  if(!_fbDb || !DEPLOY_TIME || DEPLOY_TIME==='2026-11-17T09:58:43Z') return;
   _fbDb.ref('meta/deployVersion').on('value', snap=>{
     const liveTs = snap.val();
     if(!liveTs) return;
