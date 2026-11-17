@@ -564,7 +564,7 @@ canvas{max-height:260px}
       <div class="brand-mark">🏍️</div>
       <div class="brand-text">
         <div class="t1">Bike AOP Tracker</div>
-        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.2.54</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 17/11/2026 10:06</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
+        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.2.55</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 17/11/2026 10:16</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
       </div>
     </div>
     <div class="hdr-right">
@@ -729,7 +729,7 @@ canvas{max-height:260px}
       <button class="mode-btn" id="m-all" onclick="setMode('all')">ALL</button>
     </div>
   </div>
-  <div class="ctrl-grp">
+  <div class="ctrl-grp" id="ly-ctrl">
     <label style="font-size:11px;color:var(--text2);cursor:pointer;display:flex;align-items:center;gap:4px">
       <input type="checkbox" id="show-ly" onchange="render()"> vs LY
     </label>
@@ -873,7 +873,7 @@ function oemBadge(client){
 }
 
 const ACT_KEY='leadbu_actuals_fy27_v2';
-const DEPLOY_TIME='2026-11-17T10:06:04Z'; // replaced with ISO timestamp at deploy time
+const DEPLOY_TIME='2026-11-17T10:16:29Z'; // replaced with ISO timestamp at deploy time
 let ACTUALS=TARGETS.map(()=>newActualRec()); // populated by Firebase onValue
 
 function newActualRec(){
@@ -1811,7 +1811,7 @@ function updateLastSaved(isoStr){
 }
 function showDeployTime(){
   const el=document.getElementById('hdr-deployed');
-  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-11-17T10:06:04Z')return;
+  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-11-17T10:16:29Z')return;
   try{
     const d=new Date(DEPLOY_TIME);
     const pad=n=>String(n).padStart(2,'0');
@@ -2192,6 +2192,7 @@ function setView(v){
   document.getElementById('revrec-area').classList.toggle('hidden',!isRR);
   document.getElementById('retails-area').classList.toggle('hidden',!isRT);
   document.getElementById('yield-area').classList.toggle('hidden',!isYD);
+  const lyCtl=document.getElementById('ly-ctrl'); if(lyCtl) lyCtl.style.display=isYD?'none':''; // no LY leads in the data → no LY yield, so hide vs LY here
   buildPeriodBar();
   render();
 }
@@ -6273,7 +6274,7 @@ function _dailyBackupCheck(){
 
 // ── Version watcher — nudge users to hard-refresh when a new deploy is live ─
 function _startVersionWatch(){
-  if(!_fbDb || !DEPLOY_TIME || DEPLOY_TIME==='2026-11-17T10:06:04Z') return;
+  if(!_fbDb || !DEPLOY_TIME || DEPLOY_TIME==='2026-11-17T10:16:29Z') return;
   _fbDb.ref('meta/deployVersion').on('value', snap=>{
     const liveTs = snap.val();
     if(!liveTs) return;
