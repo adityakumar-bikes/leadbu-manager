@@ -564,7 +564,7 @@ canvas{max-height:260px}
       <div class="brand-mark">🏍️</div>
       <div class="brand-text">
         <div class="t1">Bike AOP Tracker</div>
-        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.2.55</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 17/11/2026 10:16</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
+        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.2.56</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 17/11/2026 10:23</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
       </div>
     </div>
     <div class="hdr-right">
@@ -873,7 +873,7 @@ function oemBadge(client){
 }
 
 const ACT_KEY='leadbu_actuals_fy27_v2';
-const DEPLOY_TIME='2026-11-17T10:16:29Z'; // replaced with ISO timestamp at deploy time
+const DEPLOY_TIME='2026-11-17T10:23:35Z'; // replaced with ISO timestamp at deploy time
 let ACTUALS=TARGETS.map(()=>newActualRec()); // populated by Firebase onValue
 
 function newActualRec(){
@@ -1811,7 +1811,7 @@ function updateLastSaved(isoStr){
 }
 function showDeployTime(){
   const el=document.getElementById('hdr-deployed');
-  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-11-17T10:16:29Z')return;
+  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-11-17T10:23:35Z')return;
   try{
     const d=new Date(DEPLOY_TIME);
     const pad=n=>String(n).padStart(2,'0');
@@ -5576,13 +5576,6 @@ function renderYield(rows){
   const nStr=v=>Math.round(v).toLocaleString('en-IN');
   // Colour vs the account's own target yield (target revenue ÷ target leads): higher is better
   const yCol=(y,ty)=>{if(y==null||ty==null||ty<=0)return 'var(--text1)';const q=y/ty;return q>=1?'#3fb950':q>=0.8?'#d29922':'#f85149';};
-  const chip=(cur,prev)=>{
-    if(cur==null||prev==null||prev===0)return '<div style="font-size:9px;line-height:1.2">&nbsp;</div>';
-    const ch=(cur-prev)/Math.abs(prev)*100;
-    if(Math.abs(ch)<0.05)return '<div style="font-size:9px;line-height:1.2;color:var(--text3)">0.0%</div>';
-    const up=ch>0;
-    return `<div style="font-size:9px;line-height:1.2;font-weight:600;color:${up?'#3fb950':'#f85149'}">${up?'▲':'▼'}${Math.abs(ch).toFixed(1)}%</div>`;
-  };
 
   // ── styles (match the other trackers) ──
   const fyBg=_lt?'rgba(99,102,241,.06)':'#1a1a28';
@@ -5607,8 +5600,8 @@ function renderYield(rows){
     let inner;
     if(fut&&mode==='act')return `<td style="${st}"></td>`;                       // not happened yet → blank
     if(fut&&mode!=='tgt')inner=`${blank}<div style="font-size:9px;line-height:1.2;color:var(--text3)">T ${fY(a.ty)}</div>${blank}`; // target only
-    else if(mode==='tgt')inner=`<div style="font-weight:${fw};color:var(--text1)">${fY(a.ty)}</div>${isFy?blank:chip(a.ty,prev)}`;
-    else if(mode==='act')inner=`<div style="font-weight:${fw};color:${yCol(a.y,a.ty)}">${fY(a.y)}</div>${isFy?blank:chip(a.y,prev)}`;
+    else if(mode==='tgt')inner=`<div style="font-weight:${fw};color:var(--text1)">${fY(a.ty)}</div>`;
+    else if(mode==='act')inner=`<div style="font-weight:${fw};color:${yCol(a.y,a.ty)}">${fY(a.y)}</div>`;
     else inner=`<div style="font-weight:${fw};color:${yCol(a.y,a.ty)}">${fY(a.y)}</div><div style="font-size:9px;line-height:1.2;color:var(--text3)">T ${fY(a.ty)}</div>${varChip(a)}`;
     return `<td title="${tip}" style="${st}">${inner}</td>`;
   };
@@ -5663,17 +5656,8 @@ function renderYield(rows){
   if(lastI>=0){
     const a=_yAgg(M.all,per[lastI].idx,like);
     const pa=lastI>0?_yAgg(M.all,per[lastI-1].idx,like):null;
-    let sub,clr;
-    if(mode==='tva'||mode==='all'){const v=vsT(a);sub=v.t;clr=v.c;}
-    else{
-      const cur=pv(a),prevY=pa?pv(pa):null;
-      sub='first period with data';clr='var(--text3)';
-      if(prevY!=null&&prevY!==0&&cur!=null){
-        const ch=(cur-prevY)/Math.abs(prevY)*100;
-        sub=`${ch>0?'▲':'▼'} ${Math.abs(ch).toFixed(1)}% vs ${per[lastI-1].label}`;
-        clr=ch>0?'#3fb950':ch<0?'#f85149':'var(--text3)';
-      }
-    }
+    const cs=cardSub(a);
+    const sub=cs.t,clr=cs.c;
     latestCard=kCard(`${per[lastI].label} · all programs`,fY(pv(a)),sub,clr);
   }
   html+=`<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px">
@@ -5720,7 +5704,7 @@ function renderYield(rows){
 
   html+=`<div style="font-size:10.5px;color:var(--text3);line-height:1.7;margin-top:14px;max-width:900px">
     <b style="color:var(--text2)">How this is calculated:</b> Yield = revenue in the period ÷ total leads supplied in the period. Revenue and leads are read straight from each account's P&amp;L modal ("Total Revenue (Calc + Adj)" and "Triggered Leads"; sub-brand rows use that brand's own modal inputs). Quarter and FY yield are total revenue ÷ total leads, not an average of monthly yields.
-    The SHOW buttons work as elsewhere: <b style="color:var(--text2)">TGT</b> = target yield (target revenue ÷ target leads), <b style="color:var(--text2)">ACT</b> = actual yield, <b style="color:var(--text2)">T vs A / ALL</b> = actual with target and the variance. Actuals stop at the current month — months that haven't happened yet are blank in ACT (and show target only in T vs A). Actual vs target is compared over the same months only. Colour: green = at/above target, amber = within 20% below, red = more than 20% below. Small arrows show the change vs the previous ${YIELD_GRAN==='q'?'quarter':'month'} (in ACT / TGT view). Sub-brand rows have no target of their own. Respects the filters above (Cat, Fuel, Client, BTL, Zeros); CC contract accounts are not part of this view.</div>`;
+    The SHOW buttons work as elsewhere: <b style="color:var(--text2)">TGT</b> = target yield (target revenue ÷ target leads), <b style="color:var(--text2)">ACT</b> = actual yield, <b style="color:var(--text2)">T vs A / ALL</b> = actual with target and the variance. Actuals stop at the current month — months that haven't happened yet are blank in ACT (and show target only in T vs A). Actual vs target is compared over the same months only. Colour: green = at/above target, amber = within 20% below, red = more than 20% below. Sub-brand rows have no target of their own. Respects the filters above (Cat, Fuel, Client, BTL, Zeros); CC contract accounts are not part of this view.</div>`;
 
   const _sy=window.scrollY;
   el.innerHTML=html;
@@ -6274,7 +6258,7 @@ function _dailyBackupCheck(){
 
 // ── Version watcher — nudge users to hard-refresh when a new deploy is live ─
 function _startVersionWatch(){
-  if(!_fbDb || !DEPLOY_TIME || DEPLOY_TIME==='2026-11-17T10:16:29Z') return;
+  if(!_fbDb || !DEPLOY_TIME || DEPLOY_TIME==='2026-11-17T10:23:35Z') return;
   _fbDb.ref('meta/deployVersion').on('value', snap=>{
     const liveTs = snap.val();
     if(!liveTs) return;
