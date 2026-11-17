@@ -564,7 +564,7 @@ canvas{max-height:260px}
       <div class="brand-mark">🏍️</div>
       <div class="brand-text">
         <div class="t1">Bike AOP Tracker</div>
-        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.2.53</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 17/11/2026 10:04</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
+        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.2.54</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 17/11/2026 10:06</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
       </div>
     </div>
     <div class="hdr-right">
@@ -873,7 +873,7 @@ function oemBadge(client){
 }
 
 const ACT_KEY='leadbu_actuals_fy27_v2';
-const DEPLOY_TIME='2026-11-17T10:04:02Z'; // replaced with ISO timestamp at deploy time
+const DEPLOY_TIME='2026-11-17T10:06:04Z'; // replaced with ISO timestamp at deploy time
 let ACTUALS=TARGETS.map(()=>newActualRec()); // populated by Firebase onValue
 
 function newActualRec(){
@@ -1811,7 +1811,7 @@ function updateLastSaved(isoStr){
 }
 function showDeployTime(){
   const el=document.getElementById('hdr-deployed');
-  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-11-17T10:04:02Z')return;
+  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-11-17T10:06:04Z')return;
   try{
     const d=new Date(DEPLOY_TIME);
     const pad=n=>String(n).padStart(2,'0');
@@ -5476,6 +5476,13 @@ function _yPeriods(){
     ? QTRS.map((q,qi)=>({label:q+' FY27',idx:[qi*3,qi*3+1,qi*3+2]}))
     : MONTHS.map((m,i)=>({label:m,idx:[i]}));
 }
+// Index (0=Apr'26 … 11=Mar'27) of the current month; months after it have not happened yet,
+// so they carry no actuals in this tab (targets are still shown for them).
+function _yCurMonth(){
+  const n=new Date();
+  const mi=(n.getFullYear()-2026)*12+(n.getMonth()-3);
+  return Math.max(-1,Math.min(11,mi));
+}
 // Aggregate a line {r:[12] rev Lacs, l:[12] leads, tr/tl: optional target arrays} over month indices
 function _yAgg(o,idx,like){
   // like=true → target is summed only over months that actually have leads, so a part-filled
@@ -5489,6 +5496,8 @@ function _yAgg(o,idx,like){
 function _yieldModel(rows){
   const sa=arr=>Array.from({length:12},(_,i)=>+(arr&&arr[i])||0);
   const zero=()=>Array(12).fill(0);
+  const cur=_yCurMonth();
+  const past=a=>a.map((v,i)=>i>cur?0:v); // no actuals for months that haven't happened
   const procs=['CPS','Media Leads'];
   const brandsOf={};
   brandsOf[BAJAJ_CLIENT]=BAJAJ_BRANDS;brandsOf[TVS_CLIENT]=TVS_BRANDS;brandsOf[RE_CLIENT]=RE_BRANDS;brandsOf[HARLEY_CLIENT]=HARLEY_BRANDS;
@@ -5499,7 +5508,7 @@ function _yieldModel(rows){
     const {t,d}=row;
     const g=groups[procs.indexOf(t.ad_type)];
     const L={kind:'acct',key:row.i,label:t.client,btl:t.btl||'',
-      r:sa(d.rev),l:sa(d.trig_leads),
+      r:past(sa(d.rev)),l:past(sa(d.trig_leads)),
       tr:sa(t.rev&&t.rev.monthly),tl:sa(t.leads&&t.leads.monthly),brands:[]};
 
     // Sub-brand lines (Bajaj / TVS / RE / Harley) — read from each brand's own P&L inputs
@@ -5522,7 +5531,7 @@ function _yieldModel(rows){
         });
         if(!r.some(v=>v!==0)&&!l.some(v=>v>0))return;
         const short=(lblMap[b]||b).split('(')[0].trim().replace(/^(TVS|RE|Bajaj|Harley)\s+/,'');
-        L.brands.push({kind:'brand',label:short||b,r,l,tr:null,tl:null});
+        L.brands.push({kind:'brand',label:short||b,r:past(r),l:past(l),tr:null,tl:null});
       });
     }
     g.lines.push(L);
@@ -5589,12 +5598,15 @@ function renderYield(rows){
     const v=(a.y-a.ty)/a.ty*100;
     return `<div style="font-size:9px;line-height:1.2;font-weight:600;color:${v>=0?'#3fb950':'#f85149'}">${v>=0?'▲':'▼'}${Math.abs(v).toFixed(1)}% vs T</div>`;
   };
-  const cellHtml=(a,prev,isFy)=>{
+  const curM=_yCurMonth();
+  const cellHtml=(a,prev,isFy,fut)=>{
     const tip=`Actual: ₹${a.r.toFixed(2)} L ÷ ${nStr(a.l)} leads = ${fY(a.y)}`+(a.ty!=null?` · Target: ${fY(a.ty)}`:'');
     const st=tdB+(isFy?`;${fyBdr};background:${fyBg}`:'');
     const fw=isFy?700:600;
     let inner;
-    if(mode==='tgt')inner=`<div style="font-weight:${fw};color:var(--text1)">${fY(a.ty)}</div>${isFy?blank:chip(a.ty,prev)}`;
+    if(fut&&mode==='act')return `<td style="${st}"></td>`;                       // not happened yet → blank
+    if(fut&&mode!=='tgt')inner=`${blank}<div style="font-size:9px;line-height:1.2;color:var(--text3)">T ${fY(a.ty)}</div>${blank}`; // target only
+    else if(mode==='tgt')inner=`<div style="font-weight:${fw};color:var(--text1)">${fY(a.ty)}</div>${isFy?blank:chip(a.ty,prev)}`;
     else if(mode==='act')inner=`<div style="font-weight:${fw};color:${yCol(a.y,a.ty)}">${fY(a.y)}</div>${isFy?blank:chip(a.y,prev)}`;
     else inner=`<div style="font-weight:${fw};color:${yCol(a.y,a.ty)}">${fY(a.y)}</div><div style="font-size:9px;line-height:1.2;color:var(--text3)">T ${fY(a.ty)}</div>${varChip(a)}`;
     return `<td title="${tip}" style="${st}">${inner}</td>`;
@@ -5603,8 +5615,9 @@ function renderYield(rows){
   const cells=(o)=>{
     let h='',prev=null;
     per.forEach(p=>{
-      const a=_yAgg(o,p.idx,mode!=='tgt');
-      h+=cellHtml(a,prev,false);
+      const fut=p.idx.every(i=>i>curM);
+      const a=_yAgg(o,p.idx,mode!=='tgt'&&!fut);
+      h+=cellHtml(a,prev,false,fut);
       prev=(mode==='tgt')?a.ty:a.y;
     });
     return h+cellHtml(_yAgg(o,allIdx,mode!=='tgt'),null,true);
@@ -5706,7 +5719,7 @@ function renderYield(rows){
 
   html+=`<div style="font-size:10.5px;color:var(--text3);line-height:1.7;margin-top:14px;max-width:900px">
     <b style="color:var(--text2)">How this is calculated:</b> Yield = revenue in the period ÷ total leads supplied in the period. Revenue and leads are read straight from each account's P&amp;L modal ("Total Revenue (Calc + Adj)" and "Triggered Leads"; sub-brand rows use that brand's own modal inputs). Quarter and FY yield are total revenue ÷ total leads, not an average of monthly yields.
-    The SHOW buttons work as elsewhere: <b style="color:var(--text2)">TGT</b> = target yield (target revenue ÷ target leads), <b style="color:var(--text2)">ACT</b> = actual yield, <b style="color:var(--text2)">T vs A / ALL</b> = actual with target and the variance. Actual vs target is compared over the same months only. Colour: green = at/above target, amber = within 20% below, red = more than 20% below. Small arrows show the change vs the previous ${YIELD_GRAN==='q'?'quarter':'month'} (in ACT / TGT view). Sub-brand rows have no target of their own. Respects the filters above (Cat, Fuel, Client, BTL, Zeros); CC contract accounts are not part of this view.</div>`;
+    The SHOW buttons work as elsewhere: <b style="color:var(--text2)">TGT</b> = target yield (target revenue ÷ target leads), <b style="color:var(--text2)">ACT</b> = actual yield, <b style="color:var(--text2)">T vs A / ALL</b> = actual with target and the variance. Actuals stop at the current month — months that haven't happened yet are blank in ACT (and show target only in T vs A). Actual vs target is compared over the same months only. Colour: green = at/above target, amber = within 20% below, red = more than 20% below. Small arrows show the change vs the previous ${YIELD_GRAN==='q'?'quarter':'month'} (in ACT / TGT view). Sub-brand rows have no target of their own. Respects the filters above (Cat, Fuel, Client, BTL, Zeros); CC contract accounts are not part of this view.</div>`;
 
   const _sy=window.scrollY;
   el.innerHTML=html;
@@ -6260,7 +6273,7 @@ function _dailyBackupCheck(){
 
 // ── Version watcher — nudge users to hard-refresh when a new deploy is live ─
 function _startVersionWatch(){
-  if(!_fbDb || !DEPLOY_TIME || DEPLOY_TIME==='2026-11-17T10:04:02Z') return;
+  if(!_fbDb || !DEPLOY_TIME || DEPLOY_TIME==='2026-11-17T10:06:04Z') return;
   _fbDb.ref('meta/deployVersion').on('value', snap=>{
     const liveTs = snap.val();
     if(!liveTs) return;
