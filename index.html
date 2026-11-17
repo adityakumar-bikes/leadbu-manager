@@ -564,7 +564,7 @@ canvas{max-height:260px}
       <div class="brand-mark">🏍️</div>
       <div class="brand-text">
         <div class="t1">Bike AOP Tracker</div>
-        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.2.52</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 17/11/2026 09:58</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
+        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.2.53</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 17/11/2026 10:04</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
       </div>
     </div>
     <div class="hdr-right">
@@ -873,7 +873,7 @@ function oemBadge(client){
 }
 
 const ACT_KEY='leadbu_actuals_fy27_v2';
-const DEPLOY_TIME='2026-11-17T09:58:43Z'; // replaced with ISO timestamp at deploy time
+const DEPLOY_TIME='2026-11-17T10:04:02Z'; // replaced with ISO timestamp at deploy time
 let ACTUALS=TARGETS.map(()=>newActualRec()); // populated by Firebase onValue
 
 function newActualRec(){
@@ -1811,7 +1811,7 @@ function updateLastSaved(isoStr){
 }
 function showDeployTime(){
   const el=document.getElementById('hdr-deployed');
-  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-11-17T09:58:43Z')return;
+  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-11-17T10:04:02Z')return;
   try{
     const d=new Date(DEPLOY_TIME);
     const pad=n=>String(n).padStart(2,'0');
@@ -5477,10 +5477,12 @@ function _yPeriods(){
     : MONTHS.map((m,i)=>({label:m,idx:[i]}));
 }
 // Aggregate a line {r:[12] rev Lacs, l:[12] leads, tr/tl: optional target arrays} over month indices
-function _yAgg(o,idx){
+function _yAgg(o,idx,like){
+  // like=true → target is summed only over months that actually have leads, so a part-filled
+  // quarter / FY is compared with the matching months of target (like for like).
   let r=0,l=0,tr=0,tl=0;
-  idx.forEach(i=>{r+=o.r[i];l+=o.l[i];if(o.tr){tr+=o.tr[i];tl+=o.tl[i];}});
-  return {r,l,y:l>0?r*100000/l:null,ty:(tl>0&&tr>0)?tr/tl:null}; // target: Lacs ÷ Lacs = Rs/lead
+  idx.forEach(i=>{r+=o.r[i];l+=o.l[i];if(o.tr&&(!like||o.l[i]>0)){tr+=o.tr[i];tl+=o.tl[i];}});
+  return {r,l,tr,tl,y:l>0?r*100000/l:null,ty:(tl>0&&tr>0)?tr/tl:null}; // target: Lacs ÷ Lacs = Rs/lead
 }
 
 // Builds the data behind the tab from the same fields the P&L modals use
@@ -5579,18 +5581,33 @@ function renderYield(rows){
   const tdB='padding:4px 8px;font-size:11px;border-bottom:1px solid var(--border2);text-align:right;border-left:1px solid var(--border2);white-space:nowrap;min-width:'+(YIELD_GRAN==='q'?'92':'66')+'px;font-family:\'JetBrains Mono\',ui-monospace,monospace;font-variant-numeric:tabular-nums';
   const sL='padding:5px 10px;font-size:11.5px;border-bottom:1px solid var(--border2);position:sticky;left:0;z-index:1;min-width:190px;white-space:nowrap;text-align:left';
 
+  // ── follow the SHOW buttons: TGT = target yield, ACT = actual yield, T vs A / ALL = actual + target + variance ──
+  const mode=DISP_MODE;
+  const blank='<div style="font-size:9px;line-height:1.2">&nbsp;</div>';
+  const varChip=a=>{
+    if(a.y==null||a.ty==null||a.ty<=0)return blank;
+    const v=(a.y-a.ty)/a.ty*100;
+    return `<div style="font-size:9px;line-height:1.2;font-weight:600;color:${v>=0?'#3fb950':'#f85149'}">${v>=0?'▲':'▼'}${Math.abs(v).toFixed(1)}% vs T</div>`;
+  };
+  const cellHtml=(a,prev,isFy)=>{
+    const tip=`Actual: ₹${a.r.toFixed(2)} L ÷ ${nStr(a.l)} leads = ${fY(a.y)}`+(a.ty!=null?` · Target: ${fY(a.ty)}`:'');
+    const st=tdB+(isFy?`;${fyBdr};background:${fyBg}`:'');
+    const fw=isFy?700:600;
+    let inner;
+    if(mode==='tgt')inner=`<div style="font-weight:${fw};color:var(--text1)">${fY(a.ty)}</div>${isFy?blank:chip(a.ty,prev)}`;
+    else if(mode==='act')inner=`<div style="font-weight:${fw};color:${yCol(a.y,a.ty)}">${fY(a.y)}</div>${isFy?blank:chip(a.y,prev)}`;
+    else inner=`<div style="font-weight:${fw};color:${yCol(a.y,a.ty)}">${fY(a.y)}</div><div style="font-size:9px;line-height:1.2;color:var(--text3)">T ${fY(a.ty)}</div>${varChip(a)}`;
+    return `<td title="${tip}" style="${st}">${inner}</td>`;
+  };
   // one row of period cells + FY cell for a line
-  const cells=(o,useTgt)=>{
+  const cells=(o)=>{
     let h='',prev=null;
     per.forEach(p=>{
-      const a=_yAgg(o,p.idx);
-      const tip=`Revenue ₹${a.r.toFixed(2)} L ÷ ${nStr(a.l)} leads supplied`+(useTgt&&a.ty!=null?` · Target yield ${fY(a.ty)}`:'');
-      h+=`<td title="${tip}" style="${tdB}"><div style="font-weight:600;color:${useTgt?yCol(a.y,a.ty):'var(--text1)'}">${fY(a.y)}</div>${chip(a.y,prev)}</td>`;
-      prev=a.y;
+      const a=_yAgg(o,p.idx,mode!=='tgt');
+      h+=cellHtml(a,prev,false);
+      prev=(mode==='tgt')?a.ty:a.y;
     });
-    const f=_yAgg(o,allIdx);
-    h+=`<td title="Revenue ₹${f.r.toFixed(2)} L ÷ ${nStr(f.l)} leads supplied" style="${tdB};${fyBdr};background:${fyBg};font-weight:700"><div style="color:${useTgt?yCol(f.y,f.ty):'var(--text1)'}">${fY(f.y)}</div><div style="font-size:9px;line-height:1.2">&nbsp;</div></td>`;
-    return h;
+    return h+cellHtml(_yAgg(o,allIdx,mode!=='tgt'),null,true);
   };
 
   // ── toolbar ──
@@ -5604,40 +5621,58 @@ function renderYield(rows){
     <button onclick="exportYieldCSV()" style="${smallBtn};margin-left:auto">⬇ Export CSV</button>
   </div>`;
 
-  // ── KPI strip: summary before detail ──
-  const aAll=_yAgg(M.all,allIdx);
+  // ── KPI strip: summary before detail (follows the SHOW buttons too) ──
+  const like=mode!=='tgt';
+  const aAll=_yAgg(M.all,allIdx,like);
   const gCps=M.groups[0],gMl=M.groups[1];
-  const aCps=_yAgg(gCps,allIdx),aMl=_yAgg(gMl,allIdx);
+  const aCps=_yAgg(gCps,allIdx,like),aMl=_yAgg(gMl,allIdx,like);
+  const pv=a=>mode==='tgt'?a.ty:a.y;                       // the number a card headlines
   let lastI=-1;
-  per.forEach((p,i)=>{if(_yAgg(M.all,p.idx).l>0)lastI=i;});
+  per.forEach((p,i)=>{if(_yAgg(M.all,p.idx).l>0)lastI=i;}); // latest period that has actual leads
   const kCard=(title,val,sub,subClr)=>`<div style="flex:1;min-width:170px;background:var(--bg2);border:1px solid var(--border2);border-radius:10px;padding:12px 14px">
       <div style="font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text3)">${title}</div>
       <div style="font-size:22px;font-weight:700;margin-top:4px;font-variant-numeric:tabular-nums;color:var(--text1)">${val}</div>
       <div style="font-size:10.5px;margin-top:3px;color:${subClr||'var(--text3)'}">${sub}</div></div>`;
-  const subFy=a=>`₹${a.r.toFixed(1)} L revenue ÷ ${nStr(a.l)} leads`;
+  const vsT=a=>{ // variance of actual vs target, as text + colour
+    if(a.y==null||a.ty==null||a.ty<=0)return {t:'no target to compare',c:'var(--text3)'};
+    const v=(a.y-a.ty)/a.ty*100;
+    return {t:`${v>=0?'▲':'▼'} ${Math.abs(v).toFixed(1)}% vs target ${fY(a.ty)}`,c:v>=0?'#3fb950':'#f85149'};
+  };
+  const cardSub=a=>{
+    if(mode==='tgt')return {t:`₹${a.tr.toFixed(1)} L target revenue ÷ ${nStr(a.tl*100000)} target leads`,c:null};
+    if(mode==='act')return {t:`₹${a.r.toFixed(1)} L revenue ÷ ${nStr(a.l)} leads`,c:null};
+    return vsT(a);
+  };
+  const fyWord=mode==='tgt'?'FY27 target':'FY to date';
+  const mkFy=(name,a)=>{const cs=cardSub(a);return kCard(`${name} · ${fyWord}`,fY(pv(a)),cs.t,cs.c);};
   let latestCard=kCard('Latest period','—','No leads supplied yet');
   if(lastI>=0){
-    const cur=_yAgg(M.all,per[lastI].idx).y;
-    const prevY=lastI>0?_yAgg(M.all,per[lastI-1].idx).y:null;
-    let sub='first period with data',clr='var(--text3)';
-    if(prevY!=null&&prevY!==0&&cur!=null){
-      const ch=(cur-prevY)/Math.abs(prevY)*100;
-      sub=`${ch>0?'▲':'▼'} ${Math.abs(ch).toFixed(1)}% vs ${per[lastI-1].label}`;
-      clr=ch>0?'#3fb950':ch<0?'#f85149':'var(--text3)';
+    const a=_yAgg(M.all,per[lastI].idx,like);
+    const pa=lastI>0?_yAgg(M.all,per[lastI-1].idx,like):null;
+    let sub,clr;
+    if(mode==='tva'||mode==='all'){const v=vsT(a);sub=v.t;clr=v.c;}
+    else{
+      const cur=pv(a),prevY=pa?pv(pa):null;
+      sub='first period with data';clr='var(--text3)';
+      if(prevY!=null&&prevY!==0&&cur!=null){
+        const ch=(cur-prevY)/Math.abs(prevY)*100;
+        sub=`${ch>0?'▲':'▼'} ${Math.abs(ch).toFixed(1)}% vs ${per[lastI-1].label}`;
+        clr=ch>0?'#3fb950':ch<0?'#f85149':'var(--text3)';
+      }
     }
-    latestCard=kCard(`${per[lastI].label} · all programs`,fY(cur),sub,clr);
+    latestCard=kCard(`${per[lastI].label} · all programs`,fY(pv(a)),sub,clr);
   }
   html+=`<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px">
-    ${kCard('All programs · FY to date',fY(aAll.y),subFy(aAll))}
-    ${kCard('CPS · FY to date',fY(aCps.y),subFy(aCps))}
-    ${kCard('Media Leads · FY to date',fY(aMl.y),subFy(aMl))}
+    ${mkFy('All programs',aAll)}
+    ${mkFy('CPS',aCps)}
+    ${mkFy('Media Leads',aMl)}
     ${latestCard}</div>`;
 
   // ── main table ──
   html+=`<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr>`;
   html+=`<th style="${thH};text-align:left;position:sticky;left:0;z-index:3;min-width:190px">Program / Account</th>`;
   per.forEach(p=>{html+=`<th style="${thH}">${p.label}</th>`;});
-  html+=`<th style="${thH};background:${fyBg};color:var(--accent3);${fyBdr}">FY27<br><small style="font-weight:400;font-size:9px">to date</small></th>`;
+  html+=`<th style="${thH};background:${fyBg};color:var(--accent3);${fyBdr}">FY27<br><small style="font-weight:400;font-size:9px">${mode==='tgt'?'full year':'to date'}</small></th>`;
   html+=`</tr></thead><tbody>`;
 
   const secBg=_lt?'rgba(99,102,241,.10)':'rgba(99,102,241,.16)';
@@ -5666,12 +5701,12 @@ function renderYield(rows){
 
   // ── trend chart ──
   html+=`<div style="background:var(--bg2);border:1px solid var(--border2);border-radius:10px;padding:14px 16px;margin-top:16px">
-    <div style="font-size:12px;font-weight:700;color:var(--text1);margin-bottom:8px">Yield trend — ${YIELD_GRAN==='q'?'quarter on quarter':'month on month'} (Rs revenue per lead)</div>
+    <div style="font-size:12px;font-weight:700;color:var(--text1);margin-bottom:8px">Yield trend — ${YIELD_GRAN==='q'?'quarter on quarter':'month on month'} · ${mode==='tgt'?'target':mode==='act'?'actual':'actual vs target (dashed)'} (Rs revenue per lead)</div>
     <div style="position:relative;height:240px"><canvas id="yld-chart"></canvas></div></div>`;
 
   html+=`<div style="font-size:10.5px;color:var(--text3);line-height:1.7;margin-top:14px;max-width:900px">
     <b style="color:var(--text2)">How this is calculated:</b> Yield = revenue in the period ÷ total leads supplied in the period. Revenue and leads are read straight from each account's P&amp;L modal ("Total Revenue (Calc + Adj)" and "Triggered Leads"; sub-brand rows use that brand's own modal inputs). Quarter and FY yield are total revenue ÷ total leads, not an average of monthly yields.
-    Cell colour compares the actual with the account's target yield (target revenue ÷ target leads): green = at/above target, amber = within 20% below, red = more than 20% below. Small arrows show the change vs the previous ${YIELD_GRAN==='q'?'quarter':'month'}. Respects the filters above (Cat, Fuel, Client, BTL, Zeros); CC contract accounts are not part of this view.</div>`;
+    The SHOW buttons work as elsewhere: <b style="color:var(--text2)">TGT</b> = target yield (target revenue ÷ target leads), <b style="color:var(--text2)">ACT</b> = actual yield, <b style="color:var(--text2)">T vs A / ALL</b> = actual with target and the variance. Actual vs target is compared over the same months only. Colour: green = at/above target, amber = within 20% below, red = more than 20% below. Small arrows show the change vs the previous ${YIELD_GRAN==='q'?'quarter':'month'} (in ACT / TGT view). Sub-brand rows have no target of their own. Respects the filters above (Cat, Fuel, Client, BTL, Zeros); CC contract accounts are not part of this view.</div>`;
 
   const _sy=window.scrollY;
   el.innerHTML=html;
@@ -5684,13 +5719,18 @@ function _yieldChart(M,per){
   if(!ctx||typeof Chart==='undefined')return;
   dc('yld-chart');
   const base=CO();
-  const series=o=>per.map(p=>{const y=_yAgg(o,p.idx).y;return y==null||!isFinite(y)?null:+y.toFixed(2);});
-  const mk=(label,o,color,dash)=>({label,data:series(o),borderColor:color,backgroundColor:color+'33',fill:false,tension:.3,pointRadius:4,pointHoverRadius:6,borderWidth:2,spanGaps:true,borderDash:dash||[]});
+  const mode=DISP_MODE;
+  const series=(o,key)=>per.map(p=>{const v=_yAgg(o,p.idx)[key];return v==null||!isFinite(v)?null:+v.toFixed(2);});
+  const mk=(label,o,key,color,dash,w)=>({label,data:series(o,key),borderColor:color,backgroundColor:color+'33',fill:false,tension:.3,pointRadius:dash?2:4,pointHoverRadius:6,borderWidth:w||2,spanGaps:true,borderDash:dash||[]});
+  const defs=[['CPS',M.groups[0],'#818cf8'],['Media Leads',M.groups[1],'#34d399'],['All programs',M.all,'#fb923c']];
+  const ds=[];
+  defs.forEach(([name,o,col])=>{
+    if(mode==='tgt')ds.push(mk(name+' (target)',o,'ty',col,[5,4]));
+    else if(mode==='act')ds.push(mk(name,o,'y',col));
+    else{ds.push(mk(name,o,'y',col));ds.push(mk(name+' (target)',o,'ty',col,[5,4],1.5));}
+  });
   CI['yld-chart']=new Chart(ctx,{type:'line',
-    data:{labels:per.map(p=>p.label),datasets:[
-      mk('CPS',M.groups[0],'#818cf8'),
-      mk('Media Leads',M.groups[1],'#34d399'),
-      mk('All programs',M.all,'#fb923c',[5,4])]},
+    data:{labels:per.map(p=>p.label),datasets:ds},
     options:{...base,maintainAspectRatio:false,
       plugins:{...base.plugins,tooltip:{callbacks:{label:c=>`${c.dataset.label}: ₹${c.parsed.y==null?'—':c.parsed.y.toLocaleString('en-IN')} / lead`}}},
       scales:{...base.scales,y:{...base.scales.y,ticks:{...base.scales.y.ticks,callback:v=>'₹'+v}}}}});
@@ -5701,9 +5741,9 @@ function exportYieldCSV(){
   const per=_yPeriods();
   const allIdx=Array.from({length:12},(_,i)=>i);
   const hdr=['Program','Account','Brand','BTL'];
-  per.forEach(p=>hdr.push(p.label+' Revenue(L)',p.label+' Leads',p.label+' Yield(Rs/lead)'));
-  hdr.push('FY Revenue(L)','FY Leads','FY Yield(Rs/lead)');
-  const trip=a=>[+a.r.toFixed(4),Math.round(a.l),a.y==null?'':+a.y.toFixed(2)];
+  per.forEach(p=>hdr.push(p.label+' Revenue(L)',p.label+' Leads',p.label+' Actual Yield(Rs/lead)',p.label+' Target Yield(Rs/lead)'));
+  hdr.push('FY Revenue(L)','FY Leads','FY Actual Yield(Rs/lead)','FY Target Yield(Rs/lead)');
+  const trip=a=>[+a.r.toFixed(4),Math.round(a.l),a.y==null?'':+a.y.toFixed(2),a.ty==null?'':+a.ty.toFixed(2)];
   const data=[];
   const push=(proc,acct,brand,btl,o)=>{
     const row=[proc,acct,brand,btl];
@@ -6220,7 +6260,7 @@ function _dailyBackupCheck(){
 
 // ── Version watcher — nudge users to hard-refresh when a new deploy is live ─
 function _startVersionWatch(){
-  if(!_fbDb || !DEPLOY_TIME || DEPLOY_TIME==='2026-11-17T09:58:43Z') return;
+  if(!_fbDb || !DEPLOY_TIME || DEPLOY_TIME==='2026-11-17T10:04:02Z') return;
   _fbDb.ref('meta/deployVersion').on('value', snap=>{
     const liveTs = snap.val();
     if(!liveTs) return;
