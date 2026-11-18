@@ -564,7 +564,7 @@ canvas{max-height:260px}
       <div class="brand-mark">🏍️</div>
       <div class="brand-text">
         <div class="t1">Bike AOP Tracker</div>
-        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.2.57</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 17/11/2026 12:16</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
+        <div class="t2"><span class="pill">FY27</span> Lead BU · Account P&amp;L <span class="pill" style="margin-left:4px;color:var(--accent)">v1.2.58</span> <span id="hdr-deployed" style="font-size:10px;color:var(--text3);margin-left:4px;opacity:.8">· Deployed 18/11/2026 11:55</span><span id="hdr-updated" style="font-size:10px;color:var(--text3);margin-left:2px"></span></div>
       </div>
     </div>
     <div class="hdr-right">
@@ -739,6 +739,7 @@ canvas{max-height:260px}
 <!-- VIEW TABS -->
 <div class="view-tabs">
   <div class="vtab active" data-v="fy"     onclick="setView('fy')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>FY Total</div>
+  <div class="vtab"        data-v="half"   onclick="setView('half')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Half-Yearly</div>
   <div class="vtab"        data-v="qtr"    onclick="setView('qtr')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Quarterly</div>
   <div class="vtab"        data-v="mon"    onclick="setView('mon')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="9" y1="4" x2="9" y2="22"/><line x1="15" y1="4" x2="15" y2="22"/></svg>Monthly</div>
   <div class="vtab"        data-v="charts" onclick="setView('charts')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>Charts</div>
@@ -873,7 +874,7 @@ function oemBadge(client){
 }
 
 const ACT_KEY='leadbu_actuals_fy27_v2';
-const DEPLOY_TIME='2026-11-17T12:16:06Z'; // replaced with ISO timestamp at deploy time
+const DEPLOY_TIME='2026-11-18T11:55:33Z'; // replaced with ISO timestamp at deploy time
 let ACTUALS=TARGETS.map(()=>newActualRec()); // populated by Firebase onValue
 
 function newActualRec(){
@@ -1811,7 +1812,7 @@ function updateLastSaved(isoStr){
 }
 function showDeployTime(){
   const el=document.getElementById('hdr-deployed');
-  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-11-17T12:16:06Z')return;
+  if(!el||!DEPLOY_TIME||DEPLOY_TIME==='2026-11-18T11:55:33Z')return;
   try{
     const d=new Date(DEPLOY_TIME);
     const pad=n=>String(n).padStart(2,'0');
@@ -2211,8 +2212,8 @@ function buildPeriodBar(){
     pb.appendChild(exportBtn);
     return;
   }
-  const labels=VIEW==='mon'?MONTHS:QTRS.map(q=>q+' FY27');
-  pb.innerHTML=`<span style="font-size:10px;color:var(--text2);margin-right:4px">${VIEW==='mon'?'Month:':'Quarter:'}</span>`;
+  const labels=VIEW==='mon'?MONTHS:VIEW==='half'?HALVES.map((h,i)=>h+' FY27 ('+HALF_SUB[i]+')'):QTRS.map(q=>q+' FY27');
+  pb.innerHTML=`<span style="font-size:10px;color:var(--text2);margin-right:4px">${VIEW==='mon'?'Month:':VIEW==='half'?'Half:':'Quarter:'}</span>`;
   labels.forEach((l,i)=>{
     const ch=document.createElement('span');ch.className='pchip'+(i===PERIOD?' active':'');ch.textContent=l;
     ch.onclick=()=>{PERIOD=i;pb.querySelectorAll('.pchip').forEach((c,j)=>c.classList.toggle('active',j===i));render();};
@@ -2230,26 +2231,29 @@ const pct=(a,b)=>b?a/b*100:0;
 const pc=v=>v>=60?'pct-hi':v>=40?'pct-mid':'pct-lo';
 const fmtC=(v,dec)=>dec===0?Math.round(v).toLocaleString('en-IN'):fmt(v,Math.max(dec,2));
 
+// Half-year view: field==='half', idx 0=H1 (Q1+Q2), 1=H2 (Q3+Q4) — sums the quarter arrays
+const HALVES=['H1','H2'], HALF_SUB=['Q1+Q2 · Apr–Sep','Q3+Q4 · Oct–Mar'];
+const _qv=(arr,field,idx)=>field==='half'?((+(arr&&arr[idx*2])||0)+(+(arr&&arr[idx*2+1])||0)):(arr?arr[idx]:0);
 // Get period values from target and derived actual
 function getPeriodVals(t,d,field,idx){
   // target values
-  const tRev=field==='fy'?t.rev.fy:field==='monthly'?t.rev.monthly[idx]:t.rev.qtrs[idx];
-  const tMktg=field==='fy'?t.mktg.fy:field==='monthly'?t.mktg.monthly[idx]:t.mktg.qtrs[idx];
-  const tCC=field==='fy'?t.cc.fy:field==='monthly'?t.cc.monthly[idx]:t.cc.qtrs[idx];
+  const tRev=field==='fy'?t.rev.fy:field==='monthly'?t.rev.monthly[idx]:_qv(t.rev.qtrs,field,idx);
+  const tMktg=field==='fy'?t.mktg.fy:field==='monthly'?t.mktg.monthly[idx]:_qv(t.mktg.qtrs,field,idx);
+  const tCC=field==='fy'?t.cc.fy:field==='monthly'?t.cc.monthly[idx]:_qv(t.cc.qtrs,field,idx);
   // TGT leads from Excel are in Lacs → ×100000 for absolute display
-  const tLeads=(field==='fy'?t.leads.fy:field==='monthly'?t.leads.monthly[idx]:t.leads.qtrs[idx])*100000;
+  const tLeads=(field==='fy'?t.leads.fy:field==='monthly'?t.leads.monthly[idx]:_qv(t.leads.qtrs,field,idx))*100000;
   const tGM=tRev-tMktg,tGPM=tGM-tCC;
   // LY values
-  const lyRev=field==='fy'?t.rev.fy_smly:field==='monthly'?t.rev.smly[idx]:(t.rev.sqly?t.rev.sqly[idx]:0);
-  const lyMktg=field==='fy'?t.mktg.fy_smly:field==='monthly'?t.mktg.smly[idx]:(t.mktg.sqly?t.mktg.sqly[idx]:0);
-  const lyCC=field==='fy'?t.cc.fy_smly:field==='monthly'?t.cc.smly[idx]:(t.cc.sqly?t.cc.sqly[idx]:0);
-  const lyLeads=(field==='fy'?t.leads.fy_smly:field==='monthly'?t.leads.smly[idx]:(t.leads.sqly?t.leads.sqly[idx]:0))*100000;
+  const lyRev=field==='fy'?t.rev.fy_smly:field==='monthly'?t.rev.smly[idx]:(t.rev.sqly?_qv(t.rev.sqly,field,idx):0);
+  const lyMktg=field==='fy'?t.mktg.fy_smly:field==='monthly'?t.mktg.smly[idx]:(t.mktg.sqly?_qv(t.mktg.sqly,field,idx):0);
+  const lyCC=field==='fy'?t.cc.fy_smly:field==='monthly'?t.cc.smly[idx]:(t.cc.sqly?_qv(t.cc.sqly,field,idx):0);
+  const lyLeads=(field==='fy'?t.leads.fy_smly:field==='monthly'?t.leads.smly[idx]:(t.leads.sqly?_qv(t.leads.sqly,field,idx):0))*100000;
   const lyGM=lyRev-lyMktg,lyGPM=lyGM-lyCC;
   // actual derived
-  const aRev=field==='fy'?d.rev_fy:field==='monthly'?d.rev[idx]:d.rev_q[idx];
-  const aMktg=field==='fy'?d.mktg_fy:field==='monthly'?d.mktg_cost[idx]:d.mktg_q[idx];
-  const aCC=field==='fy'?d.cc_fy:field==='monthly'?d.cc[idx]:d.cc_q[idx];
-  const aLeads=field==='fy'?d.trig_fy:field==='monthly'?d.trig_leads[idx]:d.trig_q[idx];
+  const aRev=field==='fy'?d.rev_fy:field==='monthly'?d.rev[idx]:_qv(d.rev_q,field,idx);
+  const aMktg=field==='fy'?d.mktg_fy:field==='monthly'?d.mktg_cost[idx]:_qv(d.mktg_q,field,idx);
+  const aCC=field==='fy'?d.cc_fy:field==='monthly'?d.cc[idx]:_qv(d.cc_q,field,idx);
+  const aLeads=field==='fy'?d.trig_fy:field==='monthly'?d.trig_leads[idx]:_qv(d.trig_q,field,idx);
   const aGM=aRev-aMktg,aGPM=aGM-aCC;
   return {
     tgt:{rev:tRev,mktg:tMktg,gm:tGM,gm_pct:pct(tGM,tRev),cc:tCC,gpm:tGPM,gpm_pct:pct(tGPM,tRev),leads:tLeads},
@@ -2263,25 +2267,26 @@ function getPeriodVals(t,d,field,idx){
 // ═══════════════════════════
 function updateKPIs(rows){
   // Determine current period slice for KPI bar (mirrors render() logic)
-  const isQtr=VIEW==='qtr', isMon=VIEW==='mon';
-  const periodLabel=isQtr?(QTRS[PERIOD]+' FY27'):isMon?MONTHS[PERIOD]:'FY27';
+  const isQtr=VIEW==='qtr', isMon=VIEW==='mon', isHalf=VIEW==='half';
+  const _kf=isHalf?'half':'qtrs';
+  const periodLabel=isHalf?(HALVES[PERIOD]+' FY27'):isQtr?(QTRS[PERIOD]+' FY27'):isMon?MONTHS[PERIOD]:'FY27';
 
   // TGT: period-aware
   const sumT=(m)=>rows.reduce((s,{t})=>{
-    const v=isQtr?t[m].qtrs[PERIOD]:isMon?t[m].monthly[PERIOD]:t[m].fy;
+    const v=(isQtr||isHalf)?_qv(t[m].qtrs,_kf,PERIOD):isMon?t[m].monthly[PERIOD]:t[m].fy;
     return s+(v||0);
   },0);
   // LY: period-aware (sqly=quarterly LY, smly=monthly LY, fy_smly=annual LY)
   const sumLY=(m)=>rows.reduce((s,{t})=>{
-    const v=isQtr?(t[m].sqly?t[m].sqly[PERIOD]:0):isMon?(t[m].smly?t[m].smly[PERIOD]:0):t[m].fy_smly;
+    const v=(isQtr||isHalf)?(t[m].sqly?_qv(t[m].sqly,_kf,PERIOD):0):isMon?(t[m].smly?t[m].smly[PERIOD]:0):t[m].fy_smly;
     return s+(v||0);
   },0);
   // ACT: period-aware
   const sumA=(m)=>rows.reduce((s,{d})=>{
-    if(m==='rev') return s+(isQtr?d.rev_q[PERIOD]:isMon?d.rev[PERIOD]:d.rev_fy);
-    if(m==='mktg')return s+(isQtr?d.mktg_q[PERIOD]:isMon?d.mktg_cost[PERIOD]:d.mktg_fy);
-    if(m==='cc')  return s+(isQtr?d.cc_q[PERIOD]:isMon?d.cc[PERIOD]:d.cc_fy);
-    if(m==='leads')return s+(isQtr?d.trig_q[PERIOD]:isMon?d.trig_leads[PERIOD]:d.trig_fy);
+    if(m==='rev') return s+((isQtr||isHalf)?_qv(d.rev_q,_kf,PERIOD):isMon?d.rev[PERIOD]:d.rev_fy);
+    if(m==='mktg')return s+((isQtr||isHalf)?_qv(d.mktg_q,_kf,PERIOD):isMon?d.mktg_cost[PERIOD]:d.mktg_fy);
+    if(m==='cc')  return s+((isQtr||isHalf)?_qv(d.cc_q,_kf,PERIOD):isMon?d.cc[PERIOD]:d.cc_fy);
+    if(m==='leads')return s+((isQtr||isHalf)?_qv(d.trig_q,_kf,PERIOD):isMon?d.trig_leads[PERIOD]:d.trig_fy);
     return s;
   },0);
 
@@ -2441,14 +2446,14 @@ function metricCells(vals, mode, showLY, mkey, isPct, intFmt){
 
 function buildSubRow(rows,field,idx,mode,showLY,metricsArr){
   metricsArr=metricsArr||METRICS;
-  const sumT=(m)=>rows.reduce((s,{t})=>s+(field==='fy'?t[m].fy:field==='monthly'?t[m].monthly[idx]:t[m].qtrs[idx])||0,0);
+  const sumT=(m)=>rows.reduce((s,{t})=>s+(field==='fy'?t[m].fy:field==='monthly'?t[m].monthly[idx]:_qv(t[m].qtrs,field,idx))||0,0);
   const sumA=(m)=>rows.reduce((s,{d})=>{
-    if(m==='mktg')return s+(field==='fy'?d.mktg_fy:field==='monthly'?d.mktg_cost[idx]:d.mktg_q[idx])||0;
-    if(m==='leads')return s+(field==='fy'?d.trig_fy:field==='monthly'?d.trig_leads[idx]:d.trig_q[idx])||0;
-    if(m==='cc')return s+(field==='fy'?d.cc_fy:field==='monthly'?d.cc[idx]:d.cc_q[idx])||0;
-    return s+(field==='fy'?d.rev_fy:field==='monthly'?d.rev[idx]:d.rev_q[idx])||0;
+    if(m==='mktg')return s+(field==='fy'?d.mktg_fy:field==='monthly'?d.mktg_cost[idx]:_qv(d.mktg_q,field,idx))||0;
+    if(m==='leads')return s+(field==='fy'?d.trig_fy:field==='monthly'?d.trig_leads[idx]:_qv(d.trig_q,field,idx))||0;
+    if(m==='cc')return s+(field==='fy'?d.cc_fy:field==='monthly'?d.cc[idx]:_qv(d.cc_q,field,idx))||0;
+    return s+(field==='fy'?d.rev_fy:field==='monthly'?d.rev[idx]:_qv(d.rev_q,field,idx))||0;
   },0);
-  const sumLY=(m)=>rows.reduce((s,{t})=>s+(field==='fy'?t[m].fy_smly:field==='monthly'?t[m].smly[idx]:(t[m].sqly?t[m].sqly[idx]:0))||0,0);
+  const sumLY=(m)=>rows.reduce((s,{t})=>s+(field==='fy'?t[m].fy_smly:field==='monthly'?t[m].smly[idx]:(t[m].sqly?_qv(t[m].sqly,field,idx):0))||0,0);
 
   const tR=sumT('rev'),tM=sumT('mktg'),tC=sumT('cc'),tL=sumT('leads')*100000; // Lacs→absolute
   const aR=sumA('rev'),aM=sumA('mktg'),aC2=sumA('cc'),aL=sumA('leads'); // already absolute
@@ -2508,6 +2513,7 @@ function render(){
 
   let field='fy',idx=0,label='FY27 Total';
   if(VIEW==='qtr'){field='qtrs';idx=PERIOD;label=QTRS[PERIOD]+' FY27';}
+  if(VIEW==='half'){field='half';idx=PERIOD;label=HALVES[PERIOD]+' FY27 ('+HALF_SUB[PERIOD]+')';}
   if(VIEW==='mon'){field='monthly';idx=PERIOD;label=MONTHS[PERIOD];}
 
   const cols=subCols(DISP_MODE,SHOW_LY);
@@ -4628,7 +4634,12 @@ function exportCSV(){
 
   // QTR or MON: single-period aggregated export
   let mIdxs,periodLabel,periodTag;
-  if(VIEW==='qtr'){
+  if(VIEW==='half'){
+    const h=PERIOD;
+    mIdxs=[0,1,2,3,4,5].map(x=>h*6+x);
+    periodLabel='H'+(h+1)+' '+['Apr-Sep','Oct-Mar'][h];
+    periodTag='tracker_H'+(h+1);
+  } else if(VIEW==='qtr'){
     const q=PERIOD;
     mIdxs=[q*3,q*3+1,q*3+2];
     periodLabel='Q'+(q+1)+' '+['Apr-Jun','Jul-Sep','Oct-Dec','Jan-Mar'][q];
@@ -6265,7 +6276,7 @@ function _dailyBackupCheck(){
 
 // ── Version watcher — nudge users to hard-refresh when a new deploy is live ─
 function _startVersionWatch(){
-  if(!_fbDb || !DEPLOY_TIME || DEPLOY_TIME==='2026-11-17T12:16:06Z') return;
+  if(!_fbDb || !DEPLOY_TIME || DEPLOY_TIME==='2026-11-18T11:55:33Z') return;
   _fbDb.ref('meta/deployVersion').on('value', snap=>{
     const liveTs = snap.val();
     if(!liveTs) return;
